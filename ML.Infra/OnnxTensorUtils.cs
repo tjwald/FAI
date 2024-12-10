@@ -40,7 +40,7 @@ public static class OnnxTensorUtils
         return tensor;
     }
 
-    public static OrtValue[] ToOrtValues(this Span<Memory<long>> inputs, long[] dims)
+    public static OrtValue[] ToOrtValues<T>(this Span<Memory<T>> inputs, long[] dims) where T : unmanaged
     {
         var inputsOrts = new OrtValue[inputs.Length];
         for (int i = 0; i < inputs.Length; i++)

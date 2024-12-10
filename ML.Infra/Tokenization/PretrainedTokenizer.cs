@@ -3,9 +3,9 @@ using Microsoft.ML.Tokenizers;
 
 namespace ML.Infra.Tokenization;
 
-public record PretrainedTokenizerOptions(long PaddingToken, int MaxTokenLength = 512);
+public record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
 
-public readonly record struct BatchTokenizedResult(long[,] Tokens, long[,] Mask)
+public readonly record struct BatchTokenizedResult(int[,] Tokens, int[,] Mask)
 {
     public int BatchSize => Tokens.GetLength(0);
     public int MaxTokenCount => Tokens.GetLength(1);
@@ -36,15 +36,16 @@ public class PretrainedTokenizer
             }
         }
 
-        long[,] tokenization = new long[inputs.Length, maxTokenSize];
-        Span2D<long> tokenization2DSpan = tokenization.AsSpan2D();
+        int[,] tokenization = new int[inputs.Length, maxTokenSize];
+        Span2D<int> tokenization2DSpan = tokenization.AsSpan2D();
 
-        long[,] mask = new long[inputs.Length, maxTokenSize];
-        Span2D<long> mask2DSpan = tokenization.AsSpan2D();
+        int[,] mask = new int[inputs.Length, maxTokenSize];
+        Span2D<int> mask2DSpan = tokenization.AsSpan2D();
         for (int i = 0; i < inputs.Length; i++)
         {
             IReadOnlyCollection<int> tokenizedInput = tokenizedInputs[i];
-            Span<long> tokenizationRow = tokenization2DSpan.GetRowSpan(i);
+            Span<int> tokenizationRow = tokenization2DSpan.GetRowSpan(i);
+            
             foreach ((int j, int tokenId) in tokenizedInput.Index())
             {
                 tokenizationRow[j] = tokenId;
@@ -55,7 +56,7 @@ public class PretrainedTokenizer
                 tokenizationRow[tokenizedInput.Count..].Fill(_tokenizerOptions.PaddingToken);
             }
             
-            Span<long> maskRow = mask2DSpan.GetRowSpan(i);
+            Span<int> maskRow = mask2DSpan.GetRowSpan(i);
             maskRow[..tokenizedInput.Count].Fill(1);
             // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
         }

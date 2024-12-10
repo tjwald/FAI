@@ -33,7 +33,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
 
     protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
     {
-        Span<Memory<long>> modelInputs = [tokenizedResult.Tokens.AsMemory(), tokenizedResult.Mask.AsMemory()];
+        Span<Memory<int>> modelInputs = [tokenizedResult.Tokens.AsMemory(), tokenizedResult.Mask.AsMemory()];
         return await _modelRunner.RunAsync(modelInputs.ToOrtValues([tokenizedResult.BatchSize, tokenizedResult.MaxTokenCount]));
     }
 
