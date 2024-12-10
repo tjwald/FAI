@@ -3,9 +3,9 @@ using System.Text.Json;
 
 namespace ML.Infra.Tokenization;
 
-public class TokenizationUtils
+public static class TokenizationUtils
 {
-    public static async Task<PretrainedTokenizer> BPETokenizerFromPretrained(string path, PretrainedTokenizerOptions tokenizerOptions)
+    public static async Task<PretrainedTokenizer> BpeTokenizerFromPretrained(string path, PretrainedTokenizerOptions tokenizerOptions)
     {
         var streamVocab = File.OpenRead(Path.Combine(path, "vocab.json"));
         var streamMerges = File.OpenRead(Path.Combine(path, "merges.txt"));

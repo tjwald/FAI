@@ -41,11 +41,12 @@ public class ModelRunner
 
     public async Task<IDisposableReadOnlyCollection<OrtValue>> RunAsync(OrtValue[] inputs)
     {
-        var result = await Task.Run(() => _session.Run(_runOptions, _session.InputNames, inputs, _session.OutputNames)).ConfigureAwait(false);
+        IDisposableReadOnlyCollection<OrtValue>? result = await Task.Run(
+            () => _session.Run(_runOptions, _session.InputNames, inputs, _session.OutputNames)).ConfigureAwait(false);
 
-        for (int i = 0; i < inputs.Length; i++)
+        foreach (var input in inputs)
         {
-            inputs[i].Dispose();
+            input.Dispose();
         }
         return result;
     }

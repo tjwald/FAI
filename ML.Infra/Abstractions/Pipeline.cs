@@ -1,47 +1,40 @@
 ﻿namespace ML.Infra.Abstractions;
 
-public abstract class Pipeline<TInput, TOutput, TPreprocess, TBatchPreprocess, TModelOutput>
-{
-    private readonly int _optimalBatchSize;
 
-    protected Pipeline(int optimalBatchSize)
+public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>
+{
+    private readonly IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> _executor;
+
+    protected Pipeline(IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> executor)
     {
-        _optimalBatchSize = optimalBatchSize;
+        _executor = executor;
     }
 
     public async Task<TOutput> Predict(TInput input)
     {
-        return (await BatchPredict([input]))[0];
+        TInput[] inputArr = [input];
+        return (await BatchPredict(inputArr))[0];
     }
 
-    public async Task<TOutput[]> BatchPredict(TInput[] inputs)
+    public async Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> inputs)
     {
-        //Stopwatch stopwatch = Stopwatch.StartNew();
-        TBatchPreprocess preprocesses = await Preprocess(inputs);
-        //stopwatch.Stop();
-        //Console.WriteLine($"Preprocessing: {stopwatch.Elapsed}");
+        var outputs = new TOutput[inputs.Length];
+        Memory<TOutput> outputSpan = outputs.AsMemory();
 
+        await _executor.ExecuteBatchPredict(this, inputs, outputSpan);
 
-        TOutput[] outputs = new TOutput[inputs.Length];
-        int i = 0;
-        //stopwatch.Restart();
-        foreach (var (batchSize, preprocessBatch) in BatchPreprocesses(preprocesses, _optimalBatchSize))
-        {
-            var inputsSlice = inputs.AsMemory(i, batchSize);
-            TModelOutput modelOutput = await RunModel(inputsSlice, preprocessBatch);
-            PostProcess(inputsSlice.Span, preprocessBatch, modelOutput, outputs.AsSpan(i, batchSize));
-            i += batchSize;
-
-        }
-        //stopwatch.Stop();
-        //Console.WriteLine($"Processing: {stopwatch.Elapsed}");
         return outputs;
     }
 
-    protected abstract ValueTask<TBatchPreprocess> Preprocess(ReadOnlyMemory<TInput> input);
+    internal async Task ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs)
+    {
+        var preprocess = Preprocess(inputs.Span);
+        var modelOutput = await RunModel(inputs, preprocess);
+        PostProcess(inputs.Span, preprocess, modelOutput, outputs.Span);
+    }
 
-    protected abstract IEnumerable<(int, TPreprocess)> BatchPreprocesses(TBatchPreprocess preprocesses, int batchSize);
-
+    protected abstract TPreprocess Preprocess(ReadOnlySpan<TInput> input);
+    
     protected abstract Task<TModelOutput> RunModel(ReadOnlyMemory<TInput> input, TPreprocess preprocesses);
     protected abstract void PostProcess(ReadOnlySpan<TInput> inputs, TPreprocess preprocesses, TModelOutput modelOutput, Span<TOutput> outputs);
 }
