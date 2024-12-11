@@ -1,23 +1,24 @@
 ﻿using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
+using ML.Infra.Abstractions;
 
-namespace ML.Infra;
+namespace ML.Infra.ModelExecutors.Onnx;
 
 
-public record OnnxModelRunerOptions(
+public record OnnxModelExecutorOptions(
     RunOptions? RunOptions = null,
     ExecutionMode ExecutionMode = ExecutionMode.ORT_SEQUENTIAL,
     bool UseGpu = true);
 
 
-public class ModelRunner
+public class OnnxModelExecutor: IModelExecutor<int, float>
 {
     private readonly InferenceSession _session;
     private readonly RunOptions _runOptions;
 
-    public ModelRunner(InferenceSession session) : this(session, new RunOptions()) { }
+    public OnnxModelExecutor(InferenceSession session) : this(session, new RunOptions()) { }
 
-    public ModelRunner(InferenceSession session, RunOptions runOptions)
+    public OnnxModelExecutor(InferenceSession session, RunOptions runOptions)
     {
         _session = session;
         _runOptions = runOptions;
@@ -89,7 +90,7 @@ public class ModelRunner
         return dims;
     }
 
-    public static async Task<ModelRunner> FromPretrained(string modelDir, OnnxModelRunerOptions options)
+    public static async Task<OnnxModelExecutor> FromPretrained(string modelDir, OnnxModelExecutorOptions options)
     {
         SessionOptions sessionOptions = new();
         if (options.UseGpu)
@@ -105,6 +106,6 @@ public class ModelRunner
 
         var session = await Task.Run(() => new InferenceSession(Path.Combine(modelDir, "model.onnx"), sessionOptions));
 
-        return new ModelRunner(session, options.RunOptions ?? new RunOptions());
+        return new OnnxModelExecutor(session, options.RunOptions ?? new RunOptions());
     }
 }

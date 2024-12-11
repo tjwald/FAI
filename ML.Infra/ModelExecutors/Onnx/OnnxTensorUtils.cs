@@ -2,7 +2,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
-namespace ML.Infra;
+namespace ML.Infra.ModelExecutors.Onnx;
 
 public static class OnnxTensorUtils
 {

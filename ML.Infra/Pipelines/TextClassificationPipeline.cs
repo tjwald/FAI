@@ -1,11 +1,6 @@
-﻿using Microsoft.ML.OnnxRuntime;
-using System.Numerics.Tensors;
-using System.Runtime.InteropServices;
-using CommunityToolkit.HighPerformance;
-using ML.Infra.Tokenization;
+﻿using System.Numerics.Tensors;
 using ML.Infra.Abstractions;
-using MemoryExtensions = System.MemoryExtensions;
-
+using ML.Infra.Tokenization;
 
 namespace ML.Infra.Pipelines;
 
@@ -16,15 +11,15 @@ public record TextClassificationOptions<TClassification>(TClassification[] Choic
 public class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
-    private readonly ModelRunner _modelRunner;
+    private readonly IModelExecutor<int, float> _modelExecutor;
     private readonly TextClassificationOptions<TClassification> _pipeLineOptions;
 
-    public TextClassificationPipeline(PretrainedTokenizer tokenizer, ModelRunner modelRunner,
+    public TextClassificationPipeline(PretrainedTokenizer tokenizer, IModelExecutor<int, float> modelExecutor,
         TextClassificationOptions<TClassification> textClassificationOptions,
         IPipelineBatchExecutor<string, ClassificationResult<TClassification>> executor) : base(executor)
     {
         _tokenizer = tokenizer;
-        _modelRunner = modelRunner;
+        _modelExecutor = modelExecutor;
         _pipeLineOptions = textClassificationOptions;
     }
 
@@ -35,7 +30,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
 
     protected override async Task<Tensor<float>[]> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
     {
-        return await _modelRunner.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
+        return await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
     }
 
     protected override void PostProcess(ReadOnlySpan<string> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelResult, Span<ClassificationResult<TClassification>> outputs)
@@ -56,16 +51,5 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
         int argmax = TensorPrimitives.IndexOfMax(probabilities);
         float score = TensorPrimitives.Max(probabilities);
         return new ClassificationResult<TClassification>(_pipeLineOptions.Choices[argmax], score, logits.ToArray());
-    }
-
-    public static async Task<TextClassificationPipeline<TClassification>> FromPretrained(string modelDir,
-        TextClassificationOptions<TClassification> textClassificationOptions, PretrainedTokenizerOptions tokenizerOptions,
-        OnnxModelRunerOptions modelRunnerOptions,
-        IPipelineBatchExecutor<string, ClassificationResult<TClassification>> executor)
-    {
-        Task<PretrainedTokenizer> tokenizer = TokenizationUtils.BpeTokenizerFromPretrained(modelDir, tokenizerOptions);
-        Task<ModelRunner> modelRunner = ModelRunner.FromPretrained(modelDir, modelRunnerOptions);
-        await Task.WhenAll(tokenizer, modelRunner);
-        return new TextClassificationPipeline<TClassification>(tokenizer.Result, modelRunner.Result, textClassificationOptions, executor);
     }
 }
