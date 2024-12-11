@@ -1,7 +1,7 @@
 ﻿namespace ML.Infra.Abstractions;
 
-public interface IInference<in TInput, TOutput>
+public interface IInference<TInput, TOutput>
 {
     Task<TOutput> Predict(TInput input);
-    Task<TOutput[]> BatchPredict(TInput[] input);
+    Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> input);
 }

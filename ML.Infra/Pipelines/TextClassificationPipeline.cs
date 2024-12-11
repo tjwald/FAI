@@ -12,7 +12,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<int, float> _modelExecutor;
-    private readonly TextClassificationOptions<TClassification> _pipeLineOptions;
+    private readonly TextClassificationOptions<TClassification> _pipelineOptions;
 
     public TextClassificationPipeline(PretrainedTokenizer tokenizer, IModelExecutor<int, float> modelExecutor,
         TextClassificationOptions<TClassification> textClassificationOptions,
@@ -20,7 +20,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
     {
         _tokenizer = tokenizer;
         _modelExecutor = modelExecutor;
-        _pipeLineOptions = textClassificationOptions;
+        _pipelineOptions = textClassificationOptions;
     }
 
     protected override BatchTokenizedResult Preprocess(ReadOnlySpan<string> input)
@@ -50,6 +50,6 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
         TensorPrimitives.SoftMax(logits, probabilities);
         int argmax = TensorPrimitives.IndexOfMax(probabilities);
         float score = TensorPrimitives.Max(probabilities);
-        return new ClassificationResult<TClassification>(_pipeLineOptions.Choices[argmax], score, logits.ToArray());
+        return new ClassificationResult<TClassification>(_pipelineOptions.Choices[argmax], score, logits.ToArray());
     }
 }

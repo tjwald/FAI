@@ -119,7 +119,7 @@ public class InferenceOrchestrator<TInference, TQuery, TResult> : IInference<TQu
         return requests;
     }
 
-    public Task<TResult[]> BatchPredict(TQuery[] input) => _modelInstance.Value.BatchPredict(input);
+    public Task<TResult[]> BatchPredict(ReadOnlyMemory<TQuery> input) => _modelInstance.Value.BatchPredict(input);
 }
 
 

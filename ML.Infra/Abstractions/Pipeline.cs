@@ -1,11 +1,5 @@
 ﻿namespace ML.Infra.Abstractions;
 
-public interface IPipeline<TInput, TOutput>
-{
-    Task ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs);
-}
-
-
 public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPipeline<TInput, TOutput>
 {
     private readonly IPipelineBatchExecutor<TInput, TOutput> _executor;
