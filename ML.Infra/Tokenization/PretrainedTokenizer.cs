@@ -1,14 +1,18 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Buffers;
+using System.Numerics.Tensors;
+using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
 using Microsoft.ML.Tokenizers;
+using MemoryExtensions = System.MemoryExtensions;
 
 namespace ML.Infra.Tokenization;
 
 public record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
 
-public readonly record struct BatchTokenizedResult(int[,] Tokens, int[,] Mask)
+public readonly record struct BatchTokenizedResult(Tensor<int> Tokens, Tensor<int> Mask)
 {
-    public int BatchSize => Tokens.GetLength(0);
-    public int MaxTokenCount => Tokens.GetLength(1);
+    public int BatchSize => (int)Tokens.Lengths[0];
+    public int MaxTokenCount => (int)Tokens.Lengths[1];
 }
 
 public class PretrainedTokenizer
@@ -36,28 +40,28 @@ public class PretrainedTokenizer
             }
         }
 
-        int[,] tokenization = new int[inputs.Length, maxTokenSize];
-        Span2D<int> tokenization2DSpan = tokenization.AsSpan2D();
+        Tensor<int> tokenization = Tensor.Create<int>([inputs.Length, maxTokenSize]);
+        TensorSpan<int> tokenizationSpan = tokenization.AsTensorSpan();
 
-        int[,] mask = new int[inputs.Length, maxTokenSize];
-        Span2D<int> mask2DSpan = tokenization.AsSpan2D();
+        Tensor<int> mask = Tensor.Create<int>([inputs.Length, maxTokenSize]);
+        TensorSpan<int> maskSpan = tokenization.AsTensorSpan();
         for (int i = 0; i < inputs.Length; i++)
         {
+            Span<int> tokenizationRowSpan = tokenizationSpan.GetRowSpan(i);
+            Span<int> maskRowSpan = maskSpan.GetRowSpan(i);
             IReadOnlyCollection<int> tokenizedInput = tokenizedInputs[i];
-            Span<int> tokenizationRow = tokenization2DSpan.GetRowSpan(i);
             
             foreach ((int j, int tokenId) in tokenizedInput.Index())
             {
-                tokenizationRow[j] = tokenId;
+                tokenizationRowSpan[j] = tokenId;
             }
 
             if (_tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
             {
-                tokenizationRow[tokenizedInput.Count..].Fill(_tokenizerOptions.PaddingToken);
+                tokenizationRowSpan[tokenizedInput.Count..].Fill(_tokenizerOptions.PaddingToken);
             }
             
-            Span<int> maskRow = mask2DSpan.GetRowSpan(i);
-            maskRow[..tokenizedInput.Count].Fill(1);
+            maskRowSpan[..tokenizedInput.Count].Fill(1);
             // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
         }
 

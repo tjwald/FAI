@@ -2,7 +2,7 @@
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct ParallelPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> : IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput>
+public readonly struct ParallelPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private readonly int _maxBatchSize;
     private readonly int _maxConcurrency;
@@ -13,7 +13,7 @@ public readonly struct ParallelPipelineBatchExecutor<TInput, TOutput, TPreproces
         _maxConcurrency = maxConcurrency ?? 0;
     }
     
-    public async Task ExecuteBatchPredict(Pipeline<TInput, TOutput, TPreprocess, TModelOutput> pipeline, ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(IPipeline<TInput, TOutput> pipeline, ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputSpan)
     {
         int maxBatchSize = _maxBatchSize;
         int batchCount = inputs.Length / maxBatchSize;

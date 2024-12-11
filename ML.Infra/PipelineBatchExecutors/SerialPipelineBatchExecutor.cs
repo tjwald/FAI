@@ -2,7 +2,7 @@
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct SerialPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> : IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput>
+public readonly struct SerialPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private readonly int _maxBatchSize;
 
@@ -11,7 +11,7 @@ public readonly struct SerialPipelineBatchExecutor<TInput, TOutput, TPreprocess,
         _maxBatchSize = maxBatchSize;
     }
     
-    public async Task ExecuteBatchPredict(Pipeline<TInput, TOutput, TPreprocess, TModelOutput> pipeline, ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(IPipeline<TInput, TOutput> pipeline, ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputSpan)
     {
         int batchStartIndex = 0;
         for (; batchStartIndex < inputs.Length - _maxBatchSize; batchStartIndex += _maxBatchSize)

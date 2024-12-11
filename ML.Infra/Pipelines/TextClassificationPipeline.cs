@@ -1,8 +1,10 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using System.Numerics.Tensors;
+using System.Runtime.InteropServices;
 using CommunityToolkit.HighPerformance;
 using ML.Infra.Tokenization;
 using ML.Infra.Abstractions;
+using MemoryExtensions = System.MemoryExtensions;
 
 
 namespace ML.Infra.Pipelines;
@@ -11,7 +13,7 @@ namespace ML.Infra.Pipelines;
 public record ClassificationResult<T>(T Choice, float Score, IReadOnlyCollection<float> Logits);
 public record TextClassificationOptions<TClassification>(TClassification[] Choices);
 
-public class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, IDisposableReadOnlyCollection<OrtValue>>
+public class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly ModelRunner _modelRunner;
@@ -19,7 +21,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
 
     public TextClassificationPipeline(PretrainedTokenizer tokenizer, ModelRunner modelRunner,
         TextClassificationOptions<TClassification> textClassificationOptions,
-        IPipelineBatchExecutor<string,ClassificationResult<TClassification>,BatchTokenizedResult,IDisposableReadOnlyCollection<OrtValue>> executor) : base(executor)
+        IPipelineBatchExecutor<string, ClassificationResult<TClassification>> executor) : base(executor)
     {
         _tokenizer = tokenizer;
         _modelRunner = modelRunner;
@@ -31,23 +33,20 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
         return _tokenizer.BatchTokenize(input);
     }
 
-    protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
+    protected override async Task<Tensor<float>[]> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
     {
-        Span<Memory<int>> modelInputs = [tokenizedResult.Tokens.AsMemory(), tokenizedResult.Mask.AsMemory()];
-        return await _modelRunner.RunAsync(modelInputs.ToOrtValues([tokenizedResult.BatchSize, tokenizedResult.MaxTokenCount]));
+        return await _modelRunner.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
     }
 
-    protected override void PostProcess(ReadOnlySpan<string> inputs, BatchTokenizedResult preprocesses, IDisposableReadOnlyCollection<OrtValue> modelResult, Span<ClassificationResult<TClassification>> outputs)
+    protected override void PostProcess(ReadOnlySpan<string> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelResult, Span<ClassificationResult<TClassification>> outputs)
     {
-        var logits = modelResult[0].GetTensorDataAsSpan<float>().AsSpan2D(preprocesses.BatchSize, _pipeLineOptions.Choices.Length);
+        TensorSpan<float> logits = modelResult[0].AsTensorSpan();
 
-        for (int indexInBatch = 0; indexInBatch < logits.Height; indexInBatch++)
+        for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
         {
             ReadOnlySpan<float> rowLogits = logits.GetRowSpan(indexInBatch);
             outputs[indexInBatch] = GetClassificationResult(rowLogits);
         }
-
-        modelResult.Dispose();
     }
 
     private ClassificationResult<TClassification> GetClassificationResult(ReadOnlySpan<float> logits)
@@ -62,7 +61,7 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
     public static async Task<TextClassificationPipeline<TClassification>> FromPretrained(string modelDir,
         TextClassificationOptions<TClassification> textClassificationOptions, PretrainedTokenizerOptions tokenizerOptions,
         OnnxModelRunerOptions modelRunnerOptions,
-        IPipelineBatchExecutor<string,ClassificationResult<TClassification>,BatchTokenizedResult,IDisposableReadOnlyCollection<OrtValue>> executor)
+        IPipelineBatchExecutor<string, ClassificationResult<TClassification>> executor)
     {
         Task<PretrainedTokenizer> tokenizer = TokenizationUtils.BpeTokenizerFromPretrained(modelDir, tokenizerOptions);
         Task<ModelRunner> modelRunner = ModelRunner.FromPretrained(modelDir, modelRunnerOptions);

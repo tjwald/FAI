@@ -1,11 +1,16 @@
 ﻿namespace ML.Infra.Abstractions;
 
-
-public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>
+public interface IPipeline<TInput, TOutput>
 {
-    private readonly IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> _executor;
+    Task ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs);
+}
 
-    protected Pipeline(IPipelineBatchExecutor<TInput, TOutput, TPreprocess, TModelOutput> executor)
+
+public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPipeline<TInput, TOutput>
+{
+    private readonly IPipelineBatchExecutor<TInput, TOutput> _executor;
+
+    protected Pipeline(IPipelineBatchExecutor<TInput, TOutput> executor)
     {
         _executor = executor;
     }
@@ -13,7 +18,9 @@ public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>
     public async Task<TOutput> Predict(TInput input)
     {
         TInput[] inputArr = [input];
-        return (await BatchPredict(inputArr))[0];
+        var output = new TOutput[1];
+        await ((IPipeline<TInput, TOutput>)this).ProcessBatch(inputArr, output);
+        return output[0];
     }
 
     public async Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> inputs)
@@ -26,7 +33,7 @@ public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>
         return outputs;
     }
 
-    internal async Task ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs)
+    async Task IPipeline<TInput, TOutput>.ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs)
     {
         var preprocess = Preprocess(inputs.Span);
         var modelOutput = await RunModel(inputs, preprocess);

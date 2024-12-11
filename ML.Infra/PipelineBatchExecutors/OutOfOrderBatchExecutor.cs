@@ -4,18 +4,18 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct OutOfOrderBatchExecutor<TOutput, TPreprocess, TModelOutput> : IPipelineBatchExecutor<string, TOutput, TPreprocess, TModelOutput>
+public readonly struct OutOfOrderBatchExecutor<TOutput> : IPipelineBatchExecutor<string, TOutput>
 {
     private readonly Tokenizer _tokenizer;
-    private readonly IPipelineBatchExecutor<string, TOutput, TPreprocess, TModelOutput> _executor;
+    private readonly IPipelineBatchExecutor<string, TOutput> _executor;
 
-    public OutOfOrderBatchExecutor(Tokenizer tokenizer, IPipelineBatchExecutor<string, TOutput, TPreprocess, TModelOutput> executor)
+    public OutOfOrderBatchExecutor(Tokenizer tokenizer, IPipelineBatchExecutor<string, TOutput> executor)
     {
         _tokenizer = tokenizer;
         _executor = executor;
     }
 
-    public async Task ExecuteBatchPredict(Pipeline<string, TOutput, TPreprocess, TModelOutput> pipeline, ReadOnlyMemory<string> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(IPipeline<string, TOutput> pipeline, ReadOnlyMemory<string> inputs, Memory<TOutput> outputSpan)
     {
         ReadOnlySpan<string> inputSpan = inputs.Span;
         int[] inputsSortedIndices = Enumerable.Range(0, inputSpan.Length).ToArray();
