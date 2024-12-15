@@ -10,8 +10,9 @@
 
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0-preview2" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.20.1" />
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="1.0.0" />
-		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.20.0" />
+		<PackageReference Include="Scalar.AspNetCore" Version="1.2.56" />
 		<PackageReference Include="System.Linq.Async" Version="6.0.1" />
 		<PackageReference Include="System.Numerics.Tensors" Version="9.0.0" />
 

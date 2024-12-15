@@ -16,12 +16,12 @@ public static class TensorExtensions
 
     public static Memory<T> AsMemory<T>(this Tensor<T> tensor)
     {
-        return ExternalClassAccessor.GetValues(tensor).AsMemory();
+        return ExternalClassAccessor<T>.GetValues(tensor).AsMemory();
     }
 }
 
-file static class ExternalClassAccessor
+internal static class ExternalClassAccessor<T>
 {
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_values")]
-    public static extern T[] GetValues<T>(Tensor<T> instance);
+    public static extern ref T[] GetValues(Tensor<T> instance);
 }

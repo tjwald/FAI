@@ -11,10 +11,10 @@ public record TextClassificationOptions<TClassification>(TClassification[] Choic
 public class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
-    private readonly IModelExecutor<int, float> _modelExecutor;
+    private readonly IModelExecutor<long, float> _modelExecutor;
     private readonly TextClassificationOptions<TClassification> _pipelineOptions;
 
-    public TextClassificationPipeline(PretrainedTokenizer tokenizer, IModelExecutor<int, float> modelExecutor,
+    public TextClassificationPipeline(PretrainedTokenizer tokenizer, IModelExecutor<long, float> modelExecutor,
         TextClassificationOptions<TClassification> textClassificationOptions,
         IPipelineBatchExecutor<string, ClassificationResult<TClassification>> executor) : base(executor)
     {
@@ -48,8 +48,8 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
     {
         Span<float> probabilities = stackalloc float[logits.Length];
         TensorPrimitives.SoftMax(logits, probabilities);
-        int argmax = TensorPrimitives.IndexOfMax(probabilities);
-        float score = TensorPrimitives.Max(probabilities);
+        int argmax = TensorPrimitives.IndexOfMax<float>(probabilities);
+        float score = TensorPrimitives.Max<float>(probabilities);
         return new ClassificationResult<TClassification>(_pipelineOptions.Choices[argmax], score, logits.ToArray());
     }
 }

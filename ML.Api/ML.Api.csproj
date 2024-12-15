@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>ML.Api</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+        <PackageReference Include="Scalar.AspNetCore" Version="1.2.56" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Remove="ClassificationModelResources\tokenizer_config.json" />
+      <AdditionalFiles Include="ClassificationModelResources\tokenizer_config.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <Content Remove="ClassificationModelResources\vocab.json" />
+      <AdditionalFiles Include="ClassificationModelResources\vocab.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <None Remove="ClassificationModelResources\model.onnx" />
+      <AdditionalFiles Include="ClassificationModelResources\model.onnx">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <Content Remove="ClassificationModelResources\config.json" />
+      <AdditionalFiles Include="ClassificationModelResources\config.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <Content Remove="ClassificationModelResources\added_tokens.json" />
+      <AdditionalFiles Include="ClassificationModelResources\added_tokens.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <Content Remove="ClassificationModelResources\tokenizer.json" />
+      <AdditionalFiles Include="ClassificationModelResources\tokenizer.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <Content Remove="ClassificationModelResources\special_tokens_map.json" />
+      <AdditionalFiles Include="ClassificationModelResources\special_tokens_map.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+    </ItemGroup>
+</Project>

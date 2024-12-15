@@ -11,7 +11,7 @@ public record OnnxModelExecutorOptions(
     bool UseGpu = true);
 
 
-public class OnnxModelExecutor: IModelExecutor<int, float>
+public class OnnxModelExecutor: IModelExecutor<long, float>
 {
     private readonly InferenceSession _session;
     private readonly RunOptions _runOptions;
@@ -24,7 +24,7 @@ public class OnnxModelExecutor: IModelExecutor<int, float>
         _runOptions = runOptions;
     }
 
-    public async Task<Tensor<float>[]> RunAsync(Tensor<int>[] inputs)
+    public async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
     {
         OrtValue[] ortValues = GetModelInputs(inputs);
         
@@ -41,11 +41,11 @@ public class OnnxModelExecutor: IModelExecutor<int, float>
         return outTensors;
     }
 
-    private static OrtValue[] GetModelInputs(Tensor<int>[] inputs)
+    private static OrtValue[] GetModelInputs(Tensor<long>[] inputs)
     {
         long[] dims = GetInputDims(inputs);
 
-        Span<Memory<int>> modelInputs = GetInputsAsMemory(inputs);
+        Span<Memory<long>> modelInputs = GetInputsAsMemory(inputs);
 
         OrtValue[] ortValues = modelInputs.ToOrtValues(dims);
         return ortValues;
@@ -58,7 +58,10 @@ public class OnnxModelExecutor: IModelExecutor<int, float>
         {
             long[] outDims = result[i].GetTensorTypeAndShape().Shape!;
             nint[] outDimsAsNInts = new nint[outDims.Length];
-            outDims.CopyTo(outDimsAsNInts, 0);
+            for (int dim = 0; dim < outDims.Length; dim++)
+            {
+                outDimsAsNInts[dim] = (nint)outDims[dim];
+            }
 
             Tensor<float> outTensor = Tensor.Create<float>(outDimsAsNInts);
             result[i].GetTensorDataAsSpan<float>().CopyTo(outTensor.AsMemory().Span);
@@ -68,9 +71,9 @@ public class OnnxModelExecutor: IModelExecutor<int, float>
         return outTensors;
     }
 
-    private static Span<Memory<int>> GetInputsAsMemory(Tensor<int>[] inputs)
+    private static Span<Memory<long>> GetInputsAsMemory(Tensor<long>[] inputs)
     {
-        Span<Memory<int>> modelInputs = new Memory<int>[inputs.Length];
+        Span<Memory<long>> modelInputs = new Memory<long>[inputs.Length];
         for (int i = 0; i < modelInputs.Length; i++)
         {
             modelInputs[i] = inputs[i].AsMemory();
@@ -79,7 +82,7 @@ public class OnnxModelExecutor: IModelExecutor<int, float>
         return modelInputs;
     }
 
-    private static long[] GetInputDims(Tensor<int>[] inputs)
+    private static long[] GetInputDims(Tensor<long>[] inputs)
     {
         long[] dims = new long[inputs[0].Rank];
         for (int i = 0; i < inputs[0].Rank; i++)

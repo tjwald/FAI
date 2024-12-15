@@ -5,7 +5,7 @@ namespace ML.Infra.Tokenization;
 
 public record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
 
-public readonly record struct BatchTokenizedResult(Tensor<int> Tokens, Tensor<int> Mask)
+public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask)
 {
     public int BatchSize => (int)Tokens.Lengths[0];
     public int MaxTokenCount => (int)Tokens.Lengths[1];
@@ -36,15 +36,15 @@ public class PretrainedTokenizer
             }
         }
 
-        Tensor<int> tokenization = Tensor.Create<int>([inputs.Length, maxTokenSize]);
-        TensorSpan<int> tokenizationSpan = tokenization.AsTensorSpan();
+        Tensor<long> tokenization = Tensor.Create<long>([inputs.Length, maxTokenSize]);
+        TensorSpan<long> tokenizationSpan = tokenization.AsTensorSpan();
 
-        Tensor<int> mask = Tensor.Create<int>([inputs.Length, maxTokenSize]);
-        TensorSpan<int> maskSpan = tokenization.AsTensorSpan();
+        Tensor<long> mask = Tensor.Create<long>([inputs.Length, maxTokenSize]);
+        TensorSpan<long> maskSpan = mask.AsTensorSpan();
         for (int i = 0; i < inputs.Length; i++)
         {
-            Span<int> tokenizationRowSpan = tokenizationSpan.GetRowSpan(i);
-            Span<int> maskRowSpan = maskSpan.GetRowSpan(i);
+            Span<long> tokenizationRowSpan = tokenizationSpan.GetRowSpan(i);
+            Span<long> maskRowSpan = maskSpan.GetRowSpan(i);
             IReadOnlyCollection<int> tokenizedInput = tokenizedInputs[i];
             
             foreach ((int j, int tokenId) in tokenizedInput.Index())

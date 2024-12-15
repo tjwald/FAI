@@ -5,6 +5,8 @@ VisualStudioVersion = 17.12.35506.116 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Infra", "ML.Infra\ML.Infra.csproj", "{8ECD26BA-056C-4993-8943-CE27A9B3D013}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Api", "ML.Api\ML.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{8ECD26BA-056C-4993-8943-CE27A9B3D013}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8ECD26BA-056C-4993-8943-CE27A9B3D013}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8ECD26BA-056C-4993-8943-CE27A9B3D013}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
