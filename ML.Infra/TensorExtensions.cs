@@ -8,6 +8,7 @@ public static class TensorExtensions
 {
     public static Span<T> GetRowSpan<T>(this TensorSpan<T> tensor, int i)
     {
+        // Could be cool to have TensorSpan<T, N: 2> So that I don't need this check... 
         if (tensor.Lengths.Length != 2) throw new InvalidOperationException("tensor must have 2 dimensions");
         
         TensorSpan<T> tensorRow = tensor.Slice([i..(i+1), 0..]);
@@ -16,6 +17,7 @@ public static class TensorExtensions
 
     public static Memory<T> AsMemory<T>(this Tensor<T> tensor)
     {
+        // Would like this code to be safe!
         return ExternalClassAccessor<T>.GetValues(tensor).AsMemory();
     }
 }

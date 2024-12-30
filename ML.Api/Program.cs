@@ -1,25 +1,23 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.ML.OnnxRuntime;
 using ML.Infra;
 using ML.Infra.Abstractions;
 using ML.Infra.ModelExecutors.Onnx;
-using ML.Infra.PipelineBatchExecutors;
-using ML.Infra.Pipelines;
 using ML.Infra.Tokenization;
+using ML.SentimentInference;
 using Scalar.AspNetCore;
-using WebApplication1;
 
 var builder = WebApplication.CreateBuilder(args);
-
-string modelDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources");
-var tokenizerOptions = new PretrainedTokenizerOptions(0);
-
-var tokenizer = await TokenizationUtils.BpeTokenizerFromPretrained(modelDir, tokenizerOptions);
-var modelExecutor = await OnnxModelExecutor.FromPretrained(modelDir, new OnnxModelExecutorOptions(UseGpu:false));
-
-IPipelineBatchExecutor<string, ClassificationResult<bool>> executor = new SerialPipelineBatchExecutor<string, ClassificationResult<bool>>();
-
-var pipeline = new TextClassificationPipeline<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]), executor);
-var inference = new SentimentInference(pipeline);
+SentimentInferenceOptions options = new SentimentInferenceOptions(
+    ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
+    TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
+    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 2),
+    MaxConcurrency: 25,
+    BatchSize: 100,
+    UseOutOfOrderExecution: true,
+    ModelExecutorType: ModelExecutorType.Simple
+);
+var inference = await SentimentInferenceFactory.CreateSentimentInference(options);
 
 builder.Services.AddSingleton<IInference<string, bool>>(inference);
 builder.Services.AddKeyedSingleton<IInference<string, bool>>("orchestrated",
@@ -35,10 +33,10 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.MapPost("/predict", async ([FromBody]string sentence, IInference<string, bool> inference) 
+app.MapPost("/predict", async ([FromBody] string sentence, IInference<string, bool> inference)
     => await inference.Predict(sentence));
 
-app.MapPost("/predict-orchestrated", async ([FromBody]string sentence, [FromKeyedServices("orchestrated")]IInference<string, bool> inference) 
+app.MapPost("/predict-orchestrated", async ([FromBody] string sentence, [FromKeyedServices("orchestrated")] IInference<string, bool> inference)
     => await inference.Predict(sentence));
 
 app.Run();

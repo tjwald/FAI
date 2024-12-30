@@ -14,36 +14,24 @@
 
     <ItemGroup>
       <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
+      <ProjectReference Include="..\ML.SentimentInference\ML.SentimentInference.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Content Remove="ClassificationModelResources\tokenizer_config.json" />
-      <AdditionalFiles Include="ClassificationModelResources\tokenizer_config.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <Content Remove="ClassificationModelResources\vocab.json" />
-      <AdditionalFiles Include="ClassificationModelResources\vocab.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <None Remove="ClassificationModelResources\model.onnx" />
-      <AdditionalFiles Include="ClassificationModelResources\model.onnx">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <Content Remove="ClassificationModelResources\config.json" />
-      <AdditionalFiles Include="ClassificationModelResources\config.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <Content Remove="ClassificationModelResources\added_tokens.json" />
-      <AdditionalFiles Include="ClassificationModelResources\added_tokens.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <Content Remove="ClassificationModelResources\tokenizer.json" />
-      <AdditionalFiles Include="ClassificationModelResources\tokenizer.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
       <Content Remove="ClassificationModelResources\special_tokens_map.json" />
-      <AdditionalFiles Include="ClassificationModelResources\special_tokens_map.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AdditionalFiles>
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="ClassificationModelResources\added_tokens.json" />
+      <_ContentIncludedByDefault Remove="ClassificationModelResources\config.json" />
+      <_ContentIncludedByDefault Remove="ClassificationModelResources\special_tokens_map.json" />
+      <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer.json" />
+      <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer_config.json" />
     </ItemGroup>
 </Project>

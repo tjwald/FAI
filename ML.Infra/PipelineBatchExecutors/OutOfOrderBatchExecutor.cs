@@ -23,13 +23,13 @@ public readonly struct OutOfOrderBatchExecutor<TOutput> : IPipelineBatchExecutor
         
         var tokenComparer = new TokenCountComparer(_tokenizer);
         
-        MemoryExtensions.Sort<string, int>(inputsSorted, inputsSortedIndices, tokenComparer.Compare);
+        MemoryExtensions.Sort<string, int, TokenCountComparer>(inputsSorted, inputsSortedIndices, tokenComparer);
         await _executor.ExecuteBatchPredict(pipeline, inputsSorted, outputSpan);
-        MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span, (i1, i2) => i1.CompareTo(i2));
+        MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span);
     }
 }
 
-file readonly struct TokenCountComparer
+file readonly struct TokenCountComparer: IComparer<string>
 {
     private readonly Tokenizer _tokenizer;
     private readonly Dictionary<string, int> _counts;
@@ -40,8 +40,11 @@ file readonly struct TokenCountComparer
         _counts = new Dictionary<string, int>();
     }
 
-    public int Compare(string x, string y)
+    public int Compare(string? x, string? y)
     {
+        ArgumentNullException.ThrowIfNull(x);
+        ArgumentNullException.ThrowIfNull(y);
+        
         ref int xCount = ref CollectionsMarshal.GetValueRefOrAddDefault(_counts, x, out bool exists);
         if (!exists)
         {

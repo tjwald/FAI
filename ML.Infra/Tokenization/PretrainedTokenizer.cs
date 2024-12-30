@@ -22,6 +22,8 @@ public class PretrainedTokenizer
         _tokenizerOptions = tokenizerOptions;
     }
 
+    public Tokenizer Tokenizer => _tokenizer;
+    
     public BatchTokenizedResult BatchTokenize(ReadOnlySpan<string> inputs)
     {
         int maxTokenSize = 0;
@@ -36,7 +38,7 @@ public class PretrainedTokenizer
             }
         }
 
-        Tensor<long> tokenization = Tensor.Create<long>([inputs.Length, maxTokenSize]);
+        Tensor<long> tokenization = Tensor.Create<long>([inputs.Length, maxTokenSize]);  // would like to pool underlying array and use TensorMemory<T>
         TensorSpan<long> tokenizationSpan = tokenization.AsTensorSpan();
 
         Tensor<long> mask = Tensor.Create<long>([inputs.Length, maxTokenSize]);

@@ -1,5 +1,4 @@
-﻿using CommunityToolkit.HighPerformance;
-using Microsoft.ML.OnnxRuntime;
+﻿using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
@@ -17,27 +16,8 @@ public static class OnnxTensorUtils
                 values[i, j] = tensor[i, j];
             }
         }
+
         return values;
-    }
-
-    public static Tensor<T> ToTensor<T>(this Memory2D<T> memory2D)
-    {
-        ReadOnlySpan<int> dims = [memory2D.Height, memory2D.Width];
-        if (memory2D.TryGetMemory(out var memory))
-        {
-            return new DenseTensor<T>(memory, dims);
-        }
-
-        var tensor = new DenseTensor<T>(dims);
-        var span2D = memory2D.Span;
-        for (int i = 0; i < memory2D.Height; i++)
-        {
-            for (int j = 0; j < memory2D.Width; j++)
-            {
-                tensor[i, j] = span2D[i, j];
-            }
-        }
-        return tensor;
     }
 
     public static OrtValue[] ToOrtValues<T>(this Span<Memory<T>> inputs, long[] dims) where T : unmanaged
@@ -47,6 +27,7 @@ public static class OnnxTensorUtils
         {
             inputsOrts[i] = OrtValue.CreateTensorValueFromMemory(OrtMemoryInfo.DefaultInstance, inputs[i], dims);
         }
+
         return inputsOrts;
     }
 }

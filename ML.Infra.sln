@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Infra", "ML.Infra\ML.Inf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Api", "ML.Api\ML.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleInference", "ConsoleInference\ConsoleInference.csproj", "{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.SentimentInference", "ML.SentimentInference\ML.SentimentInference.csproj", "{31936B86-266B-43FC-B50D-FC3B67191C02}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31936B86-266B-43FC-B50D-FC3B67191C02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31936B86-266B-43FC-B50D-FC3B67191C02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31936B86-266B-43FC-B50D-FC3B67191C02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31936B86-266B-43FC-B50D-FC3B67191C02}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
