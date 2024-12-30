@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\ML.SentimentInference\ML.SentimentInference.csproj"/>
+        <ProjectReference Include="..\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj" />
     </ItemGroup>
 
     <ItemGroup>

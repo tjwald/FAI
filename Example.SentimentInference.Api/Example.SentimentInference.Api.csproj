@@ -4,7 +4,6 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <RootNamespace>ML.Api</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,7 +13,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
-      <ProjectReference Include="..\ML.SentimentInference\ML.SentimentInference.csproj" />
+      <ProjectReference Include="..\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,7 +1,7 @@
 ﻿using ML.Infra.Abstractions;
 using ML.Infra.Pipelines;
 
-namespace ML.SentimentInference;
+namespace Example.SentimentInference.Model;
 
 public class SentimentInference: IInference<string, bool>
 {

@@ -4,7 +4,7 @@ using ML.Infra;
 using ML.Infra.Abstractions;
 using ML.Infra.ModelExecutors.Onnx;
 using ML.Infra.Tokenization;
-using ML.SentimentInference;
+using Example.SentimentInference.Model;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);

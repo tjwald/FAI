@@ -5,7 +5,7 @@ using ML.Infra.PipelineBatchExecutors;
 using ML.Infra.Pipelines;
 using ML.Infra.Tokenization;
 
-namespace ML.SentimentInference;
+namespace Example.SentimentInference.Model;
 
 public enum ModelExecutorType
 {

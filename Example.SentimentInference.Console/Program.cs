@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.ML.OnnxRuntime;
 using ML.Infra.ModelExecutors.Onnx;
 using ML.Infra.Tokenization;
-using ML.SentimentInference;
+using Example.SentimentInference.Model;
 using Parquet;
 using Parquet.Data;
 

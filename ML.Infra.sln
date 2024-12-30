@@ -5,11 +5,13 @@ VisualStudioVersion = 17.12.35506.116 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Infra", "ML.Infra\ML.Infra.csproj", "{8ECD26BA-056C-4993-8943-CE27A9B3D013}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Api", "ML.Api\ML.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Api", "Example.SentimentInference.Api\Example.SentimentInference.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleInference", "ConsoleInference\ConsoleInference.csproj", "{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Console", "Example.SentimentInference.Console\Example.SentimentInference.Console.csproj", "{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.SentimentInference", "ML.SentimentInference\ML.SentimentInference.csproj", "{31936B86-266B-43FC-B50D-FC3B67191C02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Model", "Example.SentimentInference.Model\Example.SentimentInference.Model.csproj", "{31936B86-266B-43FC-B50D-FC3B67191C02}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Example", "Example", "{8DBE7E2D-C26E-47E2-938D-B13971FE51C0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,5 +38,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
+		{31936B86-266B-43FC-B50D-FC3B67191C02} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
 	EndGlobalSection
 EndGlobal
