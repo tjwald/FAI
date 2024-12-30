@@ -1,5 +1,6 @@
 ﻿using Microsoft.ML.Tokenizers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ML.Infra.Tokenization;
 
@@ -19,7 +20,7 @@ public static class TokenizationUtils
         }
 
         var streamAddedTokens = File.OpenRead(Path.Combine(path, "added_tokens.json"));
-        var addedTokens = JsonSerializer.Deserialize<Dictionary<string, int>>(streamAddedTokens);
+        var addedTokens = JsonSerializer.Deserialize(streamAddedTokens, TokenizationOptionsJsonSerializerContext.Default.DictionaryStringInt32);
 
         var tokenizer = await BpeTokenizer.CreateAsync(streamVocab, streamMerges, specialTokens: addedTokens);
         return new PretrainedTokenizer(tokenizer, tokenizerOptions);
@@ -29,9 +30,17 @@ public static class TokenizationUtils
     {
         var streamVocab = File.OpenRead(Path.Combine(path, "vocab.txt"));
         var streamConfig = File.OpenRead(Path.Combine(path, "tokenizer_config.json"));
-        var config = JsonSerializer.Deserialize<BertOptions>(streamConfig);
+        var config = JsonSerializer.Deserialize(streamConfig, TokenizationOptionsJsonSerializerContext.Default.BertOptions);
         Console.WriteLine(config);
         var tokenizer = await BertTokenizer.CreateAsync(streamVocab, config);
         return new PretrainedTokenizer(tokenizer, tokenizerOptions);
     }
+}
+
+
+[JsonSerializable(typeof(BertOptions))]
+[JsonSerializable(typeof(Dictionary<string, int>))]
+public partial class TokenizationOptionsJsonSerializerContext : JsonSerializerContext
+{
+    
 }
