@@ -1,9 +1,9 @@
 This project is designed to:
 * Showcase the new features of dotnet 9.0 in the world of AI
-* Compare the performance of C# to python
+* Compare the performance of C# to python in the AI workload
 * Show cool AI optimizations techniques for runtime performance
 
-This project also has many points that shows we could improve the framework and language, and to support the ML Ops story of migrating from python to a more performant solution.
+This project also has many performance opportunities that show we could improve the framework and language, and support the ML ops story of migrating from python to a more performant solution.
 
 
 ## Background 
@@ -16,35 +16,37 @@ However, getting these models to run in production in an efficient manner is a d
 
 In my case, we had multiple custom nlp models with complex algorithms deciding how and on what to use them.
 
-These models were bleeding a third of our budget on in production.
+These models were bleeding a third of our budget in production.
 
-For example, one of the models was processing 200 requests a minute. We needed it to process 20K requests a minute -> we need 1000 machines (we limited it to 100...).
+For example, one of the models was processing 200 requests a minute. I needed it to process 20K requests a minute -> we need 1000 machines (we limited it to 100...).
 
-After many optimizations and a month of work, optimizing our FastAPI server and migrating to ONNX for the model inference, we got it to 28K requests a minute, and down to 1 server.
+After many optimizations and a month of work, optimizing our FastAPI server and migrating to ONNX for the model inference, I got it to 28K requests a minute, and down to 1 server.
 
-What were some of the bottlenecks we solved?
-* Efficient use of async await - processing cpu and gpu workloads at the same time
-* Dynamic Batching - gpus love batches, but we were getting single sentence requests from different processes
-* Using Onnx - pytorch is a training framework, both heavy in installations, but also slower in runtime.
+What were some of the bottlenecks I solved?
+* Efficient use of async await - processing CPU and GPU computation at the same time
+* Dynamic Batching - GPUs love batches, but we were getting single sentence requests from different processes. So we collect them and run them together.
+* Using Onnx - pytorch is a training framework, both heavy in installations (Fatter Image), but also slower in runtime. Migrating to ONNX solved both problems - reduced our image size by 60%, and our inference time from X4 to X20 depending on the algorithm.
 * Algorithmic Improvements - complex algorithms, with many ping pongs between the gpu and cpu, do not easily optimize.
 
+But we were reaching the limitations of python - our GPU was less than 30% utilized, and our cpu was spinning with decreasing latency with increased load.
 
 ### .Net 9.0
 
-After all of this work, dotnet 9 came out with many improvements to AI workloads, including the missing piece - tokenizers!
+After all of this work, dotnet 9 came out with many improvements to AI workloads, including the missing piece from our point of view - tokenizers!
+As all of our models were NLP based, we needed tokenizers to be able to implement our models in C#, and now we had them. In addition the new `Tensor<T>` type realy helps!
 
 In 2 days work, I was able to get most of my optimizations over to the ASP.NET framework, with ONNX for the model runtime, 
 and guess what?
 
-We got 200K+ requests a minute.
+I got 200K+ requests a minute.
 
 The company didn't need this, and adding a new tech-stack to a python-only shop didn't make sense. 
 
 
 
-## The Project
+## This Project
 
-The library [ML.Infra](ML.Infra) provides the foundation for optimizing your own models.
+The library [ML.Infra](ML.Infra) (Name TBD) provides the foundation for optimizing your own models.
 
 The repo also contains an example C# usage in the `Example.SemanticInference.*` folders.
 
@@ -52,9 +54,9 @@ This project demonstrates how to optimize the use of AI models, and get better p
 
 This doesn't mean this is all good - there are many issues documented in: [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)
 
-Also, since the model I use as an example in this project has a custom tokenizer, I did my best to use the most similar tokenizer available in C#.
+Also, since the model I use as an example in this project has a custom tokenizer, I did my best to use the most similar tokenizer available in C#, but this causes accurracy issues. I doubt that this difference would effect performance, but if you feel like implementing in C# the exact same tokenizer I would love to see it :). 
 
-Under [example/python](/example/python) you will find the hugging face model I am using as a baseline. This model was picked at random, as it is a small nlp model, that is well up-voted on HuggingFace.
+Under [example/python](/Example/python) you will find the hugging face model I am using as a baseline. This model was picked at random, as it is a small nlp model, that is well up-voted on HuggingFace.
 This model is smaller than the one mentioned previously
 
 In the Example.SemanticInference.Model you will find the optimized onnx model with the needed resources.
@@ -79,7 +81,7 @@ I was inspired by [HuggingFace](https://huggingface.co/docs/transformers/en/inde
 There are multiple examples of these PipelineBatchExecutors:
 * Serial - just runs them in a loop one after the other.
 * Parallel - will do just that - parallelize the batches.
-* OutOfOrder - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, we expect the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index. 
+* OutOfOrder - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, the user expects the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index. 
 
 
 ## Results:
@@ -119,7 +121,7 @@ A little over 5X improvement on a small model with no logic outside the model.
 * This simulates training, and batched inference - However, my issue was serving dynamic queries in spike loads.
 * You can definitely take many of these optimizations and apply them to the python solution.
 * In a dynamic server setting, you will find that these benchmarks scale very well in C# but not in python. See `InferenceOrchestrator<TInference, TQuery, TResult>`
-* The more CPU logic in the inference algorithm surrounding the underlying model, the better these benchmarks favour C# even with all the optimizations applied to python.
+* The more CPU logic in the inference algorithm surrounding the underlying model, the better these benchmarks favor C# even with all the optimizations applied to python.
 * There are many Gen 0 allocations in the current solution. This is due to how `Tensor<T>` is implemented, and is under discussion in [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)  
 
 
