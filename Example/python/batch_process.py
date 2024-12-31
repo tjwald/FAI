@@ -10,7 +10,7 @@ def process_batch(pipeline, sentences, expected_labels):
     start_time = time.time()
 
     results = []
-    for chunk in batched(sentences, 100):
+    for chunk in batched(sentences, 20):
         results.extend(pipeline(list(chunk), padding=True, truncation=True, batch_size=20))
 
     end_time = time.time()

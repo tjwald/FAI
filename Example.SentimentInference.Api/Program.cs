@@ -11,10 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 SentimentInferenceOptions options = new SentimentInferenceOptions(
     ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
     TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
-    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 2),
-    MaxConcurrency: 25,
-    BatchSize: 100,
-    UseOutOfOrderExecution: true,
+    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: null),
+    MaxConcurrency: 50,
+    BatchSize: 12,
+    UseOutOfOrderExecution: false,
     ModelExecutorType: ModelExecutorType.Simple
 );
 var inference = await SentimentInferenceFactory.CreateSentimentInference(options);
