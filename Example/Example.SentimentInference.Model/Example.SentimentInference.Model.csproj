@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
+      <ProjectReference Include="..\..\ML.Infra\ML.Infra.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -29,15 +29,12 @@
       <AdditionalFiles Include="ClassificationModelResources\tokenizer_config.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </AdditionalFiles>
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Update="ClassificationModelResources\vocab.txt">
+    <AdditionalFiles Include="ClassificationModelResources\vocab.txt">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="ClassificationModelResources\model_optimized.onnx">
+    </AdditionalFiles>
+    <AdditionalFiles Include="ClassificationModelResources\model_optimized.onnx">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+    </AdditionalFiles>
     </ItemGroup>
 
 </Project>
