@@ -3,7 +3,7 @@
 public class CircularAtomicCounter
 {
     private readonly int _maxValue;
-    private int _currentValue;
+    private uint _currentValue;
 
     public CircularAtomicCounter(int maxValue)
     {
@@ -13,18 +13,11 @@ public class CircularAtomicCounter
         }
 
         _maxValue = maxValue;
-        _currentValue = -1;
+        _currentValue = uint.MaxValue;
     }
 
     public int Next()
     {
-        int initialValue, newValue;
-        do
-        {
-            initialValue = _currentValue;
-            newValue = (initialValue + 1) % _maxValue;
-        } while (Interlocked.CompareExchange(ref _currentValue, newValue, initialValue) != initialValue);
-
-        return newValue;
+        return (int)(Interlocked.Increment(ref _currentValue) % _maxValue);
     }
 }
