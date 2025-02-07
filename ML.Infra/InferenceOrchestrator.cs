@@ -4,7 +4,7 @@ using System.Threading.Channels;
 
 namespace ML.Infra;
 
-public class InferenceOrchestrator<TInference, TQuery, TResult> : IInference<TQuery, TResult> where TInference : IInference<TQuery, TResult>
+public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInference<TQuery, TResult> where TInference : IInference<TQuery, TResult>
 {
     private readonly Lazy<TInference> _modelInstance;
     private readonly int _maxBatchSize;

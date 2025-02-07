@@ -3,7 +3,7 @@ using ML.Infra.Pipelines;
 
 namespace Example.SentimentInference.Model;
 
-public class SentimentInference: IInference<string, bool>
+public sealed class SentimentInference: IInference<string, bool>
 {
     private readonly TextClassificationPipeline<bool> _pipeline;
 

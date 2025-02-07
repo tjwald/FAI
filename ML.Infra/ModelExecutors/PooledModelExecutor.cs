@@ -9,7 +9,7 @@ public interface IObjectPool<out T>
     T Get();
 }
 
-public class PooledModelExecutor<TInput, TOutput>: IModelExecutor<TInput, TOutput>
+public sealed class PooledModelExecutor<TInput, TOutput>: IModelExecutor<TInput, TOutput>
 {
     private readonly IObjectPool<IModelExecutor<TInput, TOutput>> _executorPool;
 

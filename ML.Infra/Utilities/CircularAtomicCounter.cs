@@ -1,6 +1,6 @@
 ﻿namespace ML.Infra.Utilities;
 
-public class CircularAtomicCounter
+public sealed class CircularAtomicCounter
 {
     private readonly int _maxValue;
     private uint _currentValue;

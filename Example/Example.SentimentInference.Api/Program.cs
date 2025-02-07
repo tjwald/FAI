@@ -14,8 +14,10 @@ SentimentInferenceOptions options = new SentimentInferenceOptions(
     new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: null),
     MaxConcurrency: 50,
     BatchSize: 12,
+    ModelExecutorType: ModelExecutorType.Simple,
     UseOutOfOrderExecution: false,
-    ModelExecutorType: ModelExecutorType.Simple
+    PipeLineExecutorType: PipeLineExecutorType.Parallel,
+    ParallelPreProcessing: true
 );
 var inference = await SentimentInferenceFactory.CreateSentimentInference(options);
 

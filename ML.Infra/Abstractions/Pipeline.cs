@@ -34,8 +34,8 @@ public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPip
         PostProcess(inputs.Span, preprocess, modelOutput, outputs.Span);
     }
 
-    protected abstract TPreprocess Preprocess(ReadOnlySpan<TInput> input);
+    public abstract TPreprocess Preprocess(ReadOnlySpan<TInput> input);
     
-    protected abstract Task<TModelOutput> RunModel(ReadOnlyMemory<TInput> input, TPreprocess preprocesses);
-    protected abstract void PostProcess(ReadOnlySpan<TInput> inputs, TPreprocess preprocesses, TModelOutput modelOutput, Span<TOutput> outputs);
+    public abstract Task<TModelOutput> RunModel(ReadOnlyMemory<TInput> input, TPreprocess preprocesses);
+    public abstract void PostProcess(ReadOnlySpan<TInput> inputs, TPreprocess preprocesses, TModelOutput modelOutput, Span<TOutput> outputs);
 }

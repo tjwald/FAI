@@ -2,7 +2,7 @@
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
-public class OnnxModelExecutorObjectPool<T>: IObjectPool<T> where T : IOnnxModelExecutor<T>
+public sealed class OnnxModelExecutorObjectPool<T>: IObjectPool<T> where T : IOnnxModelExecutor<T>
 {
     private readonly List<T> _onnxModelExecutors;
     private readonly CircularAtomicCounter _current;

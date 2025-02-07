@@ -2,7 +2,7 @@
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
-public class InferenceSessionFactory
+public sealed class InferenceSessionFactory
 {
     private readonly string _modelDir;
     private readonly SessionOptions _sessionOptions;

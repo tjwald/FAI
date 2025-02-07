@@ -3,7 +3,7 @@ using Microsoft.ML.Tokenizers;
 
 namespace ML.Infra.Tokenization;
 
-public record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
+public sealed record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
 
 public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask)
 {
@@ -11,7 +11,7 @@ public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<l
     public int MaxTokenCount => (int)Tokens.Lengths[1];
 }
 
-public class PretrainedTokenizer
+public sealed class PretrainedTokenizer
 {
     private readonly Tokenizer _tokenizer;
     private readonly PretrainedTokenizerOptions _tokenizerOptions;

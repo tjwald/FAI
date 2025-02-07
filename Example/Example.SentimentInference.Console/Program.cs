@@ -12,12 +12,14 @@ string fileName = "train-00000-of-00001.parquet";
 SentimentInferenceOptions options = new SentimentInferenceOptions(
     ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
     TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
-    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: null),
-    MaxConcurrency: 50,
+    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: 10),
+    MaxConcurrency: 100,
     BatchSize: 12,
+    ModelExecutorType: ModelExecutorType.Simple,
     UseOutOfOrderExecution: false,
-    ModelExecutorType: ModelExecutorType.Simple
-    );
+    PipeLineExecutorType: PipeLineExecutorType.Streamed,
+    ParallelPreProcessing: true
+);
 
 var model = await SentimentInferenceFactory.CreateSentimentInference(options);
 

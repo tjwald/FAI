@@ -8,7 +8,7 @@ namespace ML.Infra.Pipelines;
 public record ClassificationResult<T>(T Choice, float Score, IReadOnlyCollection<float> Logits);
 public record TextClassificationOptions<TClassification>(TClassification[] Choices);
 
-public class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
+public sealed class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<long, float> _modelExecutor;
@@ -23,17 +23,17 @@ public class TextClassificationPipeline<TClassification> : Pipeline<string, Clas
         _pipelineOptions = textClassificationOptions;
     }
 
-    protected override BatchTokenizedResult Preprocess(ReadOnlySpan<string> input)
+    public override BatchTokenizedResult Preprocess(ReadOnlySpan<string> input)
     {
         return _tokenizer.BatchTokenize(input);
     }
 
-    protected override async Task<Tensor<float>[]> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
+    public override async Task<Tensor<float>[]> RunModel(ReadOnlyMemory<string> input, BatchTokenizedResult tokenizedResult)
     {
         return await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
     }
 
-    protected override void PostProcess(ReadOnlySpan<string> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelResult, Span<ClassificationResult<TClassification>> outputs)
+    public override void PostProcess(ReadOnlySpan<string> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelResult, Span<ClassificationResult<TClassification>> outputs)
     {
         TensorSpan<float> logits = modelResult[0].AsTensorSpan();
 

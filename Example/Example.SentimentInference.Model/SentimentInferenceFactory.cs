@@ -1,4 +1,5 @@
-﻿using ML.Infra.Abstractions;
+﻿using System.Numerics.Tensors;
+using ML.Infra.Abstractions;
 using ML.Infra.ModelExecutors;
 using ML.Infra.ModelExecutors.Onnx;
 using ML.Infra.PipelineBatchExecutors;
@@ -15,14 +16,23 @@ public enum ModelExecutorType
     AsyncPooled,
 }
 
+public enum PipeLineExecutorType
+{
+    Serial,
+    Parallel,
+    Streamed,
+}
+
 public record SentimentInferenceOptions(
     string ModelDir,
     PretrainedTokenizerOptions TokenizerOptions,
     OnnxModelExecutorOptions OnnxModelExecutorOptions,
     int? MaxConcurrency,
     int BatchSize,
+    PipeLineExecutorType PipeLineExecutorType,
     bool UseOutOfOrderExecution,
-    ModelExecutorType ModelExecutorType);
+    ModelExecutorType ModelExecutorType,
+    bool ParallelPreProcessing);
 
 public static class SentimentInferenceFactory
 {
@@ -38,11 +48,17 @@ public static class SentimentInferenceFactory
             ModelExecutorType.Async => await AsyncOnnxModelExecutor.FromPretrained(options.ModelDir, options.OnnxModelExecutorOptions),
             ModelExecutorType.AsyncPooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(options.ModelDir,
                 options.OnnxModelExecutorOptions)),
-            _ => throw new ArgumentOutOfRangeException(),
+            _ => throw new NotImplementedException(nameof(options.ModelExecutorType)),
         };
 
-        IPipelineBatchExecutor<string, ClassificationResult<bool>> executor =
-            new ParallelPipelineBatchExecutor<string, ClassificationResult<bool>>(options.BatchSize, options.MaxConcurrency);
+        IPipelineBatchExecutor<string, ClassificationResult<bool>> executor = options.PipeLineExecutorType switch
+        {
+            PipeLineExecutorType.Serial => new SerialPipelineBatchExecutor<string, ClassificationResult<bool>>(maxBatchSize: options.BatchSize),
+            PipeLineExecutorType.Parallel => new ParallelPipelineBatchExecutor<string, ClassificationResult<bool>>(options.BatchSize, options.MaxConcurrency),
+            PipeLineExecutorType.Streamed => new StreamedBatchExecutor<string, ClassificationResult<bool>, BatchTokenizedResult, Tensor<float>[]>(options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing),
+            _ => throw new ArgumentException("Unsupported pipeline executor type")
+        };
+
         if (options.UseOutOfOrderExecution)
         {
             executor = new OutOfOrderBatchExecutor<ClassificationResult<bool>>(tokenizer.Tokenizer, executor);
