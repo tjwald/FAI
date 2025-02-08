@@ -18,6 +18,7 @@ public static class ModelExecutorFactory
     public static async ValueTask<IModelExecutor<long, float>> CreateModelExecutor(string modelDir, ModelExecutorType executorType,
         IModelExecutorConfig modelExecutorOptions)
     {
+        Console.WriteLine($"Using model executor {executorType}");
         return executorType switch
         {
             ModelExecutorType.Simple => await OnnxModelExecutor.FromPretrained(modelDir, (OnnxModelExecutorOptions)modelExecutorOptions),

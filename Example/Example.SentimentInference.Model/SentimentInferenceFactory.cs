@@ -12,11 +12,13 @@ public static class SentimentInferenceFactory
 {
     public static async Task<SentimentInference> CreateSentimentInference(SentimentInferenceOptions options)
     {
+        Console.WriteLine($"Model: {options.ModelDir}");
         var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
 
         IModelExecutor<long, float> modelExecutor =
             await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.OnnxModelExecutorOptions);
 
+        Console.WriteLine($"Using Model Pipeline Executor: {options.PipelineExecutorType}");
         IPipelineBatchExecutor<string, ClassificationResult<bool>> executor = options.PipelineExecutorType switch
         {
             PipelineExecutorType.Serial => new SerialPipelineBatchExecutor<string, ClassificationResult<bool>>(maxBatchSize: options.BatchSize),
@@ -28,6 +30,7 @@ public static class SentimentInferenceFactory
 
         if (options.UseOutOfOrderExecution)
         {
+            Console.WriteLine("Using out of order execution");
             executor = new OutOfOrderBatchExecutor<ClassificationResult<bool>>(tokenizer.Tokenizer, executor);
         }
 
