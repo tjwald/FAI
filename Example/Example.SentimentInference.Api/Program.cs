@@ -1,24 +1,12 @@
+using Example.SentimentInference.Model;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.ML.OnnxRuntime;
 using ML.Infra;
 using ML.Infra.Abstractions;
-using ML.Infra.ModelExecutors.Onnx;
-using ML.Infra.Tokenization;
-using Example.SentimentInference.Model;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-SentimentInferenceOptions options = new SentimentInferenceOptions(
-    ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
-    TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
-    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: null),
-    MaxConcurrency: 50,
-    BatchSize: 12,
-    ModelExecutorType: ModelExecutorType.Simple,
-    UseOutOfOrderExecution: false,
-    PipeLineExecutorType: PipeLineExecutorType.Parallel,
-    ParallelPreProcessing: true
-);
+var options = SentimentInferenceOptions.DefaultConfig;
+
 var inference = await SentimentInferenceFactory.CreateSentimentInference(options);
 
 builder.Services.AddSingleton<IInference<string, bool>>(inference);

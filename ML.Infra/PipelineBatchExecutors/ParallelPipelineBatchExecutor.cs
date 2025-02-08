@@ -2,7 +2,7 @@
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct ParallelPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
+public class ParallelPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private readonly int _maxBatchSize;
     private readonly int? _maxConcurrency;

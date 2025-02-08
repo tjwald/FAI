@@ -1,4 +1,5 @@
 ﻿using Microsoft.ML.OnnxRuntime;
+using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
@@ -13,7 +14,7 @@ public sealed class InferenceSessionFactory
         _modelDir = modelDir;
         RunOptions = options.RunOptions ?? new RunOptions();
         _sessionOptions = new SessionOptions();
-        
+
         if (options.UseGpu)
         {
             _sessionOptions.AppendExecutionProvider_CUDA();

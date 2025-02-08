@@ -1,25 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
-using Microsoft.ML.OnnxRuntime;
-using ML.Infra.ModelExecutors.Onnx;
-using ML.Infra.Tokenization;
 using Example.SentimentInference.Model;
 using Parquet;
 using Parquet.Data;
 
-string fileName = "train-00000-of-00001.parquet";
+const string fileName = "train-00000-of-00001.parquet";
 
-SentimentInferenceOptions options = new SentimentInferenceOptions(
-    ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
-    TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
-    new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxInferenceSessions: 1, MaxThreads: 10),
-    MaxConcurrency: 100,
-    BatchSize: 12,
-    ModelExecutorType: ModelExecutorType.Simple,
-    UseOutOfOrderExecution: false,
-    PipeLineExecutorType: PipeLineExecutorType.Streamed,
-    ParallelPreProcessing: true
-);
+var options = SentimentInferenceOptions.DefaultConfig;
 
 var model = await SentimentInferenceFactory.CreateSentimentInference(options);
 
@@ -45,7 +32,6 @@ static async Task RunBatchPredict(SentimentInference sentimentInference, string[
     int correct = output.Where((t, i) => t == bools[i]).Count();
 
     Console.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
-
 }
 
 internal class TrainingData
@@ -64,7 +50,7 @@ internal static class TrainingParquetReader
         using ParquetReader reader = await ParquetReader.CreateAsync(fs);
         var sentenceField = reader.Schema.FindDataField("sentence");
         var labelField = reader.Schema.FindDataField("label");
-                
+
         for (int i = 0; i < reader.RowGroupCount; i++)
         {
             using ParquetRowGroupReader rowGroupReader = reader.OpenRowGroupReader(i);

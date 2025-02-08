@@ -1,14 +1,8 @@
 ﻿using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
+using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
-
-public record OnnxModelExecutorOptions(
-    RunOptions? RunOptions = null,
-    ExecutionMode ExecutionMode = ExecutionMode.ORT_SEQUENTIAL,
-    bool UseGpu = true,
-    int MaxInferenceSessions = 1,
-    int? MaxThreads = null);
 
 public sealed class OnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecutor<OnnxModelExecutor>
 {

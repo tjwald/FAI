@@ -1,19 +1,20 @@
-﻿using ML.Infra.Utilities;
+﻿using ML.Infra.Configurations.ModelExecutors;
+using ML.Infra.Utilities;
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
-public sealed class OnnxModelExecutorObjectPool<T>: IObjectPool<T> where T : IOnnxModelExecutor<T>
+public sealed class OnnxModelExecutorObjectPool<T> : IObjectPool<T> where T : IOnnxModelExecutor<T>
 {
     private readonly List<T> _onnxModelExecutors;
     private readonly CircularAtomicCounter _current;
 
-    public OnnxModelExecutorObjectPool(string modelDir, OnnxModelExecutorOptions options)
+    public OnnxModelExecutorObjectPool(string modelDir, PooledExecutorOptions<OnnxModelExecutorOptions> options)
     {
-        var factory = new InferenceSessionFactory(modelDir, options);
-        _onnxModelExecutors = new List<T>(options.MaxInferenceSessions);
-        for (int i = 0; i < options.MaxInferenceSessions; i++)
+        var factory = new InferenceSessionFactory(modelDir, options.ExecutorConfig);
+        _onnxModelExecutors = new List<T>(options.ExecutorCount);
+        for (int i = 0; i < options.ExecutorCount; i++)
         {
-            _onnxModelExecutors.Add(T.Create(factory.Create(), factory.RunOptions, options));
+            _onnxModelExecutors.Add(T.Create(factory.Create(), factory.RunOptions, options.ExecutorConfig));
         }
 
         _current = new CircularAtomicCounter(_onnxModelExecutors.Count);

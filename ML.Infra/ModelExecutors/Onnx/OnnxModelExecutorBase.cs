@@ -1,6 +1,7 @@
 ﻿using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
 using ML.Infra.Abstractions;
+using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
 

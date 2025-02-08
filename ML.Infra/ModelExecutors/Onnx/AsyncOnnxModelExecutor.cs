@@ -1,7 +1,6 @@
 ﻿using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
-using ML.Infra.Abstractions;
-using Tensor = System.Numerics.Tensors.Tensor;
+using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
@@ -13,7 +12,7 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
     {
     }
 
-    public AsyncOnnxModelExecutor(InferenceSession session, RunOptions runOptions): base(session, runOptions)
+    public AsyncOnnxModelExecutor(InferenceSession session, RunOptions runOptions) : base(session, runOptions)
     {
         _semaphore = new SemaphoreSlim(1, 1);
     }
@@ -51,7 +50,7 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
 
         return Create(session, factory.RunOptions, options);
     }
-    
+
     public static AsyncOnnxModelExecutor Create(InferenceSession session, RunOptions runOptions, OnnxModelExecutorOptions options)
     {
         return new AsyncOnnxModelExecutor(session, runOptions);
