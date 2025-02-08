@@ -10,8 +10,13 @@ namespace Example.SentimentInference.Model;
 
 public static class SentimentInferenceFactory
 {
-    public static async Task<SentimentInference> CreateSentimentInference(SentimentInferenceOptions options)
+    public static async Task<SentimentInference> CreateSentimentInference(SentimentInferenceOptions options, bool useRaw)
     {
+        if (useRaw)
+        {
+            return await CreateRawPipeline(options);
+        }
+        
         Console.WriteLine($"Model: {options.ModelDir}");
         var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
 
@@ -35,6 +40,18 @@ public static class SentimentInferenceFactory
         }
 
         var pipeline = new TextClassificationPipeline<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]), executor);
+        return new SentimentInference(pipeline);
+    }
+
+    private static async Task<SentimentInference> CreateRawPipeline(SentimentInferenceOptions options)
+    {
+        var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
+        IModelExecutor<long, float> modelExecutor =
+            await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.OnnxModelExecutorOptions);
+
+        RawTextClassificationPipeline<bool> pipeline =
+            new RawTextClassificationPipeline<bool>(tokenizer.Tokenizer, options.TokenizerOptions, modelExecutor, [false, true], options.BatchSize, options.MaxConcurrency);
+
         return new SentimentInference(pipeline);
     }
 }

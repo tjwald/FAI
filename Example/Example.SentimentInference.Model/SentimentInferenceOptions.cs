@@ -22,10 +22,10 @@ public record SentimentInferenceOptions(
         TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
         new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxThreads: null),
         MaxConcurrency: 4,
-        BatchSize: 12,
+        BatchSize: 400,
         ModelExecutorType: ModelExecutorType.Simple,
         UseOutOfOrderExecution: false,
         PipelineExecutorType: PipelineExecutorType.Streamed,
         ParallelPreProcessing: true
     );
-};
+}

@@ -8,7 +8,7 @@ const string fileName = "train-00000-of-00001.parquet";
 
 var options = SentimentInferenceOptions.DefaultConfig;
 
-var model = await SentimentInferenceFactory.CreateSentimentInference(options);
+var model = await SentimentInferenceFactory.CreateSentimentInference(options, useRaw:true);
 
 (string[] input, bool[] expectedOutput) = await LoadTrainingData(fileName);
 Console.WriteLine("Finished loading training data");

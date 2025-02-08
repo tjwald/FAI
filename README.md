@@ -133,3 +133,48 @@ Python was just fine for the company, and most impactful optimizations are in th
 Before you abandon python for C# for the performance gain, remember that C# is not as mature as python in the AI ecosystem.
 
 Most new innovations happen in python and would require porting to C#.  
+
+
+---
+
+### Update:
+
+After further optimizations and creating RawTextClassificationPipeline I was able to further reduce the time taken.
+
+### C#
+* ONNX + GPU
+* ORT_SEQUENTIAL
+* Batch Size: 12
+* Threading: 4
+* Time: 6.04s
+* Time per sentence: 0.089 ms
+
+8.65X faster than python.
+
+This enabled increasing the batch size:
+
+### C#
+* ONNX + GPU
+* ORT_SEQUENTIAL
+* **Batch Size: 400**
+* Threading: 4
+* Time: 3.72s
+* Time per sentence: 0.055 ms
+
+13.63X faster than python.
+
+The time per batch size (4 threads):
+
+| Batch Size | Time (s) |
+|------------|----------|
+| 12         | 5.86     |
+| 20         | 5.05     |
+| 50         | 4.19     |
+| 100        | 3.94     |
+| 200        | 3.87     |
+| 300        | 3.79     |
+| 400        | 3.75     |
+| 450        | 3.78     |
+| 500        | 3.86     |
+
+![Batch Size VS Time Graph](docs/Batch%20Size%20VS%20Time%20Graph.png "Batch Size VS Time Graph")

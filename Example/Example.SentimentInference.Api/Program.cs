@@ -7,7 +7,7 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 var options = SentimentInferenceOptions.DefaultConfig;
 
-var inference = await SentimentInferenceFactory.CreateSentimentInference(options);
+var inference = await SentimentInferenceFactory.CreateSentimentInference(options, useRaw:true);
 
 builder.Services.AddSingleton<IInference<string, bool>>(inference);
 builder.Services.AddKeyedSingleton<IInference<string, bool>>("orchestrated",
