@@ -33,10 +33,10 @@ public static class SentimentInferenceFactory
             _ => throw new ArgumentException("Unsupported pipeline executor type")
         };
 
-        if (options.UseOutOfOrderExecution)
+        if (options.UseTokenSortingExecution)
         {
             Console.WriteLine("Using out of order execution");
-            executor = new OutOfOrderBatchExecutor<ClassificationResult<bool>>(tokenizer.Tokenizer, executor);
+            executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer.Tokenizer, executor);
         }
 
         var pipeline = new TextClassificationPipeline<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]), executor);

@@ -4,12 +4,12 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct OutOfOrderBatchExecutor<TOutput> : IPipelineBatchExecutor<string, TOutput>
+public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<string, TOutput>
 {
     private readonly Tokenizer _tokenizer;
     private readonly IPipelineBatchExecutor<string, TOutput> _executor;
 
-    public OutOfOrderBatchExecutor(Tokenizer tokenizer, IPipelineBatchExecutor<string, TOutput> executor)
+    public TokenCountSortingBatchExecutor(Tokenizer tokenizer, IPipelineBatchExecutor<string, TOutput> executor)
     {
         _tokenizer = tokenizer;
         _executor = executor;
