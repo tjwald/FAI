@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.SentimentInference.Model;
+using ML.Infra.Abstractions;
 using Parquet;
 using Parquet.Data;
 
@@ -8,7 +9,7 @@ const string fileName = "train-00000-of-00001.parquet";
 
 var options = SentimentInferenceOptions.DefaultConfig;
 
-var model = await SentimentInferenceFactory.CreateSentimentInference(options, useRaw:true);
+IInference<string, bool> model = await SentimentInferenceFactory.CreateSentimentInference(options);
 
 (string[] input, bool[] expectedOutput) = await LoadTrainingData(fileName);
 Console.WriteLine("Finished loading training data");
@@ -16,7 +17,7 @@ await RunBatchPredict(model, input, expectedOutput);
 return;
 
 
-static async Task RunBatchPredict(SentimentInference sentimentInference, string[] strings, bool[] bools)
+static async Task RunBatchPredict(IInference<string, bool> sentimentInference, string[] strings, bool[] bools)
 {
     long start = Stopwatch.GetTimestamp();
 

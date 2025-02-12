@@ -139,7 +139,7 @@ Most new innovations happen in python and would require porting to C#.
 
 ### Update:
 
-After further optimizations and creating RawTextClassificationPipeline I was able to further reduce the time taken.
+After further optimizations and fixing TokenCountSortingBatchExecutor I was able to further reduce the time taken.
 
 ### C#
 * ONNX + GPU

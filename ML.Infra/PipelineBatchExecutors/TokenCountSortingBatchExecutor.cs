@@ -1,62 +1,53 @@
-﻿using System.Runtime.InteropServices;
-using Microsoft.ML.Tokenizers;
-using ML.Infra.Abstractions;
+﻿using ML.Infra.Abstractions;
+using ML.Infra.Tokenization;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<string, TOutput>
+public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<TokenizedText, TOutput>
 {
-    private readonly Tokenizer _tokenizer;
-    private readonly IPipelineBatchExecutor<string, TOutput> _executor;
+    private readonly PretrainedTokenizer _tokenizer;
+    private readonly IPipelineBatchExecutor<TokenizedText, TOutput> _executor;
 
-    public TokenCountSortingBatchExecutor(Tokenizer tokenizer, IPipelineBatchExecutor<string, TOutput> executor)
+    public TokenCountSortingBatchExecutor(PretrainedTokenizer tokenizer, IPipelineBatchExecutor<TokenizedText, TOutput> executor)
     {
         _tokenizer = tokenizer;
         _executor = executor;
     }
 
-    public async Task ExecuteBatchPredict(IPipeline<string, TOutput> pipeline, ReadOnlyMemory<string> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(IPipeline<TokenizedText, TOutput> pipeline, ReadOnlyMemory<TokenizedText> inputs, Memory<TOutput> outputSpan)
     {
-        ReadOnlySpan<string> inputSpan = inputs.Span;
+        ReadOnlySpan<TokenizedText> inputSpan = inputs.Span;
         int[] inputsSortedIndices = Enumerable.Range(0, inputSpan.Length).ToArray();
-        string[] inputsSorted = inputs.Span.ToArray();
-        
+        TokenizedText[] inputsSorted = inputs.Span.ToArray();
+
         var tokenComparer = new TokenCountComparer(_tokenizer);
-        
-        MemoryExtensions.Sort<string, int, TokenCountComparer>(inputsSorted, inputsSortedIndices, tokenComparer);
+
+        MemoryExtensions.Sort<TokenizedText, int, TokenCountComparer>(inputsSorted, inputsSortedIndices, tokenComparer);
         await _executor.ExecuteBatchPredict(pipeline, inputsSorted, outputSpan);
         MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span);
     }
 }
 
-file readonly struct TokenCountComparer: IComparer<string>
+file readonly struct TokenCountComparer : IComparer<TokenizedText>
 {
-    private readonly Tokenizer _tokenizer;
-    private readonly Dictionary<string, int> _counts;
+    private readonly PretrainedTokenizer _tokenizer;
 
-    public TokenCountComparer(Tokenizer tokenizer)
+    public TokenCountComparer(PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
-        _counts = new Dictionary<string, int>();
     }
 
-    public int Compare(string? x, string? y)
+    public int Compare(TokenizedText? x, TokenizedText? y)
     {
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
-        
-        ref int xCount = ref CollectionsMarshal.GetValueRefOrAddDefault(_counts, x, out bool exists);
-        if (!exists)
-        {
-            xCount = _tokenizer.CountTokens(x);
-        }
-        
-        ref int yCount = ref CollectionsMarshal.GetValueRefOrAddDefault(_counts, x, out exists);
-        if (!exists)
-        {
-            yCount = _tokenizer.CountTokens(y);
-        }
-        
+
+        x.Tokens ??= _tokenizer.Tokenize(x.Text);
+        y.Tokens ??= _tokenizer.Tokenize(y.Text);
+
+        int xCount = x.Count;
+        int yCount = y.Count;
+
         return xCount.CompareTo(yCount);
     }
 }

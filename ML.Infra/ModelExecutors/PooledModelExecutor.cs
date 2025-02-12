@@ -1,5 +1,4 @@
 ﻿using System.Numerics.Tensors;
-using Microsoft.Extensions.ObjectPool;
 using ML.Infra.Abstractions;
 
 namespace ML.Infra.ModelExecutors;

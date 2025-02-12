@@ -24,7 +24,7 @@ public record SentimentInferenceOptions(
         MaxConcurrency: 4,
         BatchSize: 400,
         ModelExecutorType: ModelExecutorType.Simple,
-        UseTokenSortingExecution: false,
+        UseTokenSortingExecution: true,
         PipelineExecutorType: PipelineExecutorType.Streamed,
         ParallelPreProcessing: true
     );

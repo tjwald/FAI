@@ -7,11 +7,11 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 var options = SentimentInferenceOptions.DefaultConfig;
 
-var inference = await SentimentInferenceFactory.CreateSentimentInference(options, useRaw:true);
+IInference<string, bool> inference = await SentimentInferenceFactory.CreateSentimentInference(options);
 
-builder.Services.AddSingleton<IInference<string, bool>>(inference);
+builder.Services.AddSingleton(inference);
 builder.Services.AddKeyedSingleton<IInference<string, bool>>("orchestrated",
-    new InferenceOrchestrator<SentimentInference, string, bool>(new Lazy<SentimentInference>(() => inference), 10, 5, TimeSpan.FromMicroseconds(10)));
+    new InferenceOrchestrator<IInference<string, bool>, string, bool>(new Lazy<IInference<string, bool>>(() => inference), 10, 5, TimeSpan.FromMicroseconds(10)));
 
 builder.Services.AddOpenApi();
 
