@@ -10,11 +10,8 @@ var options = SentimentInferenceOptions.DefaultConfig;
 
 var model = await SentimentInferenceFactory.CreateSentimentInference(options);
 
-IList<TrainingData> data = await TrainingParquetReader.ReadParquetFileAsync(fileName);
-string[] input = data.Select(x => x.Sentence).ToArray();
-Console.WriteLine($"Parquet file loaded with sentences: {input.Length}");
-bool[] expectedOutput = data.Select(x => x.Label == 1).ToArray();
-
+(string[] input, bool[] expectedOutput) = await LoadTrainingData(fileName);
+Console.WriteLine("Finished loading training data");
 await RunBatchPredict(model, input, expectedOutput);
 return;
 
@@ -32,6 +29,15 @@ static async Task RunBatchPredict(SentimentInference sentimentInference, string[
     int correct = output.Where((t, i) => t == bools[i]).Count();
 
     Console.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
+}
+
+async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)
+{
+    IList<TrainingData> data = await TrainingParquetReader.ReadParquetFileAsync(s);
+    string[] strings = data.Select(x => x.Sentence).ToArray();
+    Console.WriteLine($"Parquet file loaded with sentences: {strings.Length}");
+    bool[] bools = data.Select(x => x.Label == 1).ToArray();
+    return (strings, bools);
 }
 
 internal class TrainingData

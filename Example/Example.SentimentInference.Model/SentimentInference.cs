@@ -5,9 +5,9 @@ namespace Example.SentimentInference.Model;
 
 public sealed class SentimentInference: IInference<string, bool>
 {
-    private readonly TextClassificationPipeline<bool> _pipeline;
+    private readonly IPipeline<string, ClassificationResult<bool>> _pipeline;
 
-    public SentimentInference(TextClassificationPipeline<bool> pipeline)
+    public SentimentInference(IPipeline<string, ClassificationResult<bool>> pipeline)
     {
         _pipeline = pipeline;
     }

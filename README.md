@@ -110,12 +110,12 @@ I am using the training data set, in the parquet provided in the folder.
 * ONNX + GPU
 * ORT_SEQUENTIAL
 * Batch Size: 12
-* Threading: 50
-* Time: 10s
-* Time per sentence: 0.16 ms
+* Threading: 4
+* Time: 10.56s
+* Time per sentence: 0.157 ms
 
 
-A little over 5X improvement on a small model with no logic outside the model.
+A 5X improvement on a small model with no logic outside the model.
 
 ### Notes:
 * This simulates training, and batched inference - However, my issue was serving dynamic queries in spike loads.

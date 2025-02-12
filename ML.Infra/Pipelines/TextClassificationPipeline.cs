@@ -5,7 +5,7 @@ using ML.Infra.Tokenization;
 namespace ML.Infra.Pipelines;
 
 
-public record ClassificationResult<T>(T Choice, float Score, IReadOnlyCollection<float> Logits);
+public record struct ClassificationResult<T>(T Choice, float Score, float[] Logits);
 public record TextClassificationOptions<TClassification>(TClassification[] Choices);
 
 public sealed class TextClassificationPipeline<TClassification> : Pipeline<string, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>

@@ -1,11 +1,12 @@
-﻿using System.Numerics.Tensors;
+﻿using System.Collections.Concurrent;
+using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
 using ML.Infra.Abstractions;
 using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Infra.ModelExecutors.Onnx;
 
-public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T: IOnnxModelExecutor<T>
+public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T : IOnnxModelExecutor<T>
 {
     static abstract T Create(InferenceSession session, RunOptions runOptions, OnnxModelExecutorOptions options);
 }
@@ -14,49 +15,83 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
 {
     protected readonly InferenceSession Session;
     protected readonly RunOptions RunOptions;
+    private readonly ConcurrentBag<long[]> _dimensionsPool;
+    private readonly ConcurrentBag<Memory<long>[]> _inputMemoryPool;
 
     protected OnnxModelExecutorBase(InferenceSession session, RunOptions runOptions)
     {
         Session = session;
         RunOptions = runOptions;
+        _dimensionsPool = [];
+        _inputMemoryPool = [];
     }
 
     public abstract Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs);
 
-    protected static OrtValue[] GetModelInputs(Tensor<long>[] inputs)
+    protected OrtValue[] GetModelInputs(Tensor<long>[] inputs)
     {
         long[] dims = GetInputDims(inputs);
 
-        Span<Memory<long>> modelInputs = GetInputsAsMemory(inputs);
+        Memory<long>[] modelInputs = GetInputsAsMemory(inputs);
 
-        OrtValue[] ortValues = modelInputs.ToOrtValues(dims);
+        OrtValue[] ortValues = modelInputs.AsSpan().ToOrtValues(dims);
+
+        //return to pool:
+        _dimensionsPool.Add(dims);
+        _inputMemoryPool.Add(modelInputs);
+
         return ortValues;
     }
 
     protected static Tensor<float>[] ToOutTensors(IReadOnlyCollection<OrtValue> result)
     {
-        var outTensors = new Tensor<float>[result.Count];
-        foreach ((int i, OrtValue tensor) in result.Index())
+        Tensor<float>[] outTensors = new Tensor<float>[result.Count];
+        if (result is List<OrtValue> ortValues)
         {
-            long[] outDims = tensor.GetTensorTypeAndShape().Shape!;
-            nint[] outDimsAsNInts = new nint[outDims.Length];
-            for (int dim = 0; dim < outDims.Length; dim++)
+            for (int i = 0; i < result.Count; i++)
             {
-                outDimsAsNInts[dim] = (nint)outDims[dim];
+                OrtValue tensor = ortValues[i];
+                outTensors[i] = ToOutTensor(tensor);
             }
 
-            Tensor<float> outTensor = Tensor.Create<float>(outDimsAsNInts);
-            tensor.GetTensorDataAsSpan<float>().CopyTo(outTensor.AsMemory().Span);
-            outTensors[i] = outTensor;
-            tensor.Dispose();
+            return outTensors;
+        }
+
+        int index = 0;
+        foreach (OrtValue tensor in result)
+        {
+            outTensors[index] = ToOutTensor(tensor);
+            index++;
         }
 
         return outTensors;
     }
 
-    private static Span<Memory<long>> GetInputsAsMemory(Tensor<long>[] inputs)
+    private static Tensor<float> ToOutTensor(OrtValue tensor)
     {
-        Span<Memory<long>> modelInputs = new Memory<long>[inputs.Length];
+        long[] outDims = tensor.GetTensorTypeAndShape().Shape!;
+        Span<nint> outDimsAsNInts = stackalloc nint[outDims.Length];
+        Span<nint> strides = [outDims.Length, 1];
+        for (int dim = 0; dim < outDims.Length; dim++)
+        {
+            outDimsAsNInts[dim] = (nint)outDims[dim];
+        }
+
+        Tensor<float> outTensor = Tensor.Create<float>(outDimsAsNInts, strides);
+        tensor.GetTensorDataAsSpan<float>().CopyTo(outTensor.AsMemory().Span);
+        tensor.Dispose();
+
+        return outTensor;
+    }
+
+    private Memory<long>[] GetInputsAsMemory(Tensor<long>[] inputs)
+    {
+        Memory<long>[] modelInputs;
+        if (!_inputMemoryPool.TryTake(out modelInputs!))
+        {
+            modelInputs = new Memory<long>[inputs.Length];
+        }
+
         for (int i = 0; i < modelInputs.Length; i++)
         {
             modelInputs[i] = inputs[i].AsMemory();
@@ -65,9 +100,14 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
         return modelInputs;
     }
 
-    private static long[] GetInputDims(Tensor<long>[] inputs)
+    private long[] GetInputDims(Tensor<long>[] inputs)
     {
-        long[] dims = new long[inputs[0].Rank];
+        long[] dims;
+        if (!_dimensionsPool.TryTake(out dims!))
+        {
+            dims = new long[inputs[0].Rank];
+        }
+
         for (int i = 0; i < inputs[0].Rank; i++)
         {
             dims[i] = inputs[0].Lengths[i];

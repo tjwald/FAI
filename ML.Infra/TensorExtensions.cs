@@ -8,10 +8,7 @@ public static class TensorExtensions
 {
     public static Span<T> GetRowSpan<T>(this TensorSpan<T> tensor, int i)
     {
-        // Could be cool to have TensorSpan<T, N: 2> So that I don't need this check... 
-        if (tensor.Lengths.Length != 2) throw new InvalidOperationException("tensor must have 2 dimensions");
-        
-        TensorSpan<T> tensorRow = tensor.Slice([i..(i+1), 0..]);
+        TensorSpan<T> tensorRow = tensor.Slice(i..(i+1), ..);
         return MemoryMarshal.CreateSpan(ref tensorRow.GetPinnableReference(), (int)tensor.Lengths[1]);
     }
 
