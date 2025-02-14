@@ -1,7 +1,6 @@
 ﻿using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using Microsoft.ML.Tokenizers;
-using ML.Infra.Pipelines;
 
 namespace ML.Infra.Tokenization;
 
@@ -23,8 +22,6 @@ public sealed class PretrainedTokenizer
         _tokenizer = tokenizer;
         _tokenizerOptions = tokenizerOptions;
     }
-
-    public Tokenizer Tokenizer => _tokenizer;
 
     public List<int> Tokenize(string text)
     {
@@ -77,7 +74,7 @@ public sealed class PretrainedTokenizer
         return BatchTokensToTensors(inputs, _tokenizerOptions, maxTokenSize);
     }
 
-    public static (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(
+    private static (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(
         ReadOnlySpan<List<int>> inputs,
         PretrainedTokenizerOptions tokenizerOptions,
         int maxTokenSize)

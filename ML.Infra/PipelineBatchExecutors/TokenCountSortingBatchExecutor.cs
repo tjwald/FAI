@@ -14,7 +14,7 @@ public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchE
         _executor = executor;
     }
 
-    public async Task ExecuteBatchPredict(IPipeline<TokenizedText, TOutput> pipeline, ReadOnlyMemory<TokenizedText> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(ReadOnlyMemory<TokenizedText> inputs, Memory<TOutput> outputSpan)
     {
         ReadOnlySpan<TokenizedText> inputSpan = inputs.Span;
         int[] inputsSortedIndices = Enumerable.Range(0, inputSpan.Length).ToArray();
@@ -23,7 +23,7 @@ public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchE
         var tokenComparer = new TokenCountComparer(_tokenizer);
 
         MemoryExtensions.Sort<TokenizedText, int, TokenCountComparer>(inputsSorted, inputsSortedIndices, tokenComparer);
-        await _executor.ExecuteBatchPredict(pipeline, inputsSorted, outputSpan);
+        await _executor.ExecuteBatchPredict(inputsSorted, outputSpan);
         MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span);
     }
 }

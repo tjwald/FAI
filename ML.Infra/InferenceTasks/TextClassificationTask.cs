@@ -4,17 +4,19 @@ using ML.Infra.Configurations.Pipelines;
 using ML.Infra.ResultTypes;
 using ML.Infra.Tokenization;
 
-namespace ML.Infra.Pipelines;
+namespace ML.Infra.InferenceTasks;
 
-public class TextClassificationPipeline<TClassification>: Pipeline<TokenizedText, ClassificationResult<TClassification>, BatchTokenizedResult, Tensor<float>[]>
+public class TextClassification<TClassification> 
+    : InferenceStepsSteps<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<TClassification>>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<long, float> _modelExecutor;
     private readonly TextClassificationOptions<TClassification> _pipelineOptions;
 
-    public TextClassificationPipeline(PretrainedTokenizer tokenizer, IModelExecutor<long, float> modelExecutor,
-        TextClassificationOptions<TClassification> textClassificationOptions,
-        IPipelineBatchExecutor<TokenizedText, ClassificationResult<TClassification>> executor) : base(executor)
+    public TextClassification(
+        PretrainedTokenizer tokenizer,
+        IModelExecutor<long, float> modelExecutor,
+        TextClassificationOptions<TClassification> textClassificationOptions)
     {
         _tokenizer = tokenizer;
         _modelExecutor = modelExecutor;
@@ -29,7 +31,7 @@ public class TextClassificationPipeline<TClassification>: Pipeline<TokenizedText
         }
 
         (Tensor<long> tokenization, Tensor<long> mask) = _tokenizer.BatchTokensToTensors(new TokensView(input));
-        
+
         return new BatchTokenizedResult(tokenization, mask);
     }
 
@@ -38,9 +40,10 @@ public class TextClassificationPipeline<TClassification>: Pipeline<TokenizedText
         return await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
     }
 
-    public override void PostProcess(ReadOnlySpan<TokenizedText> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelResult, Span<ClassificationResult<TClassification>> outputs)
+    public override void PostProcess(ReadOnlySpan<TokenizedText> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelOutput,
+        Span<ClassificationResult<TClassification>> outputs)
     {
-        TensorSpan<float> logits = modelResult[0].AsTensorSpan();
+        TensorSpan<float> logits = modelOutput[0].AsTensorSpan();
 
         for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
         {

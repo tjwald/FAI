@@ -3,8 +3,8 @@ using ML.Infra.Abstractions;
 using ML.Infra.Configurations.PipelineBatchExecutors;
 using ML.Infra.Configurations.Pipelines;
 using ML.Infra.Factories;
+using ML.Infra.InferenceTasks;
 using ML.Infra.PipelineBatchExecutors;
-using ML.Infra.Pipelines;
 using ML.Infra.ResultTypes;
 using ML.Infra.Tokenization;
 
@@ -23,24 +23,28 @@ public static class SentimentInferenceFactory
         return CreateSentimentInference(options, tokenizer, modelExecutor);
     }
 
-    private static IPipelineBatchExecutor<TInput, ClassificationResult<bool>> CreatePipelineBatchExecutor<TInput>(SentimentInferenceOptions options)
+    private static IPipelineBatchExecutor<TInput, TOutput> CreatePipelineBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>(
+        SentimentInferenceOptions options, IInferenceSteps<TInput, TOutput> inferenceSteps)
     {
         Console.WriteLine($"Using Model Pipeline Executor: {options.PipelineExecutorType}");
-        IPipelineBatchExecutor<TInput, ClassificationResult<bool>> executor = options.PipelineExecutorType switch
+        IPipelineBatchExecutor<TInput, TOutput> executor = options.PipelineExecutorType switch
         {
-            PipelineExecutorType.Serial => new SerialPipelineBatchExecutor<TInput, ClassificationResult<bool>>(maxBatchSize: options.BatchSize),
-            PipelineExecutorType.Parallel => new ParallelPipelineBatchExecutor<TInput, ClassificationResult<bool>>(options.BatchSize, options.MaxConcurrency),
-            PipelineExecutorType.Streamed => new StreamedBatchExecutor<TInput, ClassificationResult<bool>, BatchTokenizedResult, Tensor<float>[]>(
-                options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing),
+            PipelineExecutorType.Serial => new SerialPipelineBatchExecutor<TInput, TOutput>(inferenceSteps, maxBatchSize: options.BatchSize),
+            PipelineExecutorType.Parallel => new ParallelPipelineBatchExecutor<TInput, TOutput>(inferenceSteps, options.BatchSize, options.MaxConcurrency),
+            PipelineExecutorType.Streamed => new StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>(
+                inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing),
             _ => throw new ArgumentException("Unsupported pipeline executor type")
         };
         return executor;
     }
 
-    private static SentimentInferenceV2 CreateSentimentInference(SentimentInferenceOptions options, PretrainedTokenizer tokenizer,
+    private static SentimentInference CreateSentimentInference(SentimentInferenceOptions options, PretrainedTokenizer tokenizer,
         IModelExecutor<long, float> modelExecutor)
     {
-        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor = CreatePipelineBatchExecutor<TokenizedText>(options);
+        var textClassificationTask = new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
+
+        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor =
+            CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(options, textClassificationTask);
 
         if (options.UseTokenSortingExecution)
         {
@@ -48,7 +52,7 @@ public static class SentimentInferenceFactory
             executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
         }
 
-        var pipeline = new TextClassificationPipeline<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]), executor);
-        return new SentimentInferenceV2(pipeline);
+        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(executor);
+        return new SentimentInference(pipeline);
     }
 }

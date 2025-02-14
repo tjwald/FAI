@@ -1,10 +1,10 @@
 ﻿namespace ML.Infra.Abstractions;
 
-public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPipeline<TInput, TOutput>
+public class Pipeline<TInput, TOutput>: IPipeline<TInput, TOutput>
 {
     private readonly IPipelineBatchExecutor<TInput, TOutput> _executor;
 
-    protected Pipeline(IPipelineBatchExecutor<TInput, TOutput> executor)
+    public Pipeline(IPipelineBatchExecutor<TInput, TOutput> executor)
     {
         _executor = executor;
     }
@@ -12,9 +12,8 @@ public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPip
     public async Task<TOutput> Predict(TInput input)
     {
         TInput[] inputArr = [input];
-        var output = new TOutput[1];
-        await ((IPipeline<TInput, TOutput>)this).ProcessBatch(inputArr, output);
-        return output[0];
+        TOutput[] outputArr = await BatchPredict(inputArr);
+        return outputArr[0];
     }
 
     public async Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> inputs)
@@ -22,20 +21,8 @@ public abstract class Pipeline<TInput, TOutput, TPreprocess, TModelOutput>: IPip
         var outputs = new TOutput[inputs.Length];
         Memory<TOutput> outputSpan = outputs.AsMemory();
 
-        await _executor.ExecuteBatchPredict(this, inputs, outputSpan);
+        await _executor.ExecuteBatchPredict(inputs, outputSpan);
 
         return outputs;
     }
-
-    async Task IPipeline<TInput, TOutput>.ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs)
-    {
-        var preprocess = Preprocess(inputs.Span);
-        var modelOutput = await RunModel(inputs, preprocess);
-        PostProcess(inputs.Span, preprocess, modelOutput, outputs.Span);
-    }
-
-    public abstract TPreprocess Preprocess(ReadOnlySpan<TInput> input);
-    
-    public abstract Task<TModelOutput> RunModel(ReadOnlyMemory<TInput> input, TPreprocess preprocesses);
-    public abstract void PostProcess(ReadOnlySpan<TInput> inputs, TPreprocess preprocesses, TModelOutput modelOutput, Span<TOutput> outputs);
 }
