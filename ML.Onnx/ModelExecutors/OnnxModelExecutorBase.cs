@@ -1,10 +1,12 @@
 ﻿using System.Collections.Concurrent;
 using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
+using ML.Infra;
 using ML.Infra.Abstractions;
 using ML.Infra.Configurations.ModelExecutors;
+using ML.Onnx.Configuration;
 
-namespace ML.Infra.ModelExecutors.Onnx;
+namespace ML.Onnx.ModelExecutors;
 
 public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T : IOnnxModelExecutor<T>
 {

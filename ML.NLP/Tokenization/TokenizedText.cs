@@ -1,4 +1,4 @@
-﻿namespace ML.Infra.Tokenization;
+﻿namespace ML.NLP.Tokenization;
 
 public record TokenizedText(string Text, List<int>? Tokens = null)
 {

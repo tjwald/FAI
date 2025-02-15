@@ -1,12 +1,13 @@
 ﻿using System.Numerics.Tensors;
 using ML.Infra.Abstractions;
 using ML.Infra.Configurations.PipelineBatchExecutors;
-using ML.Infra.Configurations.Pipelines;
-using ML.Infra.Factories;
-using ML.Infra.InferenceTasks;
+using ML.NLP.Configuration;
+using ML.NLP.InferenceTasks;
+using ML.NLP.PipelineBatchExecutors;
+using ML.NLP.Tokenization;
+using ML.Onnx.Factories;
 using ML.Infra.PipelineBatchExecutors;
 using ML.Infra.ResultTypes;
-using ML.Infra.Tokenization;
 
 namespace Example.SentimentInference.Model;
 

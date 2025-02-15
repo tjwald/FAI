@@ -1,7 +1,9 @@
 ﻿using ML.Infra.Configurations.ModelExecutors;
+using ML.Infra.ModelExecutors;
 using ML.Infra.Utilities;
+using ML.Onnx.Configuration;
 
-namespace ML.Infra.ModelExecutors.Onnx;
+namespace ML.Onnx.ModelExecutors;
 
 public sealed class OnnxModelExecutorObjectPool<T> : IObjectPool<T> where T : IOnnxModelExecutor<T>
 {

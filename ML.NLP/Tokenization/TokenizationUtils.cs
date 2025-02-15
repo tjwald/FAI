@@ -1,8 +1,9 @@
-﻿using Microsoft.ML.Tokenizers;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.ML.Tokenizers;
+using ML.NLP.Configuration;
 
-namespace ML.Infra.Tokenization;
+namespace ML.NLP.Tokenization;
 
 public static class TokenizationUtils
 {

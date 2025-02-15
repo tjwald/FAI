@@ -1,10 +1,10 @@
 ﻿using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using Microsoft.ML.Tokenizers;
+using ML.Infra;
+using ML.NLP.Configuration;
 
-namespace ML.Infra.Tokenization;
-
-public sealed record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512);
+namespace ML.NLP.Tokenization;
 
 public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask)
 {

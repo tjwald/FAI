@@ -1,6 +1,7 @@
 ﻿using Microsoft.ML.OnnxRuntime;
+using ML.Infra.Configurations.ModelExecutors;
 
-namespace ML.Infra.Configurations.ModelExecutors;
+namespace ML.Onnx.Configuration;
 
 public record OnnxModelExecutorOptions(
     RunOptions? RunOptions = null,

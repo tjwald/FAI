@@ -1,9 +1,10 @@
 ﻿using ML.Infra.Abstractions;
 using ML.Infra.Configurations.ModelExecutors;
 using ML.Infra.ModelExecutors;
-using ML.Infra.ModelExecutors.Onnx;
+using ML.Onnx.Configuration;
+using ML.Onnx.ModelExecutors;
 
-namespace ML.Infra.Factories;
+namespace ML.Onnx.Factories;
 
 public enum ModelExecutorType
 {

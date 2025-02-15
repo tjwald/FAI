@@ -1,13 +1,14 @@
 ﻿using System.Numerics.Tensors;
+using ML.Infra;
 using ML.Infra.Abstractions;
-using ML.Infra.Configurations.Pipelines;
 using ML.Infra.ResultTypes;
-using ML.Infra.Tokenization;
+using ML.NLP.Configuration;
+using ML.NLP.Tokenization;
 
-namespace ML.Infra.InferenceTasks;
+namespace ML.NLP.InferenceTasks;
 
 public class TextClassification<TClassification> 
-    : InferenceStepsSteps<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<TClassification>>
+    : InferenceSteps<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<TClassification>>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<long, float> _modelExecutor;
@@ -58,6 +59,9 @@ public class TextClassification<TClassification>
         TensorPrimitives.SoftMax(logits, probabilities);
         int argmax = TensorPrimitives.IndexOfMax<float>(probabilities);
         float score = TensorPrimitives.Max<float>(probabilities);
-        return new ClassificationResult<TClassification>(_pipelineOptions.Choices[argmax], score, logits.ToArray());
+
+        float[]? logitsArray = _pipelineOptions.StoreLogits ? logits.ToArray() : null;
+        
+        return new ClassificationResult<TClassification>(_pipelineOptions.Choices[argmax], score, logitsArray);
     }
 }

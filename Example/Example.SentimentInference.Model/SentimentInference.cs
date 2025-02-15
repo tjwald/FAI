@@ -1,6 +1,6 @@
 ﻿using ML.Infra.Abstractions;
+using ML.NLP.Tokenization;
 using ML.Infra.ResultTypes;
-using ML.Infra.Tokenization;
 
 namespace Example.SentimentInference.Model;
 

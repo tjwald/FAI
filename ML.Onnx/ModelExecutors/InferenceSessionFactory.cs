@@ -1,7 +1,8 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using ML.Infra.Configurations.ModelExecutors;
+using ML.Onnx.Configuration;
 
-namespace ML.Infra.ModelExecutors.Onnx;
+namespace ML.Onnx.ModelExecutors;
 
 public sealed class InferenceSessionFactory
 {

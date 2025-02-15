@@ -10,16 +10,16 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         AllowSynchronousContinuations = false,
     };
 
-    private readonly InferenceStepsSteps<TInput, TPreprocess, TModelOutput, TOutput> _inference;
+    private readonly InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> _inference;
     private readonly int _maxBatchSize;
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
 
     public StreamedBatchExecutor(IInferenceSteps<TInput, TOutput> inferenceSteps, int maxBatchSize, int? maxConcurrency, bool parallelTokenization)
     {
-        if (inferenceSteps is not InferenceStepsSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceTaskSteps)
+        if (inferenceSteps is not InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceTaskSteps)
         {
-            throw new ArgumentException("Only InferenceStepsSteps<,,,> can be used.", nameof(inferenceSteps));
+            throw new ArgumentException("Only InferenceSteps<,,,> can be used.", nameof(inferenceSteps));
         }
         _maxBatchSize = maxBatchSize;
         _parallelTokenization = parallelTokenization;

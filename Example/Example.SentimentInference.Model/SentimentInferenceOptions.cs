@@ -1,8 +1,9 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using ML.Infra.Configurations.ModelExecutors;
 using ML.Infra.Configurations.PipelineBatchExecutors;
-using ML.Infra.Factories;
-using ML.Infra.Tokenization;
+using ML.NLP.Configuration;
+using ML.Onnx.Configuration;
+using ML.Onnx.Factories;
 
 namespace Example.SentimentInference.Model;
 

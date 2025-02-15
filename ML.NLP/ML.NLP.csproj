@@ -7,10 +7,9 @@
         <NoWarn>$(NoWarn);SYSLIB5001</NoWarn>
     </PropertyGroup>
 
-
     <ItemGroup>
-        <PackageReference Include="System.Linq.Async" Version="6.0.1"/>
-        <PackageReference Include="System.Numerics.Tensors" Version="9.0.0"/>
-        <PackageReference Include="System.Text.Json" Version="9.0.0"/>
+      <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
+      <PackageReference Include="Microsoft.ML.Tokenizers" Version="1.0.0"/>
     </ItemGroup>
+
 </Project>

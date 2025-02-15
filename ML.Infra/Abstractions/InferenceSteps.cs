@@ -5,7 +5,7 @@ public interface IInferenceSteps<TInput, TOutput>
     Task ProcessBatch(ReadOnlyMemory<TInput> inputs, Memory<TOutput> outputs);
 }
 
-public abstract class InferenceStepsSteps<TInput, TPreprocess, TModelOutput, TOutput>: IInferenceSteps<TInput, TOutput>
+public abstract class InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput>: IInferenceSteps<TInput, TOutput>
 {
     public abstract TPreprocess Preprocess(ReadOnlySpan<TInput> input);
     public abstract Task<TModelOutput> RunModel(ReadOnlyMemory<TInput> input, TPreprocess preprocesses);
