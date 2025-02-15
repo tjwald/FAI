@@ -177,4 +177,4 @@ The time per batch size (4 threads):
 | 450        | 3.78     |
 | 500        | 3.86     |
 
-![Batch Size VS Time Graph](docs/Batch%20Size%20VS%20Time%20Graph.png "Batch Size VS Time Graph")
+![Batch Size VS Time](docs/Batch%20Size%20VS%20Time.png)
