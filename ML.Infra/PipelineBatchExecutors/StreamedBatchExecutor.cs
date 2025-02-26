@@ -3,6 +3,25 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
+record StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(
+    ReadOnlyMemory<TInput> Inputs,
+    Memory<TOutput> Outputs,
+    TaskCompletionSource CompletionSource,
+    TPreprocess PreprocessResult)
+{
+    internal TModelOutput? ModelResult { get; set; } = default;
+}
+
+record ModelExecutionInput<TInput, TOutput, TPreprocess>(
+    ReadOnlyMemory<TInput> Inputs,
+    Memory<TOutput> Outputs,
+    TaskCompletionSource CompletionSource,
+    TPreprocess PreprocessResult);
+
+record PostProcessInput<TInput, TOutput, TPreprocess, TModelOutput>(
+    ModelExecutionInput<TInput, TOutput, TPreprocess> ModelExecutionInput,
+    TModelOutput ModelResult);
+
 public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private static readonly UnboundedChannelOptions UnboundedChannelOptions = new()
@@ -11,6 +30,16 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     };
 
     private readonly InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> _inference;
+
+    private readonly Channel<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>> _modelInputChannel =
+        Channel.CreateUnbounded<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>>(UnboundedChannelOptions);
+
+    private readonly Channel<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>> _postProcessingInputChannel =
+        Channel.CreateUnbounded<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>>(UnboundedChannelOptions);
+
+    private readonly Task _modelTask;
+    private readonly Task _postProcessingTask;
+
     private readonly int _maxBatchSize;
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
@@ -21,118 +50,117 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         {
             throw new ArgumentException("Only InferenceSteps<,,,> can be used.", nameof(inferenceSteps));
         }
+
         _maxBatchSize = maxBatchSize;
         _parallelTokenization = parallelTokenization;
         _inference = inferenceTaskSteps;
         _parallelOptions = maxConcurrency.HasValue ? new ParallelOptions { MaxDegreeOfParallelism = maxConcurrency.Value } : new ParallelOptions();
+
+        _modelTask = BackgroundWorker(_modelInputChannel, _parallelOptions, ModelProcessChunk);
+        _postProcessingTask = BackgroundWorker(_postProcessingInputChannel, _parallelOptions, PostProcess);
     }
 
     public Task ExecuteBatchPredict(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output)
     {
-        var preprocessChannel = Channel.CreateUnbounded<(Range inputRange, TPreprocess preprocessChunk)>(UnboundedChannelOptions);
-        var modelChannel = Channel.CreateUnbounded<(Range inputRange, TPreprocess preprocessChunk, TModelOutput modelOutput)>(UnboundedChannelOptions);
-        var preprocessWorker = PreprocessingWorker(preprocessChannel, inputs);
-        var modelWorker = ModelProcessingWorker(preprocessChannel, modelChannel, inputs);
-        var postprocessWorker = PostProcessingWorker(modelChannel, inputs, output);
-
-        return Task.WhenAll(preprocessWorker, modelWorker, postprocessWorker);
-    }
-
-    private async Task PreprocessingWorker(Channel<(Range inputRange, TPreprocess preprocessChunk)> preprocessChannel, ReadOnlyMemory<TInput> inputs)
-    {
+        if (inputs.Length < _maxBatchSize)
+        {
+            var tcs = new TaskCompletionSource();
+            var preprocess = _inference.Preprocess(inputs.Span);
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs, output, tcs, preprocess));
+            return tcs.Task;
+        }
+        (int batchCountWithoutRemainder, int remainder) = Math.DivRem(inputs.Length, _maxBatchSize);
+        int batchCount = batchCountWithoutRemainder + (remainder > 0 ? 1 : 0);
+        var tasks = new Task[batchCount];
         if (_parallelTokenization)
         {
-            await PreprocessParallel(preprocessChannel, inputs);
+            PreprocessParallel(inputs, output, batchCountWithoutRemainder, batchCount, tasks);
         }
         else
         {
-            int batchCount = inputs.Length / _maxBatchSize;
-            Range inputRange;
-            TPreprocess preprocess;
-            for (int i = 0; i < inputs.Length - _maxBatchSize; i += _maxBatchSize)
-            {
-                inputRange = new Range(i, i + _maxBatchSize);
-                preprocess = _inference.Preprocess(inputs[inputRange].Span);
-                preprocessChannel.Writer.TryWrite((inputRange, preprocess));
-            }
-
-            int batchStartIndex = batchCount * _maxBatchSize;
-            int batchEndIndex = inputs.Length;
-            inputRange = new Range(batchStartIndex, batchEndIndex);
-            preprocess = _inference.Preprocess(inputs[inputRange].Span);
-            preprocessChannel.Writer.TryWrite((inputRange, preprocess));
+            PreprocessSerial(inputs, output, batchCountWithoutRemainder, batchCount, tasks);
         }
 
-        preprocessChannel.Writer.Complete();
+        return Task.WhenAll(tasks);
     }
 
-    private async Task PreprocessParallel(
-        Channel<(Range inputRange, TPreprocess preprocessChunk)> preprocessChannel,
-        ReadOnlyMemory<TInput> inputs)
+    private void PreprocessParallel(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
-        int maxBatchSize = _maxBatchSize * 4;
-        int batchCount = inputs.Length / maxBatchSize;
-
-        var task = Task.Run(() => Parallel.For(0, batchCount, _parallelOptions, (i, _) =>
+        Parallel.For(0, batchCountWithoutRemainder, _parallelOptions, i =>
         {
-            int batchStartIndex = i * maxBatchSize;
-            int batchEndIndex = batchStartIndex + maxBatchSize;
-            for (int j = batchStartIndex; j < batchEndIndex; j += _maxBatchSize)
-            {
-                var inputRange = new Range(j, j + _maxBatchSize);
-                var preprocess = _inference.Preprocess(inputs[inputRange].Span);
-                preprocessChannel.Writer.TryWrite((inputRange, preprocess));
-            }
-        }));
+            var taskCompletionSource = new TaskCompletionSource();
+            tasks[i] = taskCompletionSource.Task;
+            int startIndex = i * batchCount;
+            var r = new Range(startIndex, startIndex + _maxBatchSize);
+            var preprocess = _inference.Preprocess(inputs[r].Span);
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+        });
 
-        if (inputs.Length % maxBatchSize > 0)
+        if (batchCountWithoutRemainder < batchCount)
         {
-            int batchStartIndex = batchCount * maxBatchSize;
-            int batchEndIndex = inputs.Length;
-            for (int j = batchStartIndex; j < batchEndIndex; j += _maxBatchSize)
-            {
-                var inputRange = new Range(j, Math.Min(j + _maxBatchSize, batchEndIndex));
-                var preprocess = _inference.Preprocess(inputs[inputRange].Span);
-                preprocessChannel.Writer.TryWrite((inputRange, preprocess));
-            }
+            var taskCompletionSource = new TaskCompletionSource();
+            tasks[^1] = taskCompletionSource.Task;
+            var r = new Range(batchCountWithoutRemainder * _maxBatchSize, inputs.Length);
+            var preprocess = _inference.Preprocess(inputs[r].Span);
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+        }
+    }
+
+    private void PreprocessSerial(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
+    {
+        int i = 0;
+        for (; i < batchCountWithoutRemainder; i+= _maxBatchSize)
+        {
+            var taskCompletionSource = new TaskCompletionSource();
+            tasks[i] = taskCompletionSource.Task;
+            var r = new Range(i, i + _maxBatchSize);
+            var preprocess = _inference.Preprocess(inputs[r].Span);
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
         }
 
-        await task;
-    }
-
-    private async Task ModelProcessingWorker(
-        Channel<(Range inputRange, TPreprocess preprocessChunk)> preprocessChannel,
-        Channel<(Range inputRange, TPreprocess preprocessChunk, TModelOutput modelOutput)> modelChannel,
-        ReadOnlyMemory<TInput> inputs)
-    {
-        await Parallel.ForEachAsync(preprocessChannel.Reader.ReadAllAsync(), _parallelOptions,
-            (preprocessedResult, _) => ModelProcessChunk(modelChannel, preprocessedResult, inputs));
-
-        modelChannel.Writer.Complete();
-    }
-
-    private async ValueTask ModelProcessChunk(
-        Channel<(Range inputRange, TPreprocess preprocessChunk, TModelOutput modelOutput)> modelChannel,
-        (Range inputRange, TPreprocess preprocessChunk) preprocessedResult,
-        ReadOnlyMemory<TInput> inputs)
-    {
-        var result = await _inference.RunModel(inputs[preprocessedResult.inputRange], preprocessedResult.preprocessChunk);
-        modelChannel.Writer.TryWrite((preprocessedResult.inputRange, preprocessedResult.preprocessChunk, result));
-    }
-
-    private async Task PostProcessingWorker(
-        Channel<(Range inputRange, TPreprocess preprocessChunk, TModelOutput modelOutput)> modelChannel,
-        ReadOnlyMemory<TInput> inputs,
-        Memory<TOutput> output)
-    {
-        await Parallel.ForEachAsync(modelChannel.Reader.ReadAllAsync(), _parallelOptions, PostProcess);
-        return;
-
-        ValueTask PostProcess((Range inputRange, TPreprocess preprocessChunk, TModelOutput modelOutput) modelResult, CancellationToken ct)
+        if (i < batchCount)
         {
-            _inference.PostProcess(inputs[modelResult.inputRange].Span, modelResult.preprocessChunk, modelResult.modelOutput,
-                output[modelResult.inputRange].Span);
-            return ValueTask.CompletedTask;
+            var taskCompletionSource = new TaskCompletionSource();
+            tasks[i] = taskCompletionSource.Task;
+            var r = new Range(i, inputs.Length);
+            var preprocess = _inference.Preprocess(inputs[r].Span);
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
         }
+    }
+
+    private static Task BackgroundWorker<T>(Channel<T> channel, ParallelOptions parallelOptions, Func<T, CancellationToken, ValueTask> func)
+    {
+        Console.WriteLine($"Starting worker thread for processing: {func.Method.Name}");
+        return Parallel.ForEachAsync(channel.Reader.ReadAllAsync(), parallelOptions, func);
+    }
+
+    private async ValueTask ModelProcessChunk(StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput> chunk, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _inference.RunModel(chunk.Inputs, chunk.PreprocessResult);
+            chunk.ModelResult = result;
+            _postProcessingInputChannel.Writer.TryWrite(chunk);
+        }
+        catch (Exception e)
+        {
+            chunk.CompletionSource.SetException(e);
+        }
+    }
+    
+    ValueTask PostProcess(StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput> postProcessInput, CancellationToken ct)
+    {
+        try
+        {
+            _inference.PostProcess(postProcessInput.Inputs.Span, postProcessInput.PreprocessResult, postProcessInput.ModelResult,
+                postProcessInput.Outputs.Span);
+            postProcessInput.CompletionSource.SetResult();
+        }
+        catch (Exception e)
+        {
+            postProcessInput.CompletionSource.SetException(e);
+        }
+            
+        return ValueTask.CompletedTask;
     }
 }

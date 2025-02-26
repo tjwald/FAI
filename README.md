@@ -81,7 +81,8 @@ I was inspired by [HuggingFace](https://huggingface.co/docs/transformers/en/inde
 There are multiple examples of these PipelineBatchExecutors:
 * Serial - just runs them in a loop one after the other.
 * Parallel - will do just that - parallelize the batches.
-* OutOfOrder - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, the user expects the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index. 
+* TokenCountSorting - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, the user expects the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index.
+* TokenBatchSize - group the sentences up to a token threshold instead of sentence count.
 
 
 ## Results:
@@ -177,3 +178,11 @@ The time per batch size (4 threads):
 | 450        | 3.78        |
 | 500        | 3.86        |
 
+With TokenBatchSizeBatchExecutor + Streamed in addition to TokenCountSortingBatchExecutor we get:
+
+* ONNX + GPU
+* ORT_SEQUENTIAL
+* **Token Max Batch Size: 2048**
+* Threading: 4
+* Time: 3.64s
+* Time per sentence: 0.054 ms

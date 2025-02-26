@@ -42,14 +42,18 @@ public static class SentimentInferenceFactory
     private static SentimentInference CreateSentimentInference(SentimentInferenceOptions options, PretrainedTokenizer tokenizer,
         IModelExecutor<long, float> modelExecutor)
     {
-        var textClassificationTask = new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
+        IInferenceSteps<TokenizedText, ClassificationResult<bool>> textClassificationTask =
+            new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
 
-        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor =
-            CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(options, textClassificationTask);
+        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor;
+        executor = CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(options, textClassificationTask);
 
         if (options.UseTokenSortingExecution)
         {
+            Console.WriteLine("Using TokenBatchSize chunking");
+            executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, options.MaxTokenCount!.Value);
             Console.WriteLine("Using out of order execution");
+            
             executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
         }
 

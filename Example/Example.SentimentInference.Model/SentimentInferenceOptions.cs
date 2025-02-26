@@ -16,17 +16,19 @@ public record SentimentInferenceOptions(
     PipelineExecutorType PipelineExecutorType,
     bool UseTokenSortingExecution,
     ModelExecutorType ModelExecutorType,
-    bool ParallelPreProcessing)
+    bool ParallelPreProcessing,
+    int? MaxTokenCount = 0)
 {
     public static readonly SentimentInferenceOptions DefaultConfig = new(
         ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
         TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
         new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxThreads: null),
         MaxConcurrency: 4,
-        BatchSize: 400,
+        BatchSize: 100000,
         ModelExecutorType: ModelExecutorType.Simple,
         UseTokenSortingExecution: true,
         PipelineExecutorType: PipelineExecutorType.Streamed,
-        ParallelPreProcessing: true
+        ParallelPreProcessing: false,
+        MaxTokenCount: 2048
     );
 }

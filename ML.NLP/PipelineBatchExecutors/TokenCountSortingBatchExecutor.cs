@@ -3,7 +3,7 @@ using ML.NLP.Tokenization;
 
 namespace ML.NLP.PipelineBatchExecutors;
 
-public readonly struct TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<TokenizedText, TOutput>
+public class TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<TokenizedText, TOutput>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IPipelineBatchExecutor<TokenizedText, TOutput> _executor;
