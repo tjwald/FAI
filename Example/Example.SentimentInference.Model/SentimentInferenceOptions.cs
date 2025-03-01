@@ -10,25 +10,15 @@ namespace Example.SentimentInference.Model;
 public record SentimentInferenceOptions(
     string ModelDir,
     PretrainedTokenizerOptions TokenizerOptions,
-    IModelExecutorConfig OnnxModelExecutorOptions,
-    int? MaxConcurrency,
-    int BatchSize,
-    PipelineExecutorType PipelineExecutorType,
-    bool UseTokenSortingExecution,
-    ModelExecutorType ModelExecutorType,
-    bool ParallelPreProcessing,
-    int? MaxTokenCount = 0)
+    IModelExecutorConfig ModelExecutorOptions,
+    IPipelineBatchExecutorOptions PipeBatchExecutorOptions,
+    ModelExecutorType ModelExecutorType)
 {
     public static readonly SentimentInferenceOptions DefaultConfig = new(
         ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
         TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
-        new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxThreads: null),
-        MaxConcurrency: 4,
-        BatchSize: 100000,
-        ModelExecutorType: ModelExecutorType.Simple,
-        UseTokenSortingExecution: true,
-        PipelineExecutorType: PipelineExecutorType.Streamed,
-        ParallelPreProcessing: false,
-        MaxTokenCount: 2048
+        ModelExecutorOptions: new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxThreads: null),
+        PipeBatchExecutorOptions: new TokenBasedBatchExecutorOptions(new StreamedPipelineExecutorOptions(100000, 4, false), true, 2048),
+        ModelExecutorType: ModelExecutorType.Simple
     );
 }

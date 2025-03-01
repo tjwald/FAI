@@ -1,12 +1,11 @@
 ﻿using System.Numerics.Tensors;
 using ML.Infra.Abstractions;
-using ML.Infra.Configurations.PipelineBatchExecutors;
+using ML.Infra.Factories;
 using ML.NLP.Configuration;
 using ML.NLP.InferenceTasks;
 using ML.NLP.PipelineBatchExecutors;
 using ML.NLP.Tokenization;
 using ML.Onnx.Factories;
-using ML.Infra.PipelineBatchExecutors;
 using ML.Infra.ResultTypes;
 
 namespace Example.SentimentInference.Model;
@@ -19,24 +18,9 @@ public static class SentimentInferenceFactory
         var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
 
         IModelExecutor<long, float> modelExecutor =
-            await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.OnnxModelExecutorOptions);
+            await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.ModelExecutorOptions);
 
         return CreateSentimentInference(options, tokenizer, modelExecutor);
-    }
-
-    private static IPipelineBatchExecutor<TInput, TOutput> CreatePipelineBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>(
-        SentimentInferenceOptions options, IInferenceSteps<TInput, TOutput> inferenceSteps)
-    {
-        Console.WriteLine($"Using Model Pipeline Executor: {options.PipelineExecutorType}");
-        IPipelineBatchExecutor<TInput, TOutput> executor = options.PipelineExecutorType switch
-        {
-            PipelineExecutorType.Serial => new SerialPipelineBatchExecutor<TInput, TOutput>(inferenceSteps, maxBatchSize: options.BatchSize),
-            PipelineExecutorType.Parallel => new ParallelPipelineBatchExecutor<TInput, TOutput>(inferenceSteps, options.BatchSize, options.MaxConcurrency),
-            PipelineExecutorType.Streamed => new StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>(
-                inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing),
-            _ => throw new ArgumentException("Unsupported pipeline executor type")
-        };
-        return executor;
     }
 
     private static SentimentInference CreateSentimentInference(SentimentInferenceOptions options, PretrainedTokenizer tokenizer,
@@ -46,15 +30,28 @@ public static class SentimentInferenceFactory
             new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
 
         IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor;
-        executor = CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(options, textClassificationTask);
-
-        if (options.UseTokenSortingExecution)
+        if (options.PipeBatchExecutorOptions is TokenBasedBatchExecutorOptions opt)
         {
-            Console.WriteLine("Using TokenBatchSize chunking");
-            executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, options.MaxTokenCount!.Value);
-            Console.WriteLine("Using out of order execution");
-            
-            executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+            executor =
+                PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(opt.InternalExecutorOptions,
+                    textClassificationTask);
+
+            if (opt.MaxTokensCount.HasValue)
+            {
+                Console.WriteLine("Using TokenBatchSize chunking");
+                executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, opt.MaxTokensCount.Value);
+            }
+
+            if (opt.SortTokens)
+            {
+                Console.WriteLine("Using Sort by token count execution");
+                executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+            }
+        }
+        else
+        {
+            executor = PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(
+                options.PipeBatchExecutorOptions, textClassificationTask);
         }
 
         var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(executor);

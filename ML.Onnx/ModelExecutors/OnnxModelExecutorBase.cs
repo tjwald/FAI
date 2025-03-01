@@ -3,7 +3,6 @@ using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
 using ML.Infra;
 using ML.Infra.Abstractions;
-using ML.Infra.Configurations.ModelExecutors;
 using ML.Onnx.Configuration;
 
 namespace ML.Onnx.ModelExecutors;
