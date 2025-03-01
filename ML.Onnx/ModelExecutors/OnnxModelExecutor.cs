@@ -1,6 +1,6 @@
 ﻿using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
-using ML.Infra.Configurations.ModelExecutors;
+using ML.Infra.Utilities;
 using ML.Onnx.Configuration;
 
 namespace ML.Onnx.ModelExecutors;
@@ -18,19 +18,33 @@ public sealed class OnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecuto
         _semaphore = maxThreads.HasValue ? new SemaphoreSlim(maxThreads.Value, maxThreads.Value) : null;
     }
 
+    private Task<IDisposableReadOnlyCollection<OrtValue>> RunWithThreadPool(OrtValue[] ortValues)
+    {
+        var tcs = new TaskCompletionSource<IDisposableReadOnlyCollection<OrtValue>>();
+        ThreadPool.QueueUserWorkItem(ortValues =>
+        {
+            try
+            {
+                IDisposableReadOnlyCollection<OrtValue> x = Session.Run(RunOptions, Session.InputNames, ortValues, Session.OutputNames);
+                tcs.SetResult(x);
+            }
+            catch (Exception e)
+            {
+                tcs.SetException(e);
+            }
+        }, ortValues, true);
+        return tcs.Task;
+    }
+
     public override async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
     {
         OrtValue[] ortValues = GetModelInputs(inputs);
 
-        if (_semaphore is not null)
+        IDisposableReadOnlyCollection<OrtValue> result;
+        using (await _semaphore.EnterScope())
         {
-            await _semaphore.WaitAsync();
+            result = await RunWithThreadPool(ortValues);
         }
-        
-        IDisposableReadOnlyCollection<OrtValue> result = await Task.Run(
-            () => Session.Run(RunOptions, Session.InputNames, ortValues, Session.OutputNames)).ConfigureAwait(false);
-
-        _semaphore?.Release();
 
         foreach (var input in ortValues)
         {
