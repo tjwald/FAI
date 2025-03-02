@@ -18,7 +18,7 @@ public record SentimentInferenceOptions(
         ModelDir: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources"),
         TokenizerOptions: new PretrainedTokenizerOptions(PaddingToken: 0),
         ModelExecutorOptions: new OnnxModelExecutorOptions(UseGpu: true, ExecutionMode: ExecutionMode.ORT_SEQUENTIAL, MaxThreads: null),
-        PipeBatchExecutorOptions: new TokenBasedBatchExecutorOptions(new StreamedPipelineExecutorOptions(100000, 4, false), true, 2048),
+        PipeBatchExecutorOptions: new MaxPaddedTokensBatchExecutorOptions(new StreamedPipelineExecutorOptions(100000, 4, false), 2048, 0.1),
         ModelExecutorType: ModelExecutorType.Simple
     );
 }

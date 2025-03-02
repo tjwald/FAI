@@ -1,5 +1,6 @@
 ﻿using System.Numerics.Tensors;
 using ML.Infra.Abstractions;
+using ML.Infra.Configurations.PipelineBatchExecutors;
 using ML.Infra.Factories;
 using ML.NLP.Configuration;
 using ML.NLP.InferenceTasks;
@@ -29,29 +30,43 @@ public static class SentimentInferenceFactory
         IInferenceSteps<TokenizedText, ClassificationResult<bool>> textClassificationTask =
             new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
 
-        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor;
-        if (options.PipeBatchExecutorOptions is TokenBasedBatchExecutorOptions opt)
+        IPipelineBatchExecutorOptions baseExecutorOptions;
+        if (options.PipeBatchExecutorOptions is DecoratorExecutorOptions decoratorExecutorOptions)
         {
-            executor =
-                PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(opt.InternalExecutorOptions,
-                    textClassificationTask);
-
-            if (opt.MaxTokensCount.HasValue)
-            {
-                Console.WriteLine("Using TokenBatchSize chunking");
-                executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, opt.MaxTokensCount.Value);
-            }
-
-            if (opt.SortTokens)
-            {
-                Console.WriteLine("Using Sort by token count execution");
-                executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
-            }
+            baseExecutorOptions = decoratorExecutorOptions.InternalExecutorOptions;
         }
         else
         {
-            executor = PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(
-                options.PipeBatchExecutorOptions, textClassificationTask);
+            baseExecutorOptions = options.PipeBatchExecutorOptions;
+        }
+
+        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor =
+            PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(
+                baseExecutorOptions,
+                textClassificationTask);
+
+        switch (options.PipeBatchExecutorOptions)
+        {
+            case MaxPaddedTokensBatchExecutorOptions maxPaddedTokensBatchExecutorOptions:
+                Console.WriteLine("Using TokenBatchSize chunking and Max Padding");
+                executor = new MaxPaddedTokensBatchExecutor<ClassificationResult<bool>>(executor, maxPaddedTokensBatchExecutorOptions.MaxPaddedRatio, maxPaddedTokensBatchExecutorOptions.MaxTokensCount);
+                
+                Console.WriteLine("Using Sort by token count execution");
+                executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+                break;
+            case TokenBasedBatchExecutorOptions tokenBasedBatchExecutorOptions:
+                if (tokenBasedBatchExecutorOptions.MaxTokensCount.HasValue)
+                {
+                    Console.WriteLine("Using TokenBatchSize chunking");
+                    executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, tokenBasedBatchExecutorOptions.MaxTokensCount.Value);
+                }
+
+                if (tokenBasedBatchExecutorOptions.SortTokens)
+                {
+                    Console.WriteLine("Using Sort by token count execution");
+                    executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+                }
+                break;
         }
 
         var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(executor);
