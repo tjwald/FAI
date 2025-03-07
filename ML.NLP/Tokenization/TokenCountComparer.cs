@@ -1,24 +1,14 @@
 ﻿namespace ML.NLP.Tokenization;
 
-public readonly struct TokenCountComparer : IComparer<TokenizedText>
+public readonly struct TokenCountComparer<TToken> : IComparer<TToken> where TToken: ITokenizable
 {
-    private readonly PretrainedTokenizer _tokenizer;
-
-    public TokenCountComparer(PretrainedTokenizer tokenizer)
-    {
-        _tokenizer = tokenizer;
-    }
-
-    public int Compare(TokenizedText? x, TokenizedText? y)
+    public int Compare(TToken? x, TToken? y)
     {
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
 
-        x.Tokens ??= _tokenizer.Tokenize(x.Text);
-        y.Tokens ??= _tokenizer.Tokenize(y.Text);
-
-        int xCount = x.Count;
-        int yCount = y.Count;
+        int xCount = x.MaxTokenLength;
+        int yCount = y.MaxTokenLength;
 
         return xCount.CompareTo(yCount);
     }

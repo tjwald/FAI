@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\ML.Infra\ML.Infra.csproj" />
+      <ProjectReference Include="..\..\..\ML.Infra\ML.Infra.csproj" />
       <ProjectReference Include="..\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj" />
     </ItemGroup>
 

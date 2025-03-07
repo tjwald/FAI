@@ -3,26 +3,31 @@ using ML.NLP.Tokenization;
 
 namespace ML.NLP.PipelineBatchExecutors;
 
-public class TokenCountSortingBatchExecutor<TOutput> : IPipelineBatchExecutor<TokenizedText, TOutput>
+public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExecutor<TToken, TOutput> where TToken: ITokenizable
 {
     private readonly PretrainedTokenizer _tokenizer;
-    private readonly IPipelineBatchExecutor<TokenizedText, TOutput> _executor;
+    private readonly IPipelineBatchExecutor<TToken, TOutput> _executor;
 
-    public TokenCountSortingBatchExecutor(PretrainedTokenizer tokenizer, IPipelineBatchExecutor<TokenizedText, TOutput> executor)
+    public TokenCountSortingBatchExecutor(PretrainedTokenizer tokenizer, IPipelineBatchExecutor<TToken, TOutput> executor)
     {
         _tokenizer = tokenizer;
         _executor = executor;
     }
 
-    public async Task ExecuteBatchPredict(ReadOnlyMemory<TokenizedText> inputs, Memory<TOutput> outputSpan)
+    public async Task ExecuteBatchPredict(ReadOnlyMemory<TToken> inputs, Memory<TOutput> outputSpan)
     {
-        ReadOnlySpan<TokenizedText> inputSpan = inputs.Span;
+        ReadOnlySpan<TToken> inputSpan = inputs.Span;
         int[] inputsSortedIndices = Enumerable.Range(0, inputSpan.Length).ToArray();
-        TokenizedText[] inputsSorted = inputs.Span.ToArray();
+        TToken[] inputsSorted = inputs.Span.ToArray();
 
-        var tokenComparer = new TokenCountComparer(_tokenizer);
+        foreach (var input in inputsSorted)
+        {
+            input.Tokenize(_tokenizer);
+        }
+        
+        var tokenComparer = new TokenCountComparer<TToken>();
 
-        MemoryExtensions.Sort<TokenizedText, int, TokenCountComparer>(inputsSorted, inputsSortedIndices, tokenComparer);
+        MemoryExtensions.Sort<TToken, int, TokenCountComparer<TToken>>(inputsSorted, inputsSortedIndices, tokenComparer);
         await _executor.ExecuteBatchPredict(inputsSorted, outputSpan);
         MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span);
     }

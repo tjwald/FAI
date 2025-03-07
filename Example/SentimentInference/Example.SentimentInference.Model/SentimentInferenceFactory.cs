@@ -1,13 +1,12 @@
-﻿using System.Numerics.Tensors;
-using ML.Infra.Abstractions;
+﻿using ML.Infra.Abstractions;
 using ML.Infra.Configurations.PipelineBatchExecutors;
 using ML.Infra.Factories;
 using ML.NLP.Configuration;
-using ML.NLP.InferenceTasks;
 using ML.NLP.PipelineBatchExecutors;
 using ML.NLP.Tokenization;
 using ML.Onnx.Factories;
 using ML.Infra.ResultTypes;
+using ML.NLP.InferenceTasks.TextClassification;
 
 namespace Example.SentimentInference.Model;
 
@@ -49,22 +48,22 @@ public static class SentimentInferenceFactory
         {
             case MaxPaddedTokensBatchExecutorOptions maxPaddedTokensBatchExecutorOptions:
                 Console.WriteLine("Using TokenBatchSize chunking and Max Padding");
-                executor = new MaxPaddedTokensBatchExecutor<ClassificationResult<bool>>(executor, maxPaddedTokensBatchExecutorOptions.MaxPaddedRatio, maxPaddedTokensBatchExecutorOptions.MaxTokensCount);
+                executor = new MaxPaddedTokensBatchExecutor<TokenizedText, ClassificationResult<bool>>(executor, maxPaddedTokensBatchExecutorOptions.MaxPaddedRatio, maxPaddedTokensBatchExecutorOptions.MaxTokensCount);
                 
                 Console.WriteLine("Using Sort by token count execution");
-                executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+                executor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(tokenizer, executor);
                 break;
             case TokenBasedBatchExecutorOptions tokenBasedBatchExecutorOptions:
                 if (tokenBasedBatchExecutorOptions.MaxTokensCount.HasValue)
                 {
                     Console.WriteLine("Using TokenBatchSize chunking");
-                    executor = new TokenBatchSizeBatchExecutor<ClassificationResult<bool>>(executor, tokenBasedBatchExecutorOptions.MaxTokensCount.Value);
+                    executor = new TokenBatchSizeBatchExecutor<TokenizedText, ClassificationResult<bool>>(executor, tokenBasedBatchExecutorOptions.MaxTokensCount.Value);
                 }
 
                 if (tokenBasedBatchExecutorOptions.SortTokens)
                 {
                     Console.WriteLine("Using Sort by token count execution");
-                    executor = new TokenCountSortingBatchExecutor<ClassificationResult<bool>>(tokenizer, executor);
+                    executor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(tokenizer, executor);
                 }
                 break;
         }

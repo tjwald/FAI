@@ -3,24 +3,14 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-record StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(
+internal sealed record StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(
     ReadOnlyMemory<TInput> Inputs,
     Memory<TOutput> Outputs,
     TaskCompletionSource CompletionSource,
     TPreprocess PreprocessResult)
 {
-    internal TModelOutput? ModelResult { get; set; } = default;
+    internal TModelOutput? ModelResult { get; set; }
 }
-
-record ModelExecutionInput<TInput, TOutput, TPreprocess>(
-    ReadOnlyMemory<TInput> Inputs,
-    Memory<TOutput> Outputs,
-    TaskCompletionSource CompletionSource,
-    TPreprocess PreprocessResult);
-
-record PostProcessInput<TInput, TOutput, TPreprocess, TModelOutput>(
-    ModelExecutionInput<TInput, TOutput, TPreprocess> ModelExecutionInput,
-    TModelOutput ModelResult);
 
 public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
@@ -152,7 +142,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     {
         try
         {
-            _inference.PostProcess(postProcessInput.Inputs.Span, postProcessInput.PreprocessResult, postProcessInput.ModelResult,
+            _inference.PostProcess(postProcessInput.Inputs.Span, postProcessInput.PreprocessResult, postProcessInput.ModelResult!,
                 postProcessInput.Outputs.Span);
             postProcessInput.CompletionSource.SetResult();
         }

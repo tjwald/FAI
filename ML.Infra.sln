@@ -5,17 +5,25 @@ VisualStudioVersion = 17.12.35506.116 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Infra", "ML.Infra\ML.Infra.csproj", "{8ECD26BA-056C-4993-8943-CE27A9B3D013}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Api", "Example\Example.SentimentInference.Api\Example.SentimentInference.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Api", "Example\SentimentInference\Example.SentimentInference.Api\Example.SentimentInference.Api.csproj", "{90A7F700-CA15-4BE2-B75D-DF104B4BA87E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Console", "Example\Example.SentimentInference.Console\Example.SentimentInference.Console.csproj", "{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Console", "Example\SentimentInference\Example.SentimentInference.Console\Example.SentimentInference.Console.csproj", "{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Model", "Example\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj", "{31936B86-266B-43FC-B50D-FC3B67191C02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.SentimentInference.Model", "Example\SentimentInference\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj", "{31936B86-266B-43FC-B50D-FC3B67191C02}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Example", "Example", "{8DBE7E2D-C26E-47E2-938D-B13971FE51C0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.NLP", "ML.NLP\ML.NLP.csproj", "{ADB65FD2-0280-420A-AF88-BD86BE67E2E2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ML.Onnx", "ML.Onnx\ML.Onnx.csproj", "{0D656B50-7C9A-4373-B2CF-BE0B791FB962}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.MultipleChoice.Model", "Example\MultipleChoice\Example.MultipleChoice.Model\Example.MultipleChoice.Model.csproj", "{78A8F568-126F-47C9-BC9A-C729AC822E86}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.MultipleChoice.Console", "Example\MultipleChoice\Example.MultipleChoice.Console\Example.MultipleChoice.Console.csproj", "{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MultipleChoice", "MultipleChoice", "{BDC6027B-7405-4C14-9ACB-AADF513BECA4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SentimentInference", "SentimentInference", "{A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,13 +55,25 @@ Global
 		{0D656B50-7C9A-4373-B2CF-BE0B791FB962}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0D656B50-7C9A-4373-B2CF-BE0B791FB962}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0D656B50-7C9A-4373-B2CF-BE0B791FB962}.Release|Any CPU.Build.0 = Release|Any CPU
+		{78A8F568-126F-47C9-BC9A-C729AC822E86}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{78A8F568-126F-47C9-BC9A-C729AC822E86}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{78A8F568-126F-47C9-BC9A-C729AC822E86}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{78A8F568-126F-47C9-BC9A-C729AC822E86}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
-		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
-		{31936B86-266B-43FC-B50D-FC3B67191C02} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
+		{BDC6027B-7405-4C14-9ACB-AADF513BECA4} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
+		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54} = {BDC6027B-7405-4C14-9ACB-AADF513BECA4}
+		{78A8F568-126F-47C9-BC9A-C729AC822E86} = {BDC6027B-7405-4C14-9ACB-AADF513BECA4}
+		{A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9} = {8DBE7E2D-C26E-47E2-938D-B13971FE51C0}
+		{90A7F700-CA15-4BE2-B75D-DF104B4BA87E} = {A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9}
+		{889F34B1-C99F-4468-9AD5-D8E2E7B9AFE9} = {A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9}
+		{31936B86-266B-43FC-B50D-FC3B67191C02} = {A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9}
 	EndGlobalSection
 EndGlobal

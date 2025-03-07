@@ -5,7 +5,7 @@ using ML.Infra.ResultTypes;
 using ML.NLP.Configuration;
 using ML.NLP.Tokenization;
 
-namespace ML.NLP.InferenceTasks;
+namespace ML.NLP.InferenceTasks.TextClassification;
 
 public class TextClassification<TClassification> 
     : InferenceSteps<TokenizedText, BatchTokenizedResult, ClassificationResult<TClassification>[], ClassificationResult<TClassification>>

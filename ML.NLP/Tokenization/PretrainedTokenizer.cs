@@ -28,6 +28,60 @@ public sealed class PretrainedTokenizer
         return (List<int>)_tokenizer.EncodeToIds(text, _tokenizerOptions.MaxTokenLength, out _, out _);
     }
 
+    public List<int> Tokenize(string context, string text)
+    {
+        if (_tokenizer is not BertTokenizer tokenizer)
+        {
+            throw new InvalidOperationException("Tokenize with context is not supported on Non-Bert Tokenizer");
+        }
+
+        IReadOnlyList<int> tokenizedContext = tokenizer.EncodeToIds(context, addSpecialTokens: false);
+        IReadOnlyList<int> tokenizedText = tokenizer.EncodeToIds(text, addSpecialTokens: false);
+        (IEnumerable<int> tokenizedContextEnumerable, IEnumerable<int> tokenizedTextEnumerable) = TruncateTokens(tokenizedContext, tokenizedText);
+
+        return (List<int>)tokenizer.BuildInputsWithSpecialTokens(tokenizedContextEnumerable, tokenizedTextEnumerable);
+    }
+    
+    public Span<int> Tokenize(string context, string text, Span<int> output)
+    {
+        if (_tokenizer is not BertTokenizer tokenizer)
+        {
+            throw new InvalidOperationException("Tokenize with context is not supported on Non-Bert Tokenizer");
+        }
+
+        IReadOnlyList<int> tokenizedContext = tokenizer.EncodeToIds(context, addSpecialTokens: false);
+        IReadOnlyList<int> tokenizedText = tokenizer.EncodeToIds(text, addSpecialTokens: false);
+
+        (IEnumerable<int> tokenizedContextEnumerable, IEnumerable<int> tokenizedTextEnumerable) = TruncateTokens(tokenizedContext, tokenizedText);
+        tokenizer.BuildInputsWithSpecialTokens(tokenizedContextEnumerable, output, out int valuesWritten, tokenizedTextEnumerable);
+        return output[..valuesWritten];
+    }
+
+    private (IEnumerable<int> tokenizedContextEnumerable, IEnumerable<int> tokenizedTextEnumerable) TruncateTokens(IReadOnlyList<int> tokenizedContext,
+        IReadOnlyList<int> tokenizedText)
+    {
+        IEnumerable<int> tokenizedContextEnumerable = tokenizedContext;
+        IEnumerable<int> tokenizedTextEnumerable = tokenizedText;
+        int truncationLength = tokenizedContext.Count + tokenizedText.Count - _tokenizerOptions.MaxTokenLength;
+        if (truncationLength <= 0) return (tokenizedContextEnumerable, tokenizedTextEnumerable);
+        
+        switch (_tokenizerOptions.TruncationOption)
+        {
+            case TruncationOption.Longest when tokenizedContext.Count > tokenizedText.Count:
+            case TruncationOption.Context:
+                tokenizedContextEnumerable = tokenizedContextEnumerable.SkipLast(truncationLength);
+                break;
+            case TruncationOption.Longest:
+            case TruncationOption.Text:
+                tokenizedTextEnumerable = tokenizedTextEnumerable.Take(tokenizedContext.Count - truncationLength);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException($"Tokenization Option: {_tokenizerOptions.TruncationOption} Not supported");
+        }
+
+        return (tokenizedContextEnumerable, tokenizedTextEnumerable);
+    }
+
     public BatchTokenizedResult BatchTokenize(TextView inputs)
     {
         int maxTokenSize = 0;
