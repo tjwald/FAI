@@ -28,7 +28,7 @@ What were some of the bottlenecks I solved?
 * Using Onnx - pytorch is a training framework, both heavy in installations (Fatter Image), but also slower in runtime. Migrating to ONNX solved both problems - reduced our image size by 60%, and our inference time from X4 to X20 depending on the algorithm.
 * Algorithmic Improvements - complex algorithms, with many ping pongs between the gpu and cpu, do not easily optimize.
 
-But we were reaching the limitations of python - our GPU was less than 30% utilized, and our cpu was spinning with decreasing latency with increased load.
+But we were reaching the limitations of python - our GPU was less than 30% utilized, and our cpu was spinning with increasing latency with increased load.
 
 ### .Net 9.0
 
