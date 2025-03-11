@@ -12,6 +12,8 @@ public enum ModelExecutorType
     Pooled,
     Async,
     AsyncPooled,
+    Tensor,
+    TensorPooled,
 }
 
 public static class ModelExecutorFactory
@@ -27,6 +29,9 @@ public static class ModelExecutorFactory
                 (PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
             ModelExecutorType.Async => await AsyncOnnxModelExecutor.FromPretrained(modelDir, (OnnxModelExecutorOptions)modelExecutorOptions),
             ModelExecutorType.AsyncPooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(modelDir,
+                (PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
+            ModelExecutorType.Tensor => await OnnxModelTensorExecutor.FromPretrained(modelDir, (OnnxModelExecutorOptions)modelExecutorOptions),
+            ModelExecutorType.TensorPooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(modelDir,
                 (PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
             _ => throw new NotImplementedException(nameof(executorType)),
         };

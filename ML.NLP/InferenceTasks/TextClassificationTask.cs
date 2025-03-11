@@ -8,7 +8,7 @@ using ML.NLP.Tokenization;
 namespace ML.NLP.InferenceTasks;
 
 public class TextClassification<TClassification> 
-    : InferenceSteps<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<TClassification>>
+    : InferenceSteps<TokenizedText, BatchTokenizedResult, ClassificationResult<TClassification>[], ClassificationResult<TClassification>>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<long, float> _modelExecutor;
@@ -36,21 +36,24 @@ public class TextClassification<TClassification>
         return new BatchTokenizedResult(tokenization, mask);
     }
 
-    public override async Task<Tensor<float>[]> RunModel(ReadOnlyMemory<TokenizedText> input, BatchTokenizedResult tokenizedResult)
+    public override async Task<ClassificationResult<TClassification>[]> RunModel(ReadOnlyMemory<TokenizedText> input, BatchTokenizedResult tokenizedResult)
     {
-        return await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask]);
+        var outputs = new ClassificationResult<TClassification>[input.Length];
+        await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask], (logits, _) =>
+        {
+            for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
+            {
+                ReadOnlySpan<float> rowLogits = logits.GetRowSpan(indexInBatch);
+                outputs[indexInBatch] = GetClassificationResult(rowLogits);
+            }
+        });
+        return outputs;
     }
 
-    public override void PostProcess(ReadOnlySpan<TokenizedText> inputs, BatchTokenizedResult preprocesses, Tensor<float>[] modelOutput,
+    public override void PostProcess(ReadOnlySpan<TokenizedText> inputs, BatchTokenizedResult preprocesses, ClassificationResult<TClassification>[] modelOutput,
         Span<ClassificationResult<TClassification>> outputs)
     {
-        TensorSpan<float> logits = modelOutput[0].AsTensorSpan();
-
-        for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
-        {
-            ReadOnlySpan<float> rowLogits = logits.GetRowSpan(indexInBatch);
-            outputs[indexInBatch] = GetClassificationResult(rowLogits);
-        }
+        modelOutput.AsSpan().CopyTo(outputs);
     }
     
     private ClassificationResult<TClassification> GetClassificationResult(ReadOnlySpan<float> logits)

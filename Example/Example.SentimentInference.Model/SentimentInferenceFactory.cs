@@ -41,7 +41,7 @@ public static class SentimentInferenceFactory
         }
 
         IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor =
-            PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, Tensor<float>[], ClassificationResult<bool>>(
+            PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
                 baseExecutorOptions,
                 textClassificationTask);
 

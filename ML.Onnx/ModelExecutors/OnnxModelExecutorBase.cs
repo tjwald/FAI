@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Numerics.Tensors;
+using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
 using ML.Infra;
 using ML.Infra.Abstractions;
+using ML.Infra.Utilities;
 using ML.Onnx.Configuration;
 
 namespace ML.Onnx.ModelExecutors;
@@ -18,18 +20,55 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
     protected readonly RunOptions RunOptions;
     private readonly ConcurrentBag<long[]> _dimensionsPool;
     private readonly ConcurrentBag<Memory<long>[]> _inputMemoryPool;
+    private readonly SemaphoreSlim? _semaphore;
 
-    protected OnnxModelExecutorBase(InferenceSession session, RunOptions runOptions)
+
+    protected OnnxModelExecutorBase(InferenceSession session, RunOptions runOptions, int? maxThreads = null)
     {
         Session = session;
         RunOptions = runOptions;
         _dimensionsPool = [];
         _inputMemoryPool = [];
+        _semaphore = maxThreads.HasValue ? new SemaphoreSlim(maxThreads.Value, maxThreads.Value) : null;
+        
     }
 
-    public abstract Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs);
+    protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(Tensor<long>[] inputs, OrtValue[] ortValues);
 
-    protected OrtValue[] GetModelInputs(Tensor<long>[] inputs)
+    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(Tensor<long>[] inputs)
+    {
+        OrtValue[] ortValues = GetModelInputs(inputs);
+
+        IDisposableReadOnlyCollection<OrtValue> result;
+        using (await _semaphore.EnterScope())
+        {
+            result = await RunSessionInference(inputs, ortValues);
+        }
+
+        foreach (var input in ortValues)
+        {
+            input.Dispose();
+        }
+        return result;
+    }
+
+    public async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
+    {
+        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
+
+        return ToOutTensors(result);
+    }
+
+    public async Task RunAsync(Tensor<long>[] inputs, Action<ReadOnlyTensorSpan<float>, int> postProcess)
+    {
+        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
+        for (int i = 0; i < result.Count; i++)
+        {
+            postProcess(result[i].GetTensorDataAsTensorSpan<float>(), i);
+        }
+    }
+
+    protected virtual OrtValue[] GetModelInputs(Tensor<long>[] inputs)
     {
         long[] dims = GetInputDims(inputs);
 
@@ -46,13 +85,13 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
 
     protected static Tensor<float>[] ToOutTensors(IReadOnlyCollection<OrtValue> result)
     {
-        Tensor<float>[] outTensors = new Tensor<float>[result.Count];
+        var outTensors = new Tensor<float>[result.Count];
         if (result is List<OrtValue> ortValues)
         {
-            for (int i = 0; i < result.Count; i++)
+            Span<OrtValue> span = CollectionsMarshal.AsSpan(ortValues);
+            for (int i = 0; i < span.Length; i++)
             {
-                OrtValue tensor = ortValues[i];
-                outTensors[i] = ToOutTensor(tensor);
+                outTensors[i] = ToOutTensor(span[i]);
             }
 
             return outTensors;
@@ -70,18 +109,11 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
 
     private static Tensor<float> ToOutTensor(OrtValue tensor)
     {
-        long[] outDims = tensor.GetTensorTypeAndShape().Shape!;
-        Span<nint> outDimsAsNInts = stackalloc nint[outDims.Length];
-        Span<nint> strides = [outDims.Length, 1];
-        for (int dim = 0; dim < outDims.Length; dim++)
-        {
-            outDimsAsNInts[dim] = (nint)outDims[dim];
-        }
-
-        Tensor<float> outTensor = Tensor.Create<float>(outDimsAsNInts, strides);
-        tensor.GetTensorDataAsSpan<float>().CopyTo(outTensor.AsMemory().Span);
-        tensor.Dispose();
-
+        ReadOnlyTensorSpan<float> x = tensor.GetTensorDataAsTensorSpan<float>();
+        
+        Tensor<float> outTensor = Tensor.Create<float>(x.Lengths, x.Strides);
+        x.CopyTo(outTensor);
+        
         return outTensor;
     }
 

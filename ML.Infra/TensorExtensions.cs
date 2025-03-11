@@ -11,6 +11,12 @@ public static class TensorExtensions
         TensorSpan<T> tensorRow = tensor.Slice(i..(i+1), ..);
         return MemoryMarshal.CreateSpan(ref tensorRow.GetPinnableReference(), (int)tensor.Lengths[1]);
     }
+    
+    public static ReadOnlySpan<T> GetRowSpan<T>(this ReadOnlyTensorSpan<T> tensor, int i)
+    {
+        ReadOnlyTensorSpan<T> tensorRow = tensor.Slice(i..(i+1), ..);
+        return MemoryMarshal.CreateReadOnlySpan(in tensorRow.GetPinnableReference(), (int)tensor.Lengths[1]);
+    }
 
     public static Memory<T> AsMemory<T>(this Tensor<T> tensor)
     {

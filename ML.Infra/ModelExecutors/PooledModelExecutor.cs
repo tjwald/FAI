@@ -22,4 +22,10 @@ public sealed class PooledModelExecutor<TInput, TOutput>: IModelExecutor<TInput,
         IModelExecutor<TInput, TOutput> executor = _executorPool.Get();
         return await executor.RunAsync(inputs);
     }
+
+    public Task RunAsync(Tensor<TInput>[] inputs, Action<ReadOnlyTensorSpan<TOutput>, int> postProcess)
+    {
+        IModelExecutor<TInput, TOutput> executor = _executorPool.Get();
+        return executor.RunAsync(inputs, postProcess);
+    }
 }

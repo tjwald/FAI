@@ -1,47 +1,40 @@
-﻿using System.Numerics.Tensors;
+﻿using System.Collections;
+using System.Numerics.Tensors;
 using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
 using ML.Onnx.Configuration;
+using Tensor = System.Numerics.Tensors.Tensor;
 
 namespace ML.Onnx.ModelExecutors;
 
 public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecutor<AsyncOnnxModelExecutor>
 {
-    private readonly SemaphoreSlim _semaphore;
-
-    public AsyncOnnxModelExecutor(InferenceSession session) : this(session, new RunOptions())
+    private readonly long[] _outputDimensions;
+    private readonly TensorElementType _elementDataType;
+    
+    public AsyncOnnxModelExecutor(InferenceSession session, RunOptions runOptions) : base(session, runOptions, maxThreads: 1)
     {
+        var metadata = Session.OutputMetadata[Session.OutputNames[0]];
+        _elementDataType = metadata.ElementDataType;
+        _outputDimensions = new long[metadata.Dimensions.Length - 1];
+        Tensor.ConvertChecked(new ReadOnlyTensorSpan<int>(metadata.Dimensions.AsSpan(1)), new TensorSpan<long>(_outputDimensions));
     }
 
-    public AsyncOnnxModelExecutor(InferenceSession session, RunOptions runOptions) : base(session, runOptions)
+    protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(System.Numerics.Tensors.Tensor<long>[] inputs, OrtValue[] ortValues)
     {
-        _semaphore = new SemaphoreSlim(1, 1);
+        long[] outputDimensions = new long[_outputDimensions.Length + 1];
+        outputDimensions[0] = inputs[0].Lengths[0];
+        _outputDimensions.AsSpan().CopyTo(outputDimensions.AsSpan(1));
+        
+        IReadOnlyCollection<OrtValue> outputs =
+            [OrtValue.CreateAllocatedTensorValue(OrtAllocator.DefaultInstance, _elementDataType, outputDimensions)];
+
+        IReadOnlyCollection<OrtValue> result =
+            await Session.RunAsync(RunOptions, Session.InputNames, ortValues, Session.OutputNames, outputs).ConfigureAwait(false);
+
+        return new DisposableCollection<OrtValue>(result);
     }
-
-    public override async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
-    {
-        await _semaphore.WaitAsync();
-        try
-        {
-            OrtValue[] ortValues = GetModelInputs(inputs);
-            var metadata = Session.OutputMetadata[Session.OutputNames[0]];
-            IReadOnlyCollection<OrtValue> outputs =
-                [OrtValue.CreateAllocatedTensorValue(OrtAllocator.DefaultInstance, metadata.ElementDataType, [inputs[0].Lengths[0], metadata.Dimensions[1]])];
-
-            IReadOnlyCollection<OrtValue> result =
-                await Session.RunAsync(RunOptions, Session.InputNames, ortValues, Session.OutputNames, outputs).ConfigureAwait(false);
-            foreach (var input in ortValues)
-            {
-                input.Dispose();
-            }
-
-            return ToOutTensors(result);
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
-    }
-
+    
     public static async Task<AsyncOnnxModelExecutor> FromPretrained(string modelDir, OnnxModelExecutorOptions options)
     {
         var factory = new InferenceSessionFactory(modelDir, options);
@@ -55,4 +48,55 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
     {
         return new AsyncOnnxModelExecutor(session, runOptions);
     }
+}
+
+file struct DisposableCollection<T>: IDisposableReadOnlyCollection<T> where T : IDisposable
+{
+    private bool _disposed;
+    private readonly T[] _collection;
+    public DisposableCollection(IReadOnlyCollection<T> collection)
+    {
+        _collection = collection.ToArray();
+    }
+
+    #region IDisposable Support
+
+    private void Dispose(bool disposing)
+    {
+        if (_disposed || !disposing) return;
+        
+        // Dispose in the reverse order.
+        // Objects should typically be destroyed/disposed
+        // in the reverse order of its creation
+        // especially if the objects created later refer to the
+        // objects created earlier. For homogeneous collections of objects
+        // it would not matter.
+        for (int i = _collection.Length - 1; i >= 0; i--)
+        {
+            var item = _collection[i];
+            item.Dispose();
+        }
+
+        _disposed = true;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+    }
+    #endregion
+
+    public IEnumerator<T> GetEnumerator()
+    {
+        return _collection.AsEnumerable().GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    public int Count => _collection.Length;
+
+    public T this[int index] => _collection[index];
 }
