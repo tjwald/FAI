@@ -14,9 +14,9 @@ public class OnnxModelTensorExecutor: OnnxModelExecutorBase, IOnnxModelExecutor<
         return new OnnxModelTensorExecutor(session, runOptions, options.MaxThreads);
     }
     
-    public static async Task<OnnxModelTensorExecutor> FromPretrained(string modelDir, OnnxModelExecutorOptions options)
+    public static async Task<OnnxModelTensorExecutor> FromPretrained(OnnxModelExecutorOptions options)
     {
-        var factory = new InferenceSessionFactory(modelDir, options);
+        var factory = new InferenceSessionFactory(options.OnnxOptions);
 
         var session = await Task.Run(() => factory.Create());
 

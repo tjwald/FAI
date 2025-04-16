@@ -35,9 +35,9 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
         return new DisposableCollection<OrtValue>(result);
     }
     
-    public static async Task<AsyncOnnxModelExecutor> FromPretrained(string modelDir, OnnxModelExecutorOptions options)
+    public static async Task<AsyncOnnxModelExecutor> FromPretrained(OnnxModelExecutorOptions options)
     {
-        var factory = new InferenceSessionFactory(modelDir, options);
+        var factory = new InferenceSessionFactory(options.OnnxOptions);
 
         var session = await Task.Run(() => factory.Create());
 

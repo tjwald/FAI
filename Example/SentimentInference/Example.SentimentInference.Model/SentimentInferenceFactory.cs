@@ -18,7 +18,7 @@ public static class SentimentInferenceFactory
         var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
 
         IModelExecutor<long, float> modelExecutor =
-            await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.ModelExecutorOptions);
+            await ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, options.ModelExecutorOptions);
 
         return CreateSentimentInference(options, tokenizer, modelExecutor);
     }
