@@ -8,8 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.21.0"/>
-        <ProjectReference Include="..\ML.Infra\ML.Infra.csproj" />
+        <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.21.0"/>
+        <ProjectReference Include="..\ML.Infra\ML.Infra.csproj"/>
     </ItemGroup>
 
 </Project>
