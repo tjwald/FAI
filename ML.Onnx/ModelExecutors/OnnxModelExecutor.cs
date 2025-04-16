@@ -15,9 +15,9 @@ public sealed class OnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecuto
         return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, ortValues);
     }
 
-    public static async Task<OnnxModelExecutor> FromPretrained(string modelDir, OnnxModelExecutorOptions options)
+    public static async Task<OnnxModelExecutor> FromPretrained(OnnxModelExecutorOptions options)
     {
-        var factory = new InferenceSessionFactory(modelDir, options);
+        var factory = new InferenceSessionFactory(options.OnnxOptions);
 
         var session = await Task.Run(() => factory.Create());
 

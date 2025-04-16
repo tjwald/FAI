@@ -18,7 +18,7 @@ public static class SwagMultipleChoiceInferenceFactory
         PretrainedTokenizer tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
         
         IModelExecutor<long, float> modelExecutor =
-            await ModelExecutorFactory.CreateModelExecutor(options.ModelDir, options.ModelExecutorType, options.ModelExecutorOptions);
+            await ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, options.ModelExecutorOptions);
 
         IInferenceSteps<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> textMultipleChoiceTask =
             new TextMultipleChoiceTask(tokenizer, modelExecutor, new TextMultipleChoiceOptions(4));

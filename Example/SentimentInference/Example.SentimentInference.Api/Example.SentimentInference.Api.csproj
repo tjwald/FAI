@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+        <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.21.0" />
         <PackageReference Include="Scalar.AspNetCore" Version="1.2.56" />
     </ItemGroup>
 

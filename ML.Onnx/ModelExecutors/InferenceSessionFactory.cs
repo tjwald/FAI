@@ -5,32 +5,21 @@ namespace ML.Onnx.ModelExecutors;
 
 public sealed class InferenceSessionFactory
 {
-    private readonly string _modelDir;
+    private readonly string _modelPath;
     private readonly SessionOptions _sessionOptions;
+
     public RunOptions RunOptions { get; }
 
-    public InferenceSessionFactory(string modelDir, OnnxModelExecutorOptions options)
+    public InferenceSessionFactory(OnnxOptions options)
     {
-        _modelDir = modelDir;
-        RunOptions = options.RunOptions ?? new RunOptions();
-        _sessionOptions = new SessionOptions();
+        _modelPath = options.FullModelPath;
 
-        if (options.UseGpu)
-        {
-            _sessionOptions.AppendExecutionProvider_CUDA();
-            Console.WriteLine("Using GPU accelerator");
-        }
-
-        _sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_EXTENDED;
-        _sessionOptions.AddSessionConfigEntry("session.use_fp16", "1");
-        _sessionOptions.AppendExecutionProvider_CPU();
-
-        _sessionOptions.ExecutionMode = options.ExecutionMode;
-        Console.WriteLine($"Running With Execution Mode: {options.ExecutionMode}");
+        _sessionOptions = options.SessionOptions;
+        RunOptions = options.RunOptions;
     }
 
     public InferenceSession Create()
     {
-        return new InferenceSession(Path.Combine(_modelDir, "model_optimized.onnx"), _sessionOptions);
+        return new InferenceSession(_modelPath, _sessionOptions);
     }
 }
