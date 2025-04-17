@@ -80,7 +80,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[i] = taskCompletionSource.Task;
-            int startIndex = i * batchCount;
+            int startIndex = i * _maxBatchSize;
             var r = new Range(startIndex, startIndex + _maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
