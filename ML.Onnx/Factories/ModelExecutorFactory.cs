@@ -6,30 +6,45 @@ using ML.Onnx.ModelExecutors;
 
 namespace ML.Onnx.Factories;
 
-public enum ModelExecutorType
-{
-    Simple,
-    Pooled,
-    Async,
-    AsyncPooled,
-    Tensor,
-    TensorPooled,
-}
 
+/// <summary>
+/// Factory class for creating instances of model executors based on configuration.
+/// </summary>
 public static class ModelExecutorFactory
 {
-    public static async ValueTask<IModelExecutor<long, float>> CreateModelExecutor(ModelExecutorType executorType,
+    /// <summary>
+    /// Creates an instance of <see cref="IModelExecutor{TInput, TOutput}"/> based on the specified executor type and configuration.
+    /// </summary>
+    /// <param name="executorType">The type of model executor to create.</param>
+    /// <param name="modelExecutorOptions">The configuration options for the model executor.</param>
+    /// <returns>Task that creates a model executor</returns>
+    /// <exception cref="NotImplementedException">
+    /// Thrown when the specified <paramref name="executorType"/> is not implemented.
+    /// </exception>
+    public static async ValueTask<IModelExecutor<long, float>> CreateModelExecutor(
+        ModelExecutorType executorType,
         IModelExecutorConfig modelExecutorOptions)
     {
+        if (modelExecutorOptions is PooledExecutorOptions<OnnxModelExecutorOptions> pooledExecutorOptions)
+        {
+            Console.WriteLine($"Using pooling for {executorType}");
+            IObjectPool<IModelExecutor<long, float>> objectPool = executorType switch
+            {
+                ModelExecutorType.Simple => new OnnxModelExecutorObjectPool<OnnxModelExecutor>(pooledExecutorOptions),
+                ModelExecutorType.Async => new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(pooledExecutorOptions),
+                ModelExecutorType.Tensor => new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(pooledExecutorOptions),
+                _ => throw new NotImplementedException(nameof(executorType)),
+            };
+            return new PooledModelExecutor<long, float>(objectPool);
+        }
+
         Console.WriteLine($"Using model executor {executorType}");
+        var onnxModelExecutorOptions = (OnnxModelExecutorOptions)modelExecutorOptions;
         return executorType switch
         {
-            ModelExecutorType.Simple => await OnnxModelExecutor.FromPretrained((OnnxModelExecutorOptions)modelExecutorOptions),
-            ModelExecutorType.Pooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<OnnxModelExecutor>((PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
-            ModelExecutorType.Async => await AsyncOnnxModelExecutor.FromPretrained((OnnxModelExecutorOptions)modelExecutorOptions),
-            ModelExecutorType.AsyncPooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>((PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
-            ModelExecutorType.Tensor => await OnnxModelTensorExecutor.FromPretrained((OnnxModelExecutorOptions)modelExecutorOptions),
-            ModelExecutorType.TensorPooled => new PooledModelExecutor<long, float>(new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>((PooledExecutorOptions<OnnxModelExecutorOptions>)modelExecutorOptions)),
+            ModelExecutorType.Simple => await OnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
+            ModelExecutorType.Async => await AsyncOnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
+            ModelExecutorType.Tensor => await OnnxModelTensorExecutor.FromPretrained(onnxModelExecutorOptions),
             _ => throw new NotImplementedException(nameof(executorType)),
         };
     }
