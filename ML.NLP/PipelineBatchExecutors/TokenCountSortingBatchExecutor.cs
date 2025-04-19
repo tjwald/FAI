@@ -3,17 +3,34 @@ using ML.NLP.Tokenization;
 
 namespace ML.NLP.PipelineBatchExecutors;
 
-public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExecutor<TToken, TOutput> where TToken: ITokenizable
+/// <summary>
+/// A batch executor that sorts tokenized inputs by token count before executing batch predictions.
+/// </summary>
+/// <typeparam name="TToken">The type of tokenizable input items.</typeparam>
+/// <typeparam name="TOutput">The type of output items.</typeparam>
+public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExecutor<TToken, TOutput> where TToken : ITokenizable
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IPipelineBatchExecutor<TToken, TOutput> _executor;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TokenCountSortingBatchExecutor{TToken, TOutput}"/> class.
+    /// </summary>
+    /// <param name="tokenizer">The tokenizer used for tokenizing input items.</param>
+    /// <param name="executor">The underlying batch executor responsible for predictions.</param>
     public TokenCountSortingBatchExecutor(PretrainedTokenizer tokenizer, IPipelineBatchExecutor<TToken, TOutput> executor)
     {
         _tokenizer = tokenizer;
         _executor = executor;
     }
 
+    /// <summary>
+    /// Executes batch prediction asynchronously by first sorting tokenized inputs by token count
+    /// and then calling the underlying executor on the sorted inputs.
+    /// </summary>
+    /// <param name="inputs">The input batch of tokenizable items.</param>
+    /// <param name="outputSpan">The memory span for storing output results.</param>
+    /// <returns>A task representing the asynchronous batch prediction operation.</returns>
     public async Task ExecuteBatchPredict(ReadOnlyMemory<TToken> inputs, Memory<TOutput> outputSpan)
     {
         ReadOnlySpan<TToken> inputSpan = inputs.Span;

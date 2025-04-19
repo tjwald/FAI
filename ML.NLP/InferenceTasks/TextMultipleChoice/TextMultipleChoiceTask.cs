@@ -8,12 +8,21 @@ using ML.NLP.Tokenization;
 namespace ML.NLP.InferenceTasks.TextMultipleChoice;
 
 
+/// <summary>
+/// Represents a pipeline for multiple-choice text classification tasks.
+/// </summary>
 public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly TextMultipleChoiceOptions _options;
     private readonly IModelExecutor<long, float> _modelExecutor;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TextMultipleChoiceTask"/> class.
+    /// </summary>
+    /// <param name="tokenizer">The pretrained tokenizer used for tokenizing inputs and choices.</param>
+    /// <param name="modelExecutor">The model executor used for inference.</param>
+    /// <param name="options">The options for configuring multiple-choice tasks.</param>
     public TextMultipleChoiceTask(PretrainedTokenizer tokenizer, IModelExecutor<long, float> modelExecutor, TextMultipleChoiceOptions options)
     {
         _tokenizer = tokenizer;
@@ -21,6 +30,11 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
         _modelExecutor = modelExecutor;
     }
 
+    /// <summary>
+    /// Preprocesses the input into a batch tokenized result, preparing tensors for inference.
+    /// </summary>
+    /// <param name="input">The input containing context and multiple-choice options.</param>
+    /// <returns>A batch tokenized result with token and mask tensors.</returns>
     public override BatchTokenizedResult Preprocess(ReadOnlySpan<TextMultipleChoiceInput> input)
     {
         (List<List<int>?> tokensList, int maxChoiceCount, int maxTokenCount) =
@@ -111,6 +125,14 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
         return (tokens, maxChoiceCount, maxTokenCount);
     }
 
+    /// <summary>
+    /// Runs the model inference to produce classification results for multiple-choice tasks.
+    /// </summary>
+    /// <param name="input">The input containing context and choices.</param>
+    /// <param name="tokenizedResult">The preprocessed batch tokenized result.</param>
+    /// <returns>
+    /// A task containing an array of <see cref="ChoiceResult{TokenizedText}"/> representing the classification results.
+    /// </returns>
     public override async Task<ChoiceResult<TokenizedText>[]> RunModel(ReadOnlyMemory<TextMultipleChoiceInput> input, BatchTokenizedResult tokenizedResult)
     {
         var outputs = new ChoiceResult<TokenizedText>[input.Length];
@@ -126,12 +148,25 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
         return outputs;
     }
 
+    /// <summary>
+    /// Post-processes the model outputs into the final classification results.
+    /// </summary>
+    /// <param name="inputs">The original multiple-choice inputs.</param>
+    /// <param name="preprocesses">The preprocessed batch tokenized result.</param>
+    /// <param name="modelOutput">The raw classification results from the model.</param>
+    /// <param name="outputs">The final choice results to be populated.</param>
     public override void PostProcess(ReadOnlySpan<TextMultipleChoiceInput> inputs, BatchTokenizedResult preprocesses, ChoiceResult<TokenizedText>[] modelOutput,
         Span<ChoiceResult<TokenizedText>> outputs)
     {
         modelOutput.AsSpan().CopyTo(outputs);
     }
 
+    /// <summary>
+    /// Generates a multiple-choice result from the raw logits produced by the model.
+    /// </summary>
+    /// <param name="input">The input containing context and choices.</param>
+    /// <param name="logits">The raw logits produced by the model.</param>
+    /// <returns>A choice result containing the selected choice, index, and confidence score.</returns>
     private ChoiceResult<TokenizedText> GetMultipleChoiceResult(TextMultipleChoiceInput input, ReadOnlySpan<float> logits)
     {
         Span<float> probabilities = stackalloc float[logits.Length];
