@@ -3,15 +3,6 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
-internal sealed record StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(
-    ReadOnlyMemory<TInput> Inputs,
-    Memory<TOutput> Outputs,
-    TaskCompletionSource CompletionSource,
-    TPreprocess PreprocessResult)
-{
-    internal TModelOutput? ModelResult { get; set; }
-}
-
 public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private static readonly UnboundedChannelOptions UnboundedChannelOptions = new()
@@ -21,11 +12,8 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
 
     private readonly InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> _inference;
 
-    private readonly Channel<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>> _modelInputChannel =
-        Channel.CreateUnbounded<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>>(UnboundedChannelOptions);
-
-    private readonly Channel<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>> _postProcessingInputChannel =
-        Channel.CreateUnbounded<StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>>(UnboundedChannelOptions);
+    private readonly Channel<StreamedInferenceChunk> _modelInputChannel = Channel.CreateUnbounded<StreamedInferenceChunk>(UnboundedChannelOptions);
+    private readonly Channel<StreamedInferenceChunk> _postProcessingInputChannel = Channel.CreateUnbounded<StreamedInferenceChunk>(UnboundedChannelOptions);
 
     private readonly Task _modelTask;
     private readonly Task _postProcessingTask;
@@ -34,16 +22,11 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
 
-    public StreamedBatchExecutor(IInferenceSteps<TInput, TOutput> inferenceSteps, int maxBatchSize, int? maxConcurrency, bool parallelTokenization)
+    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, int maxBatchSize, int? maxConcurrency, bool parallelTokenization)
     {
-        if (inferenceSteps is not InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceTaskSteps)
-        {
-            throw new ArgumentException("Only InferenceSteps<,,,> can be used.", nameof(inferenceSteps));
-        }
-
         _maxBatchSize = maxBatchSize;
         _parallelTokenization = parallelTokenization;
-        _inference = inferenceTaskSteps;
+        _inference = inferenceSteps;
         _parallelOptions = maxConcurrency.HasValue ? new ParallelOptions { MaxDegreeOfParallelism = maxConcurrency.Value } : new ParallelOptions();
 
         _modelTask = BackgroundWorker(_modelInputChannel, _parallelOptions, ModelProcessChunk);
@@ -56,7 +39,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         {
             var tcs = new TaskCompletionSource();
             var preprocess = _inference.Preprocess(inputs.Span);
-            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs, output, tcs, preprocess));
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs, output, tcs, preprocess));
             return tcs.Task;
         }
         (int batchCountWithoutRemainder, int remainder) = Math.DivRem(inputs.Length, _maxBatchSize);
@@ -83,7 +66,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
             int startIndex = i * _maxBatchSize;
             var r = new Range(startIndex, startIndex + _maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
-            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         });
 
         if (batchCountWithoutRemainder < batchCount)
@@ -92,7 +75,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
             tasks[^1] = taskCompletionSource.Task;
             var r = new Range(batchCountWithoutRemainder * _maxBatchSize, inputs.Length);
             var preprocess = _inference.Preprocess(inputs[r].Span);
-            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
     }
 
@@ -105,7 +88,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
             tasks[i] = taskCompletionSource.Task;
             var r = new Range(i, i + _maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
-            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
 
         if (i < batchCount)
@@ -114,7 +97,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
             tasks[i] = taskCompletionSource.Task;
             var r = new Range(i, inputs.Length);
             var preprocess = _inference.Preprocess(inputs[r].Span);
-            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput>(inputs[r], output[r], taskCompletionSource, preprocess));
+            _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
     }
 
@@ -124,7 +107,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         return Parallel.ForEachAsync(channel.Reader.ReadAllAsync(), parallelOptions, func);
     }
 
-    private async ValueTask ModelProcessChunk(StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput> chunk, CancellationToken ct)
+    private async ValueTask ModelProcessChunk(StreamedInferenceChunk chunk, CancellationToken ct)
     {
         try
         {
@@ -138,7 +121,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         }
     }
     
-    ValueTask PostProcess(StreamedInferenceChunk<TInput, TOutput, TPreprocess, TModelOutput> postProcessInput, CancellationToken ct)
+    ValueTask PostProcess(StreamedInferenceChunk postProcessInput, CancellationToken ct)
     {
         try
         {
@@ -152,5 +135,14 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         }
             
         return ValueTask.CompletedTask;
+    }
+    
+    private sealed record StreamedInferenceChunk(
+        ReadOnlyMemory<TInput> Inputs,
+        Memory<TOutput> Outputs,
+        TaskCompletionSource CompletionSource,
+        TPreprocess PreprocessResult)
+    {
+        internal TModelOutput? ModelResult { get; set; }
     }
 }
