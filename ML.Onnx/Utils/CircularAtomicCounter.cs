@@ -1,9 +1,9 @@
-﻿namespace ML.Infra.Utilities;
+namespace ML.Onnx.Utils;
 
 /// <summary>
 /// A thread-safe circular counter that increments atomically and wraps around when it reaches a specified maximum value.
 /// </summary>
-public sealed class CircularAtomicCounter
+internal sealed class CircularAtomicCounter
 {
     private readonly int _maxValue;
     private uint _currentValue;
