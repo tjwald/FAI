@@ -3,10 +3,16 @@ using ML.Infra.Configurations.ModelExecutors;
 
 namespace ML.Onnx.Configuration;
 
+/// <summary>
+/// Represents the configuration options for the OnnxModelExecutor.
+/// </summary>
 public class OnnxModelExecutorOptions : IModelExecutorConfig
 {
     private Action<OnnxOptions>? _configureOptions;
     
+    /// <summary>
+    /// Gets the OnnxOptions object, configured using the provided delegate if available.
+    /// </summary>
     public OnnxOptions OnnxOptions
     {
         get
@@ -17,8 +23,16 @@ public class OnnxModelExecutorOptions : IModelExecutorConfig
         }
     }
 
+    /// <summary>
+    /// Gets or sets the maximum number of threads that can be used for execution.
+    /// </summary>
     public int? MaxThreads { get; set; } = null;
 
+    /// <summary>
+    /// Configures the OnnxOptions using the specified delegate.
+    /// </summary>
+    /// <param name="configureOptions">A delegate to configure the OnnxOptions.</param>
+    /// <returns>The current instance of <see cref="OnnxModelExecutorOptions"/>.</returns>
     public OnnxModelExecutorOptions ConfigureOnnxOptions(Action<OnnxOptions> configureOptions)
     {
         _configureOptions = configureOptions;
@@ -27,6 +41,9 @@ public class OnnxModelExecutorOptions : IModelExecutorConfig
 }
 
 
+/// <summary>
+/// Provides configuration options for ONNX (Open Neural Network Exchange) model execution.
+/// </summary>
 public class OnnxOptions
 {
     /// <summary>
@@ -91,6 +108,8 @@ public class OnnxOptions
         return this;
     }
 
+    private SessionOptions? _sessionOptions;
+    
     /// <summary>
     /// Returns a configured instance of <see cref="SessionOptions"/>.
     /// If no configuration function was provided, returns a default instance.
@@ -100,11 +119,17 @@ public class OnnxOptions
     {
         get
         {
+            if (_sessionOptions is not null) return _sessionOptions;
+            
             var sessionOptions = new SessionOptions();
             CreateSessionOptionsDelegate?.Invoke(sessionOptions);
+            
+            _sessionOptions = sessionOptions;
             return sessionOptions;
         }
     }
+    
+    private RunOptions? _runOptions;
 
     /// <summary>
     /// Returns a configured instance of <see cref="RunOptions"/>.
@@ -115,8 +140,12 @@ public class OnnxOptions
     {
         get
         {
+            if (_runOptions is not null) return _runOptions;
+            
             var runOptions = new RunOptions();
             CreateRunOptionsDelegate?.Invoke(runOptions);
+            
+            _runOptions = runOptions;
             return runOptions;
         }
     }

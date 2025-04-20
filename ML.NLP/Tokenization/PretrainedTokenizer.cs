@@ -6,12 +6,31 @@ using ML.NLP.Configuration;
 
 namespace ML.NLP.Tokenization;
 
+/// <summary>
+/// Represents a batch tokenized result containing token and mask tensors.
+/// </summary>
+/// <param name="Tokens">The tensor representing tokenized input sequences.</param>
+/// <param name="Mask">
+/// The tensor representing the attention mask, indicating which tokens should be processed.
+/// </param>
 public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask)
 {
+    /// <summary>
+    /// Gets the batch size, determined by the first dimension of the token tensor.
+    /// </summary>
     public int BatchSize => (int)Tokens.Lengths[0];
+
+    /// <summary>
+    /// Gets the maximum token count per sequence, determined by the second dimension of the token tensor.
+    /// </summary>
     public int MaxTokenCount => (int)Tokens.Lengths[1];
 }
 
+
+/// <summary>
+/// Represents a pretrained tokenizer used for tokenizing text inputs and managing token-related transformations.
+/// Wraps a <see cref="Microsoft.ML.Tokenizers.Tokenizer"/> and adds batch functionality. 
+/// </summary>
 public sealed class PretrainedTokenizer
 {
     private readonly Tokenizer _tokenizer;

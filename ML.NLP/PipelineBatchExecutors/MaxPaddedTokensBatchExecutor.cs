@@ -3,12 +3,26 @@ using ML.NLP.Tokenization;
 
 namespace ML.NLP.PipelineBatchExecutors;
 
+/// <summary>
+/// Represents a batch executor that limits the number of padded tokens in each batch
+/// by enforcing constraints on token count and padding ratio.
+/// </summary>
+/// <typeparam name="TToken">The type of the tokenizable input items.</typeparam>
+/// <typeparam name="TOutput">The type of the output items.</typeparam>
 public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecutor<TToken, TOutput> where TToken : ITokenizable
 {
     private readonly double _maxPaddedTokenRatio;
     private readonly int _maxTokenCount;
     private readonly IPipelineBatchExecutor<TToken, TOutput> _executor;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MaxPaddedTokensBatchExecutor{TToken, TOutput}"/> class.
+    /// </summary>
+    /// <param name="executor">The underlying pipeline batch executor to handle actual prediction tasks.</param>
+    /// <param name="maxPaddedTokenRatio">
+    /// The maximum allowed ratio of padded tokens to actual tokens in a batch.
+    /// </param>
+    /// <param name="maxTokenCount">The maximum number of tokens allowed per batch.</param>
     public MaxPaddedTokensBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, double maxPaddedTokenRatio, int maxTokenCount)
     {
         _maxPaddedTokenRatio = maxPaddedTokenRatio;
@@ -16,6 +30,13 @@ public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecu
         _executor = executor;
     }
 
+    /// <summary>
+    /// Executes batch prediction asynchronously by splitting the input into valid ranges
+    /// based on token constraints and calling the underlying executor on each range.
+    /// </summary>
+    /// <param name="inputs">The input batch of tokenizable items.</param>
+    /// <param name="outputSpan">The memory span for storing output results.</param>
+    /// <returns>A task that represents the asynchronous batch prediction operation.</returns>
     public async Task ExecuteBatchPredict(ReadOnlyMemory<TToken> inputs, Memory<TOutput> outputSpan)
     {
         IEnumerable<Range> ranges = GenerateRanges(inputs, _maxTokenCount, _maxPaddedTokenRatio);
@@ -23,6 +44,15 @@ public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecu
         await Task.WhenAll(ranges.Select(range => _executor.ExecuteBatchPredict(inputs[range], outputSpan[range])));
     }
 
+    /// <summary>
+    /// Generates ranges of input items for batching, ensuring token count and padding ratio constraints are met.
+    /// </summary>
+    /// <param name="inputs">The input batch of tokenizable items.</param>
+    /// <param name="maxTokenCount">The maximum number of tokens allowed per batch.</param>
+    /// <param name="maxPaddedTokenRatio">
+    /// The maximum allowed ratio of padded tokens to actual tokens in a batch.
+    /// </param>
+    /// <returns>An enumerable of ranges representing valid batches.</returns>
     private static IEnumerable<Range> GenerateRanges(ReadOnlyMemory<TToken> inputs, int maxTokenCount, double maxPaddedTokenRatio)
     {
         int currentIndex = 0;
