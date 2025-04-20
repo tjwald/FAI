@@ -4,6 +4,12 @@ using System.Threading.Channels;
 
 namespace ML.Infra;
 
+/// <summary>
+/// Orchestrates inference operations by batching requests and managing concurrency for dynamic requests.
+/// </summary>
+/// <typeparam name="TInference">The type of the inference model implementing <see cref="IInference{TQuery, TResult}"/>.</typeparam>
+/// <typeparam name="TQuery">The type of the input query for inference.</typeparam>
+/// <typeparam name="TResult">The type of the result produced by the inference.</typeparam>
 public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInference<TQuery, TResult> where TInference : IInference<TQuery, TResult>
 {
     private readonly Lazy<TInference> _modelInstance;
@@ -13,6 +19,13 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
     private readonly SemaphoreSlim _semaphore;
     private static readonly ActivitySource ActivitySource = new ActivitySource("ModelPredictionOrchestrator");
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InferenceOrchestrator{TInference, TQuery, TResult}"/> class.
+    /// </summary>
+    /// <param name="modelInstance">A lazy-loaded instance of the inference model.</param>
+    /// <param name="maxBatchSize">The maximum number of requests to process in a single batch.</param>
+    /// <param name="maxConcurrentBatches">The maximum number of concurrent batches allowed.</param>
+    /// <param name="emptyQueueSleepDuration">The duration to wait when the queue is empty before checking again.</param>
     public InferenceOrchestrator(
         Lazy<TInference> modelInstance,
         int maxBatchSize,
@@ -27,6 +40,11 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         StartBackgroundProcessing();
     }
 
+    /// <summary>
+    /// Predicts the result for a single input query asynchronously.
+    /// </summary>
+    /// <param name="inputQuery">The input query for the prediction.</param>
+    /// <returns>A task representing the asynchronous operation. The task result contains the predicted result.</returns>
     public async Task<TResult> Predict(TQuery inputQuery)
     {
         var tcs = new TaskCompletionSource<TResult>();
@@ -45,6 +63,9 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         }
     }
 
+    /// <summary>
+    /// Starts the background processing task to handle batched inference requests.
+    /// </summary>
     private void StartBackgroundProcessing()
     {
         Task.Run(async () =>
@@ -68,8 +89,16 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         });
     }
 
+    /// <summary>
+    /// Releases the semaphore after a batch task completes.
+    /// </summary>
+    /// <param name="t">The completed task.</param>
     private void ReleaseSemaphore(Task t) => _semaphore.Release();
 
+    /// <summary>
+    /// Processes a batch of inference requests dynamically.
+    /// </summary>
+    /// <param name="model">The inference model to use for processing the batch.</param>
     private async Task RunDynamicBatchAsync(IInference<TQuery, TResult> model)
     {
         // Start a tracing span for the batch processing
@@ -109,6 +138,11 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         }
     }
 
+    /// <summary>
+    /// Retrieves available requests from the queue up to the specified maximum count.
+    /// </summary>
+    /// <param name="maxCount">The maximum number of requests to retrieve.</param>
+    /// <returns>A list of requests retrieved from the queue.</returns>
     private List<(TQuery, TaskCompletionSource<TResult>, ActivityContext?)> GetAvailableRequestsAsync(int maxCount)
     {
         var requests = new List<(TQuery, TaskCompletionSource<TResult>, ActivityContext?)>();
@@ -119,6 +153,11 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         return requests;
     }
 
+    /// <summary>
+    /// Predicts the results for a batch of input queries asynchronously.
+    /// </summary>
+    /// <param name="input">A read-only memory containing the batch of input queries.</param>
+    /// <returns>A task representing the asynchronous operation. The task result contains an array of predicted results.</returns>
     public Task<TResult[]> BatchPredict(ReadOnlyMemory<TQuery> input) => _modelInstance.Value.BatchPredict(input);
 }
 

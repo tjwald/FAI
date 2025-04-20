@@ -3,6 +3,13 @@ using ML.Infra.Abstractions;
 
 namespace ML.Infra.PipelineBatchExecutors;
 
+/// <summary>
+/// A batch executor that processes input data in background workers split between the different steps of the task.
+/// </summary>
+/// <typeparam name="TInput">The type of the input data.</typeparam>
+/// <typeparam name="TPreprocess">The type of the preprocessing result.</typeparam>
+/// <typeparam name="TModelOutput">The type of the model output.</typeparam>
+/// <typeparam name="TOutput">The type of the final output data.</typeparam>
 public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private static readonly UnboundedChannelOptions UnboundedChannelOptions = new()
@@ -22,6 +29,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StreamedBatchExecutor{TInput, TPreprocess, TModelOutput, TOutput}"/> class.
+    /// </summary>
+    /// <param name="inferenceSteps">The inference steps to be executed.</param>
+    /// <param name="maxBatchSize">The maximum size of a batch to process.</param>
+    /// <param name="maxConcurrency">The maximum degree of parallelism for processing tasks.</param>
+    /// <param name="parallelTokenization">Indicates whether tokenization should be parallelized.</param>
     public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, int maxBatchSize, int? maxConcurrency, bool parallelTokenization)
     {
         _maxBatchSize = maxBatchSize;
@@ -33,6 +47,12 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         _postProcessingTask = BackgroundWorker(_postProcessingInputChannel, _parallelOptions, PostProcess);
     }
 
+    /// <summary>
+    /// Executes a batch prediction operation by processing the input data and writing the results to the output memory.
+    /// </summary>
+    /// <param name="inputs">The input data for the batch prediction.</param>
+    /// <param name="output">The memory block where the output data will be written.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public Task ExecuteBatchPredict(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output)
     {
         if (inputs.Length < _maxBatchSize)
@@ -57,6 +77,9 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         return Task.WhenAll(tasks);
     }
 
+    /// <summary>
+    /// Preprocesses the input data in parallel batches and writes the results to the model input channel.
+    /// </summary>
     private void PreprocessParallel(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
         Parallel.For(0, batchCountWithoutRemainder, _parallelOptions, i =>
@@ -79,10 +102,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         }
     }
 
+    /// <summary>
+    /// Preprocesses the input data serially and writes the results to the model input channel.
+    /// </summary>
     private void PreprocessSerial(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
         int i = 0;
-        for (; i < batchCountWithoutRemainder; i+= _maxBatchSize)
+        for (; i < batchCountWithoutRemainder; i += _maxBatchSize)
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[i] = taskCompletionSource.Task;
@@ -101,12 +127,18 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         }
     }
 
+    /// <summary>
+    /// Starts a background worker to process items from the specified channel using the provided function.
+    /// </summary>
     private static Task BackgroundWorker<T>(Channel<T> channel, ParallelOptions parallelOptions, Func<T, CancellationToken, ValueTask> func)
     {
         Console.WriteLine($"Starting worker thread for processing: {func.Method.Name}");
         return Parallel.ForEachAsync(channel.Reader.ReadAllAsync(), parallelOptions, func);
     }
 
+    /// <summary>
+    /// Processes a chunk of data by running the model and writing the results to the postprocessing channel.
+    /// </summary>
     private async ValueTask ModelProcessChunk(StreamedInferenceChunk chunk, CancellationToken ct)
     {
         try
@@ -120,8 +152,11 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
             chunk.CompletionSource.SetException(e);
         }
     }
-    
-    ValueTask PostProcess(StreamedInferenceChunk postProcessInput, CancellationToken ct)
+
+    /// <summary>
+    /// Postprocesses a chunk of data and writes the final output to the provided memory block.
+    /// </summary>
+    private ValueTask PostProcess(StreamedInferenceChunk postProcessInput, CancellationToken ct)
     {
         try
         {
@@ -133,16 +168,22 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         {
             postProcessInput.CompletionSource.SetException(e);
         }
-            
+
         return ValueTask.CompletedTask;
     }
-    
+
+    /// <summary>
+    /// Represents a chunk of data to be processed in the inference pipeline.
+    /// </summary>
     private sealed record StreamedInferenceChunk(
         ReadOnlyMemory<TInput> Inputs,
         Memory<TOutput> Outputs,
         TaskCompletionSource CompletionSource,
         TPreprocess PreprocessResult)
     {
+        /// <summary>
+        /// Gets or sets the result of the model execution for this chunk.
+        /// </summary>
         internal TModelOutput? ModelResult { get; set; }
     }
 }
