@@ -10,10 +10,12 @@ public enum TruncationOption
     /// Will truncate the longer part of the context or text.
     /// </summary>
     Longest,
+
     /// <summary>
     /// Will always truncate the context.
     /// </summary>
     Context,
+
     /// <summary>
     /// Will always truncate the text.
     /// </summary>
@@ -26,4 +28,4 @@ public enum TruncationOption
 /// <param name="PaddingToken">The token used for padding sequences.</param>
 /// <param name="MaxTokenLength">The maximum number of tokens allowed in a sequence.</param>
 /// <param name="TruncationOption">The truncation strategy applied when tokenizing text.</param>
-public record PretrainedTokenizerOptions(int PaddingToken, int MaxTokenLength = 512, TruncationOption TruncationOption = TruncationOption.Longest);
+public record PretrainedTokenizerOptions(int PaddingToken = 0, int MaxTokenLength = 512, TruncationOption TruncationOption = TruncationOption.Longest);

@@ -16,9 +16,9 @@ public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExe
     /// <summary>
     /// Initializes a new instance of the <see cref="TokenCountSortingBatchExecutor{TToken, TOutput}"/> class.
     /// </summary>
-    /// <param name="tokenizer">The tokenizer used for tokenizing input items.</param>
     /// <param name="executor">The underlying batch executor responsible for predictions.</param>
-    public TokenCountSortingBatchExecutor(PretrainedTokenizer tokenizer, IPipelineBatchExecutor<TToken, TOutput> executor)
+    /// <param name="tokenizer">The tokenizer used for tokenizing input items.</param>
+    public TokenCountSortingBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
         _executor = executor;

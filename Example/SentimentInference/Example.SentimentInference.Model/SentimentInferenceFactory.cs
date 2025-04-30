@@ -1,74 +1,66 @@
 ﻿using ML.Infra.Abstractions;
 using ML.Infra.Configurations.PipelineBatchExecutors;
-using ML.Infra.Factories;
-using ML.NLP.Configuration;
-using ML.NLP.PipelineBatchExecutors;
-using ML.NLP.Tokenization;
-using ML.Onnx.Factories;
 using ML.Infra.ResultTypes;
+using ML.NLP.Configuration;
+using ML.NLP.Configuration.PipelineBatchExecutors;
 using ML.NLP.InferenceTasks.TextClassification;
+using ML.NLP.Tokenization;
+using ML.Onnx.Configuration;
+using ML.Onnx.Factories;
 
 namespace Example.SentimentInference.Model;
+
+using StreamedBatchExecutor = StreamedPipelineExecutorBuilder<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>;
 
 public static class SentimentInferenceFactory
 {
     public static async Task<IInference<string, bool>> CreateSentimentInference(SentimentInferenceOptions options)
     {
         Console.WriteLine($"Model: {options.ModelDir}");
-        var tokenizer = await TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
+        Func<Task<PretrainedTokenizer>> tokenizer = () => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
+        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory = tokenizer.GetTokenizerFactory();
 
-        IModelExecutor<long, float> modelExecutor =
-            await ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, options.ModelExecutorOptions);
+        var executorBuilder = CreateBatchGpuExecutorBuilder(options, tokenizerFactory);
 
-        return CreateSentimentInference(options, tokenizer, modelExecutor);
+        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(await executorBuilder.BuildAsync());
+        return new SentimentInference(pipeline);
     }
 
-    private static SentimentInference CreateSentimentInference(SentimentInferenceOptions options, PretrainedTokenizer tokenizer,
-        IModelExecutor<long, float> modelExecutor)
+    private static MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> CreateBatchGpuExecutorBuilder(
+        SentimentInferenceOptions options,
+        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
     {
-        IInferenceSteps<TokenizedText, ClassificationResult<bool>> textClassificationTask =
-            new TextClassification<bool>(tokenizer, modelExecutor, new TextClassificationOptions<bool>([false, true]));
-
-        IPipelineBatchExecutorOptions baseExecutorOptions;
-        if (options.PipeBatchExecutorOptions is DecoratorExecutorOptions decoratorExecutorOptions)
-        {
-            baseExecutorOptions = decoratorExecutorOptions.InternalExecutorOptions;
-        }
-        else
-        {
-            baseExecutorOptions = options.PipeBatchExecutorOptions;
-        }
-
-        IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>> executor =
-            PipelineBatchExecutorFactory.CreatePipelineBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
-                baseExecutorOptions,
-                textClassificationTask);
-
-        switch (options.PipeBatchExecutorOptions)
-        {
-            case MaxPaddedTokensBatchExecutorOptions maxPaddedTokensBatchExecutorOptions:
-                Console.WriteLine("Using TokenBatchSize chunking and Max Padding");
-                executor = new MaxPaddedTokensBatchExecutor<TokenizedText, ClassificationResult<bool>>(executor, maxPaddedTokensBatchExecutorOptions.MaxPaddedRatio, maxPaddedTokensBatchExecutorOptions.MaxTokensCount);
-                
-                Console.WriteLine("Using Sort by token count execution");
-                executor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(tokenizer, executor);
-                break;
-            case TokenBasedBatchExecutorOptions tokenBasedBatchExecutorOptions:
-                if (tokenBasedBatchExecutorOptions.MaxTokensCount.HasValue)
+        MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> builder = new();
+        var executorOptions = new OnnxModelExecutorOptions()
+            .ConfigureOnnxOptions(onnxOptions =>
+            {
+                onnxOptions.ConfigureSessionOptions(sessionOptions =>
                 {
-                    Console.WriteLine("Using TokenBatchSize chunking");
-                    executor = new TokenBatchSizeBatchExecutor<TokenizedText, ClassificationResult<bool>>(executor, tokenBasedBatchExecutorOptions.MaxTokensCount.Value);
-                }
+                    sessionOptions.AppendExecutionProvider_CUDA();
+                    Console.WriteLine("Using GPU accelerator");
 
-                if (tokenBasedBatchExecutorOptions.SortTokens)
+                    sessionOptions.AppendExecutionProvider_CPU();
+                });
+                onnxOptions.ModelDir = options.ModelDir;
+            });
+
+        builder.MaxPaddedRatio = 0.1;
+        builder.MaxTokensCount = 2048;
+        builder
+            .UseTokenizer(tokenizerFactory)
+            .UseInnerPipelineExecutor<StreamedBatchExecutor>(builder =>
+            {
+                builder.MaxConcurrency = 4;
+                builder.ParallelPreProcessing = false;
+                builder.UseInferenceSteps<TextClassificationBuilder<bool>, TextClassification<bool>>(classificationBuilder =>
                 {
-                    Console.WriteLine("Using Sort by token count execution");
-                    executor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(tokenizer, executor);
-                }
-                break;
-        }
+                    classificationBuilder
+                        .UseChoices(false, true)
+                        .UseTokenizer(tokenizerFactory)
+                        .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
+                });
+            });
 
-        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(executor);
-        return new SentimentInference(pipeline);
+        return builder;
     }
 }

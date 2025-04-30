@@ -25,7 +25,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private readonly Task _modelTask;
     private readonly Task _postProcessingTask;
 
-    private readonly int _maxBatchSize;
+    private readonly int? _maxBatchSize;
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
 
@@ -36,7 +36,8 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// <param name="maxBatchSize">The maximum size of a batch to process.</param>
     /// <param name="maxConcurrency">The maximum degree of parallelism for processing tasks.</param>
     /// <param name="parallelTokenization">Indicates whether tokenization should be parallelized.</param>
-    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, int maxBatchSize, int? maxConcurrency, bool parallelTokenization)
+    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, int? maxBatchSize, int? maxConcurrency,
+        bool parallelTokenization)
     {
         _maxBatchSize = maxBatchSize;
         _parallelTokenization = parallelTokenization;
@@ -55,14 +56,15 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// <returns>A task that represents the asynchronous operation.</returns>
     public Task ExecuteBatchPredict(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output)
     {
-        if (inputs.Length < _maxBatchSize)
+        if (!_maxBatchSize.HasValue || inputs.Length < _maxBatchSize)
         {
             var tcs = new TaskCompletionSource();
             var preprocess = _inference.Preprocess(inputs.Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs, output, tcs, preprocess));
             return tcs.Task;
         }
-        (int batchCountWithoutRemainder, int remainder) = Math.DivRem(inputs.Length, _maxBatchSize);
+
+        (int batchCountWithoutRemainder, int remainder) = Math.DivRem(inputs.Length, _maxBatchSize.Value);
         int batchCount = batchCountWithoutRemainder + (remainder > 0 ? 1 : 0);
         var tasks = new Task[batchCount];
         if (_parallelTokenization)
@@ -82,12 +84,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// </summary>
     private void PreprocessParallel(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
+        int maxBatchSize = _maxBatchSize!.Value;
         Parallel.For(0, batchCountWithoutRemainder, _parallelOptions, i =>
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[i] = taskCompletionSource.Task;
-            int startIndex = i * _maxBatchSize;
-            var r = new Range(startIndex, startIndex + _maxBatchSize);
+            int startIndex = i * maxBatchSize;
+            var r = new Range(startIndex, startIndex + maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         });
@@ -96,7 +99,7 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[^1] = taskCompletionSource.Task;
-            var r = new Range(batchCountWithoutRemainder * _maxBatchSize, inputs.Length);
+            var r = new Range(batchCountWithoutRemainder * maxBatchSize, inputs.Length);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
@@ -108,11 +111,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private void PreprocessSerial(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
         int i = 0;
-        for (; i < batchCountWithoutRemainder; i += _maxBatchSize)
+        int maxBatchSize = _maxBatchSize!.Value;
+        for (; i < batchCountWithoutRemainder; i += maxBatchSize)
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[i] = taskCompletionSource.Task;
-            var r = new Range(i, i + _maxBatchSize);
+
+            var r = new Range(i, i + maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }

@@ -1,4 +1,8 @@
-﻿namespace ML.NLP.Configuration;
+﻿using ML.Infra.ResultTypes;
+using ML.NLP.InferenceTasks.TextClassification;
+using ML.NLP.Tokenization;
+
+namespace ML.NLP.Configuration;
 
 /// <summary>
 /// Represents configuration options for text classification tasks.
@@ -11,3 +15,25 @@
 /// Indicates whether to store raw model logits for further analysis. Defaults to <c>false</c>. This allows the Inference Task to reduce allocations if possible.  
 /// </param>
 public record TextClassificationOptions<TClassification>(TClassification[] Choices, bool StoreLogits = false);
+
+public class TextClassificationBuilder<TClassification>
+    : TextInferenceStepsBuilder<TokenizedText, ClassificationResult<TClassification>, TextClassification<TClassification>,
+        TextClassificationBuilder<TClassification>>
+{
+    public TClassification[] Choices { get; set; }
+    public bool StoreLogits { get; set; } = false;
+
+    public TextClassificationBuilder<TClassification> UseChoices(params TClassification[] choices)
+    {
+        Choices = choices;
+        return this;
+    }
+
+    public override async ValueTask<TextClassification<TClassification>> BuildAsync()
+    {
+        var tokenizerTask = GetTokenizer();
+        var modelExecutorTask = ExecutorFactory();
+
+        return new TextClassification<TClassification>(await tokenizerTask, await modelExecutorTask, new(Choices, StoreLogits));
+    }
+}

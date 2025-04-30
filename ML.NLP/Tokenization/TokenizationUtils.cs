@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.ML.Tokenizers;
 using ML.NLP.Configuration;
@@ -54,12 +55,20 @@ public static class TokenizationUtils
         var tokenizer = await BertTokenizer.CreateAsync(streamVocab, config);
         return new PretrainedTokenizer(tokenizer, tokenizerOptions);
     }
-}
 
+    public static Func<ValueTask<PretrainedTokenizer>> GetTokenizerFactory(this Func<Task<PretrainedTokenizer>> factory)
+    {
+        StrongBox<PretrainedTokenizer> box = new();
+        return async () =>
+        {
+            box.Value ??= await factory();
+            return box.Value;
+        };
+    }
+}
 
 [JsonSerializable(typeof(BertOptions))]
 [JsonSerializable(typeof(Dictionary<string, int>))]
 public partial class TokenizationOptionsJsonSerializerContext : JsonSerializerContext
 {
-    
 }
