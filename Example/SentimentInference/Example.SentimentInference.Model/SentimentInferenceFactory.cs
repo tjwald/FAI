@@ -1,12 +1,12 @@
-﻿using ML.Infra.Abstractions;
-using ML.Infra.Configurations.PipelineBatchExecutors;
-using ML.Infra.ResultTypes;
-using ML.NLP.Configuration;
-using ML.NLP.Configuration.PipelineBatchExecutors;
-using ML.NLP.InferenceTasks.TextClassification;
-using ML.NLP.Tokenization;
-using ML.Onnx.Configuration;
-using ML.Onnx.Factories;
+﻿using FAI.Core.Abstractions;
+using FAI.Core.Configurations.PipelineBatchExecutors;
+using FAI.Core.ResultTypes;
+using FAI.NLP.Configuration;
+using FAI.NLP.Configuration.PipelineBatchExecutors;
+using FAI.NLP.InferenceTasks.TextClassification;
+using FAI.NLP.Tokenization;
+using FAI.Onnx.Configuration;
+using FAI.Onnx.Factories;
 
 namespace Example.SentimentInference.Model;
 

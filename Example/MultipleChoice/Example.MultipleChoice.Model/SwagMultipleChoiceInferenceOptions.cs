@@ -1,5 +1,5 @@
-using ML.NLP.Configuration;
-using ML.Onnx.Configuration;
+using FAI.NLP.Configuration;
+using FAI.Onnx.Configuration;
 
 namespace Example.MultipleChoice.Model;
 

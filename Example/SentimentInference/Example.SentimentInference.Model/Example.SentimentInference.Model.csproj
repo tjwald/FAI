@@ -8,9 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\ML.NLP\ML.NLP.csproj" />
-      <ProjectReference Include="..\..\..\ML.Onnx\ML.Onnx.csproj" />
-      <ProjectReference Include="..\..\..\ML.Infra\ML.Infra.csproj" />
+        <ProjectReference Include="..\..\..\FAI.NLP\FAI.NLP.csproj"/>
+        <ProjectReference Include="..\..\..\FAI.Onnx\FAI.Onnx.csproj"/>
+        <ProjectReference Include="..\..\..\FAI.Core\FAI.Core.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

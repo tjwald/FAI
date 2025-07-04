@@ -1,10 +1,10 @@
-﻿using ML.Infra.Abstractions;
-using ML.NLP.Tokenization;
-using ML.Infra.ResultTypes;
+﻿using FAI.Core.Abstractions;
+using FAI.Core.ResultTypes;
+using FAI.NLP.Tokenization;
 
 namespace Example.SentimentInference.Model;
 
-public sealed class SentimentInference: IInference<string, bool>
+public sealed class SentimentInference : IInference<string, bool>
 {
     private readonly IPipeline<TokenizedText, ClassificationResult<bool>> _pipeline;
 
@@ -22,12 +22,12 @@ public sealed class SentimentInference: IInference<string, bool>
     public async Task<bool[]> BatchPredict(ReadOnlyMemory<string> input)
     {
         var textInputs = new TokenizedText[input.Length];
-        ReadOnlySpan<string> inputSpan = input.Span; 
+        ReadOnlySpan<string> inputSpan = input.Span;
         for (int i = 0; i < input.Length; i++)
         {
             textInputs[i] = inputSpan[i];
         }
-        
+
         ClassificationResult<bool>[] classificationResults = await _pipeline.BatchPredict(textInputs);
         return classificationResults.Select(x => x.Choice).ToArray();
     }
