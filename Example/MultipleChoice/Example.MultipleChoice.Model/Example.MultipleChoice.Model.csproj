@@ -11,9 +11,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\ML.Infra\ML.Infra.csproj" />
-      <ProjectReference Include="..\..\..\ML.NLP\ML.NLP.csproj" />
-      <ProjectReference Include="..\..\..\ML.Onnx\ML.Onnx.csproj" />
+        <ProjectReference Include="..\..\..\FAI.Core\FAI.Core.csproj"/>
+        <ProjectReference Include="..\..\..\FAI.NLP\FAI.NLP.csproj"/>
+        <ProjectReference Include="..\..\..\FAI.Onnx\FAI.Onnx.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

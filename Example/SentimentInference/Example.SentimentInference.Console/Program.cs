@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.SentimentInference.Model;
-using ML.Infra.Abstractions;
+using FAI.Core.Abstractions;
 using Parquet;
 using Parquet.Data;
 

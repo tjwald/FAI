@@ -1,7 +1,7 @@
 using Example.SentimentInference.Model;
+using FAI.Core;
+using FAI.Core.Abstractions;
 using Microsoft.AspNetCore.Mvc;
-using ML.Infra;
-using ML.Infra.Abstractions;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +11,8 @@ IInference<string, bool> inference = await SentimentInferenceFactory.CreateSenti
 
 builder.Services.AddSingleton(inference);
 builder.Services.AddKeyedSingleton<IInference<string, bool>>("orchestrated",
-    new InferenceOrchestrator<IInference<string, bool>, string, bool>(new Lazy<IInference<string, bool>>(() => inference), 10, 5, TimeSpan.FromMicroseconds(10)));
+    new InferenceOrchestrator<IInference<string, bool>, string, bool>(new Lazy<IInference<string, bool>>(() => inference), 10, 5,
+        TimeSpan.FromMicroseconds(10)));
 
 builder.Services.AddOpenApi();
 

@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.MultipleChoice.Model;
-using ML.Infra.Abstractions;
-using ML.Infra.ResultTypes;
-using ML.NLP.Tokenization;
+using FAI.Core.Abstractions;
+using FAI.Core.ResultTypes;
+using FAI.NLP.Tokenization;
 using Parquet;
 
 const string fileName = "swag_train.parquet";
@@ -18,7 +18,6 @@ Console.WriteLine("Finished loading training data");
 
 await RunBatchPredict(model, input, expectedOutput);
 return;
-
 
 
 static async Task RunBatchPredict(IInference<SwagInput, ChoiceResult<TokenizedText>> sentimentInference, SwagInput[] input, int[] expectedOutput)
@@ -63,7 +62,7 @@ file static class TrainingParquetReader
         var trainingDataList = new List<TrainingData>();
         await using Stream fs = File.OpenRead(filePath);
         using var reader = await ParquetReader.CreateAsync(fs);
-        
+
         var sent1Field = reader.Schema.FindDataField("sent1");
         var sent2Field = reader.Schema.FindDataField("sent2");
         var ending0Field = reader.Schema.FindDataField("ending0");
@@ -75,25 +74,25 @@ file static class TrainingParquetReader
         for (int i = 0; i < reader.RowGroupCount; i++)
         {
             using var rowGroupReader = reader.OpenRowGroupReader(i);
-            
-            var sent1Column = await rowGroupReader.ReadColumnAsync(sent1Field); 
-            var sent2Column = await rowGroupReader.ReadColumnAsync(sent2Field); 
-            var ending0Column = await rowGroupReader.ReadColumnAsync(ending0Field); 
-            var ending1Column = await rowGroupReader.ReadColumnAsync(ending1Field); 
-            var ending2Column = await rowGroupReader.ReadColumnAsync(ending2Field); 
-            var ending3Column = await rowGroupReader.ReadColumnAsync(ending3Field); 
-            var labelColumn = await rowGroupReader.ReadColumnAsync(labelField); 
-            
+
+            var sent1Column = await rowGroupReader.ReadColumnAsync(sent1Field);
+            var sent2Column = await rowGroupReader.ReadColumnAsync(sent2Field);
+            var ending0Column = await rowGroupReader.ReadColumnAsync(ending0Field);
+            var ending1Column = await rowGroupReader.ReadColumnAsync(ending1Field);
+            var ending2Column = await rowGroupReader.ReadColumnAsync(ending2Field);
+            var ending3Column = await rowGroupReader.ReadColumnAsync(ending3Field);
+            var labelColumn = await rowGroupReader.ReadColumnAsync(labelField);
+
             for (int j = 0; j < sent1Column.Data.Length; j++)
             {
                 var trainingData = new TrainingData
                 {
-                    Context = (string)sent1Column.Data.GetValue(j)!, 
-                    Sentence = (string)sent2Column.Data.GetValue(j)!, 
-                    Ending0 = (string)ending0Column.Data.GetValue(j)!, 
-                    Ending1 = (string)ending1Column.Data.GetValue(j)!, 
-                    Ending2 = (string)ending2Column.Data.GetValue(j)!, 
-                    Ending3 = (string)ending3Column.Data.GetValue(j)!, 
+                    Context = (string)sent1Column.Data.GetValue(j)!,
+                    Sentence = (string)sent2Column.Data.GetValue(j)!,
+                    Ending0 = (string)ending0Column.Data.GetValue(j)!,
+                    Ending1 = (string)ending1Column.Data.GetValue(j)!,
+                    Ending2 = (string)ending2Column.Data.GetValue(j)!,
+                    Ending3 = (string)ending3Column.Data.GetValue(j)!,
                     Label = (long)labelColumn.Data.GetValue(j)!
                 };
                 trainingDataList.Add(trainingData);
