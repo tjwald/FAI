@@ -67,6 +67,5 @@ Most new innovations happen in python and would require porting to C#.
   `InferenceOrchestrator<TInference, TQuery, TResult>`
 * The more CPU logic in the inference algorithm surrounding the underlying model, the better these benchmarks favor C#
   even with all the optimizations applied to python.
-* There are many Gen 0 allocations in the current solution. This is due to how `Tensor<T>` is implemented, and is under
-  discussion
-  in [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)  
+* There are many Gen 0 allocations in the current solution. This is due to how tokenization and tensor creation, and is
+  under discussion in the relevant repos with the dotnet team.

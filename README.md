@@ -63,7 +63,8 @@ The repo also contains an example C# usage in the `Example` folder.
 
 This project demonstrates how to optimize the use of AI models, and get better performance by migrating to C#.
 
-This doesn't mean this is all good - there are many issues documented in: [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)
+This doesn't mean this is all good - there are many issues documented
+in: [.NET AI Fundamentals Feedback / Feature Requests](https://github.com/dotnet/machinelearning/issues/7383)
 
 We would love contributions -
 
@@ -118,3 +119,13 @@ There are multiple examples of these PipelineBatchExecutors:
 * TokenBatchSize - group the sentences up to a token threshold instead of sentence count.
 * Max Padding - make sure you don't waste a lot of compute on padding tokens.
   And more.
+
+---
+
+## Feedback and Contributions
+
+We would love your feedback! Please file issues on this repo with suggestions and improvements you would like to
+contribute.
+
+Please file an issue **before** you open a PR so we get a chance to review the suggestion and make sure the design and
+implementation direction are in alignment with this project.
