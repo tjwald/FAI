@@ -78,8 +78,8 @@ We would love contributions -
 
 Python is and probably will be the foundation for AI/ML research and development for the coming years.
 
-This practically means that any cutting edge new ML result will take time to find its way to C#+dotnet, and you **should
-** take this into consideration.
+This practically means that any cutting edge new ML result will take time to find its way to C#+dotnet,
+and you **should** take this into consideration.
 
 If the models you are developing are not under a lot of dynamic load, you aren't using your entire budget on running AI
 with low utilization, then maybe this is not worth the effort to migrate.
