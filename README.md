@@ -1,66 +1,89 @@
-This project is designed to:
-* Showcase the new features of dotnet 9.0 in the world of AI
-* Compare the performance of C# to python in the AI workload
-* Show cool AI optimizations techniques for runtime performance
+# FAI - Fast AI on A Budget
 
-This project also has many performance opportunities that show we could improve the framework and language, and support the ML ops story of migrating from python to a more performant solution.
+<img src="/docs/Images/FAI%20Logo.jpg" alt="FAI logo" width="300" height="300"/></br>
 
+FAI (Fast AI) is a library design to maximize the performance of your models by giving you the best tools to do so:
+
+* Choose the right hardware for you
+* Choose the right model executing framework for you
+* Implement an inference task once and inject the right hardware and framework to run it for the specific model
+* Optimize batch inference execution with custom algorithms and scheduling
+* Enjoy a nice User Friendly API for consuming code via Pipeline abstraction
+* Bootstrap inference algorithms for different applications by providing a common abstraction to build on.
+
+## Results
+
+Under the [Example](Example) folder, you can find projects written using the standard python stack and compare it with
+the same task written using this library. </br>
+The results in the examples are anywhere between 7X and 14X that is for offline batch inference, for online Web
+inference, the gains can be a lot more.
+
+## Production Readiness
+
+**THIS PROJECT IS NOT READY FOR PRODUCTION USE.**
+
+This project uses preview and experimental features of dotnet, as well as having 0 test coverage.
+
+In addition, the design is still evolving and many more ML tasks need to be implemented before a preview release can be
+considered.
+
+Would love the assistance to get it there.
 
 ## Background 
 
 Many AI projects start from a researcher developing or customizing existing models to specific tasks.
 
-These are usually developed in python, normally using the [HuggingFace transformers library](https://huggingface.co/docs/transformers/en/index), and pytorch models.
+These are usually developed in python, using
+the [HuggingFace transformers library](https://huggingface.co/docs/transformers/en/index), and pytorch models.
 
 However, getting these models to run in production in an efficient manner is a different story.
 
-In my case, we had multiple custom nlp models with complex algorithms deciding how and on what to use them.
-
-These models were bleeding a third of our budget in production.
-
-For example, one of the models was processing 200 requests a minute. I needed it to process 20K requests a minute -> we need 1000 machines (we limited it to 100...).
-
-After many optimizations and a month of work, optimizing our FastAPI server and migrating to ONNX for the model inference, I got it to 28K requests a minute, and down to 1 server.
-
-What were some of the bottlenecks I solved?
-* Efficient use of async await - processing CPU and GPU computation at the same time
-* Dynamic Batching - GPUs love batches, but we were getting single sentence requests from different processes. So we collect them and run them together.
-* Using Onnx - pytorch is a training framework, both heavy in installations (Fatter Image), but also slower in runtime. Migrating to ONNX solved both problems - reduced our image size by 60%, and our inference time from X4 to X20 depending on the algorithm.
-* Algorithmic Improvements - complex algorithms, with many ping pongs between the gpu and cpu, do not easily optimize.
-
-But we were reaching the limitations of python - our GPU was less than 30% utilized, and our cpu was spinning with increasing latency with increased load.
+See the [Testimonial](docs/Testimonial.md) for how this library got to be created.
 
 ### .Net 9.0
 
-After all of this work, dotnet 9 came out with many improvements to AI workloads, including the missing piece from our point of view - tokenizers!
-As all of our models were NLP based, we needed tokenizers to be able to implement our models in C#, and now we had them. In addition the new `Tensor<T>` type realy helps!
+Dotnet 9 came out with many improvements to AI workloads including:
 
-In 2 days work, I was able to get most of my optimizations over to the ASP.NET framework, with ONNX for the model runtime, 
-and guess what?
+- `Tensor<T>`
+- `Tokenizer`
 
-I got 200K+ requests a minute.
+The missing pieces for a generic ML library designed for performance.
 
-The company didn't need this, and adding a new tech-stack to a python-only shop didn't make sense. 
-
-
+---
 
 ## This Project
 
-The library [ML.Infra](ML.Infra) (Name TBD) provides the foundation for optimizing your own models.
+FAI is designed to:
 
-The repo also contains an example C# usage in the `Example.SemanticInference.*` folders.
+* Support the ML-Fin-Ops migration story from python to production
+* Enable more AI for less within a budget
+* Bootstrap common usage patterns of ML with high performance
+
+The repo also contains an example C# usage in the `Example` folder.
 
 This project demonstrates how to optimize the use of AI models, and get better performance by migrating to C#.
 
 This doesn't mean this is all good - there are many issues documented in: [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)
 
-Also, since the model I use as an example in this project has a custom tokenizer, I did my best to use the most similar tokenizer available in C#, but this causes accurracy issues. I doubt that this difference would effect performance, but if you feel like implementing in C# the exact same tokenizer I would love to see it :). 
+We would love contributions -
 
-Under [example/python](/Example/python) you will find the hugging face model I am using as a baseline. This model was picked at random, as it is a small nlp model, that is well up-voted on HuggingFace.
-This model is smaller than the one mentioned previously
+* More ML tasks - QA, Entity recognition, etc.
+* More Input modalities - Image, Video, Multi-Modals etc.
+* More Model Inference Frameworks - PyTorch via TorchSharp/CSnakes, etc.
+* More Bootstrapping - ASP.NET Autowired web server, Evaluation pipeline, configuration and dependency injection
+  integration, etc.
 
-In the Example.SemanticInference.Model you will find the optimized onnx model with the needed resources.
+## General Note
 
+Python is and probably will be the foundation for AI/ML research and development for the coming years.
+
+This practically means that any cutting edge new ML result will take time to find its way to C#+dotnet, and you **should
+** take this into consideration.
+
+If the models you are developing are not under a lot of dynamic load, you aren't using your entire budget on running AI
+with low utilization, then maybe this is not worth the effort to migrate.
+
+---
 
 ## The Lego Bricks
 
@@ -71,118 +94,27 @@ These actually run the model. You can switch from ONNX to another implementation
 
 You can also see that there are multiple ONNX runners, with a pooled wrapper that can pool multiple instances. 
 
-### Tokenizers
-I didn't do much except implement a wrapper to the dotnet abstraction of a tokenizer such that it supports batching and returns `Tensor<T>`.
+Currently supported:
 
+* FAI.Onnx - implements multiple onnx ModelExecutors. When referencing this package, you need to add the specific Onnx
+  package you want to use (GPU, OpenVino etc.).
+
+### Tokenizers
+
+A batch tokenizer implementation - `FAI.NLP.Tokenization.PretrainedTokenizer`
 
 ### Pipelines
 I was inspired by [HuggingFace](https://huggingface.co/docs/transformers/en/index), but I added my own little twist - you can now inject a custom `IPipelineBatchExecutor<TInput, TOutput>` that controls how batches are executed.
+
+### Pipeline Batch Executors
+
+This abstraction enables you to mix and match different batching and scheduling algorithms to get the most performance
+out of you model and hardware.
 
 There are multiple examples of these PipelineBatchExecutors:
 * Serial - just runs them in a loop one after the other.
 * Parallel - will do just that - parallelize the batches.
 * TokenCountSorting - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, the user expects the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index.
 * TokenBatchSize - group the sentences up to a token threshold instead of sentence count.
-
-
-## Results:
-
-### My Specs: 
-* CPU: i5-13600KF
-* GPU: RTX 3060 12GB
-* CUDA (C#) - 12.6
-* CUDA (Torch) - 12.1
-* Torch - 2.5.1
-* Onnx - 1.20.1
-
-### Data Set:
-I am using the training data set, in the parquet provided in the folder.
-
-67349 Sentences with the relevant labels
-
-### Python:
-* Torch + GPU
-* Batch Size: 20 
-* Threading: 1
-* Time: 51s
-* Time per sentence: 0.77 ms
-
-### C#:
-* ONNX + GPU
-* ORT_SEQUENTIAL
-* Batch Size: 12
-* Threading: 4
-* Time: 10.56s
-* Time per sentence: 0.157 ms
-
-
-A 5X improvement on a small model with no logic outside the model.
-
-### Notes:
-* This simulates training, and batched inference - However, my issue was serving dynamic queries in spike loads.
-* You can definitely take many of these optimizations and apply them to the python solution.
-* In a dynamic server setting, you will find that these benchmarks scale very well in C# but not in python. See `InferenceOrchestrator<TInference, TQuery, TResult>`
-* The more CPU logic in the inference algorithm surrounding the underlying model, the better these benchmarks favor C# even with all the optimizations applied to python.
-* There are many Gen 0 allocations in the current solution. This is due to how `Tensor<T>` is implemented, and is under discussion in [PyTorch & HuggingFace Custom Models Migration Story](https://github.com/microsoft/semantic-kernel/issues/9793)  
-
-
-### What should you do?
-Probably nothing. I hope you will learn something from this project.
-
-Python was just fine for the company, and most impactful optimizations are in the framework level and algorithmic level (from 200reqs/m -> 24K reqs/m remember?)
-
-Before you abandon python for C# for the performance gain, remember that C# is not as mature as python in the AI ecosystem.
-
-Most new innovations happen in python and would require porting to C#.  
-
-
----
-
-### Update:
-
-After further optimizations and fixing TokenCountSortingBatchExecutor I was able to further reduce the time taken.
-
-### C#
-* ONNX + GPU
-* ORT_SEQUENTIAL
-* Batch Size: 12
-* Threading: 4
-* Time: 6.04s
-* Time per sentence: 0.089 ms
-
-8.65X faster than python.
-
-This enabled increasing the batch size:
-
-### C#
-* ONNX + GPU
-* ORT_SEQUENTIAL
-* **Batch Size: 400**
-* Threading: 4
-* Time: 3.72s
-* Time per sentence: 0.055 ms
-
-13.63X faster than python.
-
-The time per batch size (4 threads):
-
-| Batch Size | Time (s)    |
-|------------|-------------|
-| 12         | 5.86        |
-| 20         | 5.05        |
-| 50         | 4.19        |
-| 100        | 3.94        |
-| 200        | 3.87        |
-| 300        | 3.79        |
-| 400        | 3.75  <---- |
-| 450        | 3.78        |
-| 500        | 3.86        |
-
-With TokenBatchSizeBatchExecutor + Streamed in addition to TokenCountSortingBatchExecutor we get:
-
-* ONNX + GPU
-* ORT_SEQUENTIAL
-* **Token Max Batch Size: 2048**
-* Threading: 4
-* Time: 3.64s
-* Time per sentence: 0.054 ms
+* Max Padding - make sure you don't waste a lot of compute on padding tokens.
+  And more.
