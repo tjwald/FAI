@@ -11,7 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.21.0" />
+        <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.22.1"/>
         <PackageReference Include="Parquet.Net" Version="5.0.2"/>
     </ItemGroup>
 

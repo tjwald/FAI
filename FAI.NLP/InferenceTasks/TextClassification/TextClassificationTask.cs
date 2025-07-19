@@ -66,10 +66,11 @@ public class TextClassification<TClassification>
         var outputs = new ClassificationResult<TClassification>[input.Length];
         await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask], (logits, _) =>
         {
-            for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
+            int indexInBatch = 0;
+            foreach (ReadOnlyTensorSpan<float> rowLogits in logits.GetDimensionSpan(0))
             {
-                ReadOnlySpan<float> rowLogits = logits.GetRowSpan(indexInBatch);
-                outputs[indexInBatch] = GetClassificationResult(rowLogits);
+                outputs[indexInBatch] = GetClassificationResult(rowLogits.AsSpan());
+                indexInBatch++;
             }
         });
         return outputs;

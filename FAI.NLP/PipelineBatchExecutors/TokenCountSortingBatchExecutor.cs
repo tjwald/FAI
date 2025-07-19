@@ -37,10 +37,7 @@ public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExe
         int[] inputsSortedIndices = Enumerable.Range(0, inputSpan.Length).ToArray();
         TToken[] inputsSorted = inputs.Span.ToArray();
 
-        foreach (var input in inputsSorted)
-        {
-            input.Tokenize(_tokenizer);
-        }
+        Parallel.ForEach(inputsSorted, input => input.Tokenize(_tokenizer));
 
         var tokenComparer = new TokenCountComparer<TToken>();
 

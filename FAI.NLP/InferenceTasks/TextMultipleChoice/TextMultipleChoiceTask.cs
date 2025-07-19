@@ -1,4 +1,5 @@
 using System.Numerics.Tensors;
+using System.Runtime.InteropServices;
 using FAI.Core;
 using FAI.Core.Abstractions;
 using FAI.Core.ResultTypes;
@@ -42,8 +43,8 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
         Tensor<long> tokenTensor = Tensor.Create<long>([input.Length * maxChoiceCount, maxTokenCount]);
         Tensor<long> maskTensor = Tensor.Create<long>([input.Length * maxChoiceCount, maxTokenCount]);
 
-        TensorSpan<long> tokenTensorSpan = tokenTensor.AsTensorSpan();
-        TensorSpan<long> maskTensorSpan = maskTensor.AsTensorSpan();
+        var tokenTensorSpan = tokenTensor.GetDimensionSpan(0);
+        var maskTensorSpan = maskTensor.GetDimensionSpan(0);
 
         int outputRow = 0;
         foreach (List<int>? tokens in tokensList)
@@ -55,12 +56,11 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
                 continue;
             }
 
-            Span<long> tokenRow = tokenTensorSpan.GetRowSpan(outputRow);
-            Span<long> maskRow = maskTensorSpan.GetRowSpan(outputRow);
-            for (int tokenIndex = 0; tokenIndex < tokens.Count; tokenIndex++)
-            {
-                tokenRow[tokenIndex] = tokens[tokenIndex];
-            }
+            // When AsSpan is merged - use it!
+            var tokenRow = tokenTensorSpan[outputRow].AsSpan();
+            var maskRow = maskTensorSpan[outputRow].AsSpan();
+
+            TensorPrimitives.ConvertChecked<int, long>(CollectionsMarshal.AsSpan(tokens), tokenRow);
 
             maskRow[..tokens.Count].Fill(1);
             outputRow++;
@@ -138,10 +138,11 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
 
         await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask], (logits, _) =>
         {
-            for (int indexInBatch = 0; indexInBatch < logits.Lengths[0]; indexInBatch++)
+            int indexInBatch = 0;
+            foreach (ReadOnlyTensorSpan<float> rowLogits in logits.GetDimensionSpan(0))
             {
-                ReadOnlySpan<float> rowLogits = logits.GetRowSpan(indexInBatch);
-                outputs[indexInBatch] = GetMultipleChoiceResult(input.Span[indexInBatch], rowLogits);
+                outputs[indexInBatch] = GetMultipleChoiceResult(input.Span[indexInBatch], rowLogits.AsSpan());
+                indexInBatch++;
             }
         });
         return outputs;

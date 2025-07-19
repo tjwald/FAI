@@ -9,30 +9,14 @@ namespace FAI.Core;
 /// </summary>
 public static class TensorExtensions
 {
-    /// <summary>
-    /// Retrieves a span representing a specific row of a tensor.
-    /// </summary>
-    /// <typeparam name="T">The type of elements in the tensor.</typeparam>
-    /// <param name="tensor">The tensor span to retrieve the row from.</param>
-    /// <param name="i">The index of the row to retrieve.</param>
-    /// <returns>A span representing the specified row of the tensor.</returns>
-    public static Span<T> GetRowSpan<T>(this TensorSpan<T> tensor, int i)
+    public static Span<T> AsSpan<T>(this TensorSpan<T> tensor)
     {
-        TensorSpan<T> tensorRow = tensor.Slice(i..(i + 1), ..);
-        return MemoryMarshal.CreateSpan(ref tensorRow.GetPinnableReference(), (int)tensor.Lengths[1]);
+        return MemoryMarshal.CreateSpan(ref tensor.GetPinnableReference(), (int)tensor.FlattenedLength);
     }
 
-    /// <summary>
-    /// Retrieves a read-only span representing a specific row of a read-only tensor.
-    /// </summary>
-    /// <typeparam name="T">The type of elements in the tensor.</typeparam>
-    /// <param name="tensor">The read-only tensor span to retrieve the row from.</param>
-    /// <param name="i">The index of the row to retrieve.</param>
-    /// <returns>A read-only span representing the specified row of the tensor.</returns>
-    public static ReadOnlySpan<T> GetRowSpan<T>(this ReadOnlyTensorSpan<T> tensor, int i)
+    public static ReadOnlySpan<T> AsSpan<T>(this ReadOnlyTensorSpan<T> tensor)
     {
-        ReadOnlyTensorSpan<T> tensorRow = tensor.Slice(i..(i + 1), ..);
-        return MemoryMarshal.CreateReadOnlySpan(in tensorRow.GetPinnableReference(), (int)tensor.Lengths[1]);
+        return MemoryMarshal.CreateReadOnlySpan(in tensor.GetPinnableReference(), (int)tensor.FlattenedLength);
     }
 
     /// <summary>

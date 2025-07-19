@@ -20,7 +20,7 @@ public class TextClassificationBuilder<TClassification>
     : TextInferenceStepsBuilder<TokenizedText, ClassificationResult<TClassification>, TextClassification<TClassification>,
         TextClassificationBuilder<TClassification>>
 {
-    public TClassification[] Choices { get; set; }
+    public TClassification[]? Choices { get; set; }
     public bool StoreLogits { get; set; } = false;
 
     public TextClassificationBuilder<TClassification> UseChoices(params TClassification[] choices)
@@ -33,6 +33,8 @@ public class TextClassificationBuilder<TClassification>
     {
         var tokenizerTask = GetTokenizer();
         var modelExecutorTask = ExecutorFactory();
+
+        ArgumentNullException.ThrowIfNull(Choices, nameof(Choices));
 
         return new TextClassification<TClassification>(await tokenizerTask, await modelExecutorTask, new(Choices, StoreLogits));
     }

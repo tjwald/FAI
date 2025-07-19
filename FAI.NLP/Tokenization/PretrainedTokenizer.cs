@@ -115,9 +115,7 @@ public sealed class PretrainedTokenizer
             }
         }
 
-        (Tensor<long> tokenization, Tensor<long> mask) = BatchTokensToTensors(tokenizedInputs, _tokenizerOptions, maxTokenSize);
-
-        return new BatchTokenizedResult(tokenization, mask);
+        return BatchTokensToTensors(tokenizedInputs, _tokenizerOptions, maxTokenSize);
     }
 
     public BatchTokenizedResult BatchTokenize(ReadOnlySpan<string> inputs)
@@ -134,89 +132,79 @@ public sealed class PretrainedTokenizer
             }
         }
 
-        (Tensor<long> tokenization, Tensor<long> mask) = BatchTokensToTensors(tokenizedInputs, _tokenizerOptions, maxTokenSize);
-
-        return new BatchTokenizedResult(tokenization, mask);
+        return BatchTokensToTensors(tokenizedInputs, _tokenizerOptions, maxTokenSize);
     }
 
-    public (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(
-        ReadOnlySpan<List<int>> inputs,
-        int maxTokenSize)
+    public BatchTokenizedResult BatchTokensToTensors(ReadOnlySpan<List<int>> inputs, int maxTokenSize)
     {
         return BatchTokensToTensors(inputs, _tokenizerOptions, maxTokenSize);
     }
 
-    private static (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(
-        ReadOnlySpan<List<int>> inputs,
-        PretrainedTokenizerOptions tokenizerOptions,
-        int maxTokenSize)
+    private static BatchTokenizedResult BatchTokensToTensors(ReadOnlySpan<List<int>> inputs, PretrainedTokenizerOptions tokenizerOptions, int maxTokenSize)
     {
-        Span<nint> tensorShape = [inputs.Length, maxTokenSize];
-        Span<nint> strides = [maxTokenSize, 1];
-        Tensor<long> tokenization = Tensor.Create<long>(tensorShape, strides); // would like to pool underlying array and use TensorMemory<T>
-        TensorSpan<long> tokenizationSpan = tokenization.AsTensorSpan();
+        int batchSize = inputs.Length;
+        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize);
 
-        Tensor<long> mask = Tensor.Create<long>(tensorShape, strides);
-        TensorSpan<long> maskSpan = mask.AsTensorSpan();
-        for (int i = 0; i < inputs.Length; i++)
+        TensorDimensionSpan<long> tokenizationSpan = result.Tokens.GetDimensionSpan(0);
+        TensorDimensionSpan<long> maskSpan = result.Mask.GetDimensionSpan(0);
+        for (int i = 0; i < batchSize; i++)
         {
-            Span<long> tokenizationRowSpan = tokenizationSpan.GetRowSpan(i);
-            Span<long> maskRowSpan = maskSpan.GetRowSpan(i);
-            Span<int> tokenizedInput = CollectionsMarshal.AsSpan(inputs[i]);
-
-            for (int j = 0; j < tokenizedInput.Length; j++)
-            {
-                tokenizationRowSpan[j] = tokenizedInput[j];
-            }
-
-            if (tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
-            {
-                tokenizationRowSpan[tokenizedInput.Length..].Fill(tokenizerOptions.PaddingToken);
-            }
-
-            maskRowSpan[..tokenizedInput.Length].Fill(1);
-            // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
+            TokenizeRow(tokenizerOptions, inputs[i], tokenizationSpan, maskSpan, i);
         }
 
-        return (tokenization, mask);
+        return result;
     }
 
-    public (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(TokensView inputs)
+    public BatchTokenizedResult BatchTokensToTensors(TokensView inputs)
     {
         return BatchTokensToTensors(inputs, _tokenizerOptions);
     }
 
-    private static (Tensor<long> tokens, Tensor<long> mask) BatchTokensToTensors(
+    private static BatchTokenizedResult BatchTokensToTensors(
         TokensView inputs,
         PretrainedTokenizerOptions tokenizerOptions)
     {
-        Span<nint> tensorShape = [inputs.Count, inputs.MaxTokenSize];
-        Span<nint> strides = [inputs.MaxTokenSize, 1];
-        Tensor<long> tokenization = Tensor.Create<long>(tensorShape, strides); // would like to pool underlying array and use TensorMemory<T>
-        TensorSpan<long> tokenizationSpan = tokenization.AsTensorSpan();
+        int batchSize = inputs.Count;
+        int maxTokenSize = inputs.MaxTokenSize;
 
-        Tensor<long> mask = Tensor.Create<long>(tensorShape, strides);
-        TensorSpan<long> maskSpan = mask.AsTensorSpan();
-        for (int i = 0; i < inputs.Count; i++)
+        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize);
+
+        TensorDimensionSpan<long> tokenizationSpan = result.Tokens.GetDimensionSpan(0);
+        TensorDimensionSpan<long> maskSpan = result.Mask.GetDimensionSpan(0);
+        for (int i = 0; i < batchSize; i++)
         {
-            Span<long> tokenizationRowSpan = tokenizationSpan.GetRowSpan(i);
-            Span<long> maskRowSpan = maskSpan.GetRowSpan(i);
-            Span<int> tokenizedInput = CollectionsMarshal.AsSpan(inputs[i]);
-
-            for (int j = 0; j < tokenizedInput.Length; j++)
-            {
-                tokenizationRowSpan[j] = tokenizedInput[j];
-            }
-
-            if (tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
-            {
-                tokenizationRowSpan[tokenizedInput.Length..].Fill(tokenizerOptions.PaddingToken);
-            }
-
-            maskRowSpan[..tokenizedInput.Length].Fill(1);
-            // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
+            TokenizeRow(tokenizerOptions, inputs[i], tokenizationSpan, maskSpan, i);
         }
 
-        return (tokenization, mask);
+        return result;
+    }
+
+    private static BatchTokenizedResult CreateTokenAndMaskTensorsFromShape(int batchSize, int maxTokenSize)
+    {
+        Span<nint> tensorShape = [batchSize, maxTokenSize];
+        nint columnStride = maxTokenSize == 1 ? 0 : 1;
+        Span<nint> strides = [maxTokenSize, columnStride];
+
+        Tensor<long> tokenization = Tensor.Create<long>(tensorShape, strides); // would like to pool underlying array and use TensorMemory<T>
+        Tensor<long> mask = Tensor.Create<long>(tensorShape, strides);
+        return new BatchTokenizedResult(tokenization, mask);
+    }
+
+    private static void TokenizeRow(PretrainedTokenizerOptions tokenizerOptions, List<int> rowTokens, TensorDimensionSpan<long> tokenizationSpan,
+        TensorDimensionSpan<long> maskSpan, int i)
+    {
+        Span<int> tokenizedInput = CollectionsMarshal.AsSpan(rowTokens);
+        Span<long> tokenizationRowSpan = tokenizationSpan[i].AsSpan();
+        Span<long> maskRowSpan = maskSpan[i].AsSpan();
+
+        TensorPrimitives.ConvertChecked<int, long>(tokenizedInput, tokenizationRowSpan);
+
+        if (tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
+        {
+            tokenizationRowSpan[tokenizedInput.Length..].Fill(tokenizerOptions.PaddingToken);
+        }
+
+        maskRowSpan[..tokenizedInput.Length].Fill(1);
+        // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
     }
 }
