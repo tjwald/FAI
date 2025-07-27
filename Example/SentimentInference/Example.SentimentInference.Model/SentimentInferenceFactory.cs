@@ -10,8 +10,6 @@ using FAI.Onnx.Factories;
 
 namespace Example.SentimentInference.Model;
 
-using StreamedBatchExecutor = StreamedPipelineExecutorBuilder<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>;
-
 public static class SentimentInferenceFactory
 {
     public static async Task<IInference<string, bool>> CreateSentimentInference(SentimentInferenceOptions options)
@@ -26,7 +24,7 @@ public static class SentimentInferenceFactory
         return new SentimentInference(pipeline);
     }
 
-    private static MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> CreateBatchGpuExecutorBuilder(
+    private static IPipelineBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> CreateBatchGpuExecutorBuilder(
         SentimentInferenceOptions options,
         Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
     {
@@ -46,12 +44,11 @@ public static class SentimentInferenceFactory
 
         builder.MaxPaddedRatio = 0.1;
         builder.MaxTokensCount = 2048;
+
         builder
             .UseTokenizer(tokenizerFactory)
-            .UseInnerPipelineExecutor<StreamedBatchExecutor>(builder =>
+            .UseInnerPipelineExecutor<SerialPipelineExecutorBuilder<TokenizedText, ClassificationResult<bool>>>(builder =>
             {
-                builder.MaxConcurrency = 4;
-                builder.ParallelPreProcessing = false;
                 builder.UseInferenceSteps<TextClassificationBuilder<bool>, TextClassification<bool>>(classificationBuilder =>
                 {
                     classificationBuilder
