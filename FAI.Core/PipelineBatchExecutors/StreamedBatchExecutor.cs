@@ -110,23 +110,22 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// </summary>
     private void PreprocessSerial(ReadOnlyMemory<TInput> inputs, Memory<TOutput> output, int batchCountWithoutRemainder, int batchCount, Task[] tasks)
     {
-        int i = 0;
         int maxBatchSize = _maxBatchSize!.Value;
-        for (; i < batchCountWithoutRemainder; i += maxBatchSize)
+        for (int i = 0; i < batchCountWithoutRemainder; i++)
         {
             var taskCompletionSource = new TaskCompletionSource();
             tasks[i] = taskCompletionSource.Task;
-
-            var r = new Range(i, i + maxBatchSize);
+            int startIndex = i * maxBatchSize;
+            var r = new Range(startIndex, startIndex + maxBatchSize);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
 
-        if (i < batchCount)
+        if (batchCountWithoutRemainder < batchCount)
         {
             var taskCompletionSource = new TaskCompletionSource();
-            tasks[i] = taskCompletionSource.Task;
-            var r = new Range(i, inputs.Length);
+            tasks[^1] = taskCompletionSource.Task;
+            var r = new Range(batchCountWithoutRemainder * maxBatchSize, inputs.Length);
             var preprocess = _inference.Preprocess(inputs[r].Span);
             _modelInputChannel.Writer.TryWrite(new StreamedInferenceChunk(inputs[r], output[r], taskCompletionSource, preprocess));
         }
