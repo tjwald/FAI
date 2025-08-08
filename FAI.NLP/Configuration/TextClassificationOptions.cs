@@ -32,7 +32,7 @@ public class TextClassificationBuilder<TClassification>
     public override async ValueTask<TextClassification<TClassification>> BuildAsync()
     {
         var tokenizerTask = GetTokenizer();
-        var modelExecutorTask = ExecutorFactory();
+        var modelExecutorTask = GetExecutorFactory();
 
         ArgumentNullException.ThrowIfNull(Choices, nameof(Choices));
 

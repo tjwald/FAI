@@ -17,7 +17,7 @@ public class TextMultipleChoiceBuilder
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxChoices);
 
         var tokenizerTask = GetTokenizer();
-        var modelExecutorTask = ExecutorFactory();
+        var modelExecutorTask = GetExecutorFactory();
 
         return new TextMultipleChoiceTask(await tokenizerTask, await modelExecutorTask, new(MaxChoices, StoreLogits));
     }

@@ -7,6 +7,7 @@ from transformers import DistilBertTokenizer, \
 
 
 def process_batch(pipeline, sentences, expected_labels):
+    print("started: ")
     start_time = time.time()
 
     results = []
