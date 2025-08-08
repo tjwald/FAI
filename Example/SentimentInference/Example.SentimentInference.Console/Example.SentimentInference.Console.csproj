@@ -11,6 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Humanizer" Version="2.14.1" />
         <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.22.1"/>
         <PackageReference Include="Parquet.Net" Version="5.0.2"/>
     </ItemGroup>

@@ -51,10 +51,20 @@ public class EvaluationManager
         var end = Stopwatch.GetElapsedTime(start);
 
         SysConsole.WriteLine($"elapsed time: {end.TotalSeconds}s");
-        SysConsole.WriteLine($"avg time: {end.TotalMilliseconds / strings.Length}ms/it");
+        double timePerSentence = end.TotalMilliseconds / strings.Length;
+        if (timePerSentence < 1)
+        {
+            timePerSentence *= 1000;
+            SysConsole.WriteLine($"avg time: {timePerSentence:F4} µs/it");
+        }
+        else
+        {
+            SysConsole.WriteLine($"avg time: {timePerSentence:F4} ms/it");
+        }
+
         int correct = output.Where((t, i) => t == tags.Span[i]).Count();
 
-        SysConsole.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
+        SysConsole.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 100.0 / output.Length:F2}%");
     }
 
     async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)

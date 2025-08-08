@@ -43,7 +43,9 @@ TextClassification<bool> classificationTask = await new TextClassificationBuilde
     .UseModelExecutor(model.Result)
     .BuildAsync();
 
-var executor = new SerialPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>>(classificationTask, maxBatchSize: 10);
+int maxBatchSize = 20;
+
+var executor = new SerialPipelineBatchExecutor<TokenizedText, ClassificationResult<bool>>(classificationTask, maxBatchSize: maxBatchSize);
 
 var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(executor);
 
@@ -89,8 +91,8 @@ for (int i = 0; i < sentences.Length; i++)
 
 Console.WriteLine(">");
 Console.ReadLine();
-int sampleSize = 20000;
-Console.WriteLine("Sample size: {0}", sampleSize);
+int sampleSize = 10000;
+Console.WriteLine($"Sample size: {sampleSize} Batch Size: {maxBatchSize}");
 
 #endregion
 
@@ -110,9 +112,14 @@ Console.Write(">");
 Console.ReadLine();
 Console.WriteLine("parallel evaluation:");
 
+/*
+ * Streamed:
+ * input o=o tokenization o=o inference o=o post-process o=o output
+ */
+
 var streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
     classificationTask,
-    maxBatchSize: 10,
+    maxBatchSize: maxBatchSize,
     maxConcurrency: 4,
     parallelTokenization: false);
 
@@ -132,7 +139,7 @@ Console.WriteLine("parallel evaluation (including tokenization):");
 
 streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
     classificationTask,
-    maxBatchSize: 10,
+    maxBatchSize: maxBatchSize,
     maxConcurrency: 4,
     parallelTokenization: true);
 
@@ -152,7 +159,7 @@ Console.WriteLine("sorted by token count:");
 
 streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
     classificationTask,
-    maxBatchSize: 10,
+    maxBatchSize: maxBatchSize,
     maxConcurrency: 4,
     parallelTokenization: false);
 
@@ -163,13 +170,38 @@ pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(tokenSortingE
 sentimentInference = new SentimentInference(pipeline);
 await evaluationManager.Run(sentimentInference, sampleSize);
 
+/*
+ * Padding:
+ * T T T T T T T T
+ * T T T T
+ * T T
+ * T T T T T T
+ * T T T T T T T T T T
+ *
+ * Padded:
+ * T T T T T T T T
+ * T T T T 0 0 0 0
+ * T T 0 0 0 0 0 0
+ * --------batch break----------
+ * T T T T T T 0 0 0 0
+ * T T T T T T T T T T
+ *
+ * Sorted:
+ * T T 0 0 0 0
+ * T T T T 0 0
+ * T T T T T T
+ * --------batch break----------
+ * T T T T T T T T 0 0
+ * T T T T T T T T T T
+ */
+
 #endregion
 
 #region stage 4
 
 Console.Write(">");
 Console.ReadLine();
-Console.WriteLine("sorted by token count:");
+Console.WriteLine("dynamic batch size by token count:");
 
 streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
     classificationTask,
