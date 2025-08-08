@@ -10,7 +10,7 @@ namespace FAI.Onnx.Factories;
 /// <summary>
 /// Factory class for creating instances of model executors based on configuration.
 /// </summary>
-public static class ModelExecutorFactory
+public static class OnnxModelExecutorFactory
 {
     /// <summary>
     /// Creates an instance of <see cref="IModelExecutor{TInput, TOutput}"/> based on the specified executor type and configuration.

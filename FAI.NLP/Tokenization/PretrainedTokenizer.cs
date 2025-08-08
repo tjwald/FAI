@@ -182,11 +182,9 @@ public sealed class PretrainedTokenizer
     private static BatchTokenizedResult CreateTokenAndMaskTensorsFromShape(int batchSize, int maxTokenSize)
     {
         Span<nint> tensorShape = [batchSize, maxTokenSize];
-        nint columnStride = maxTokenSize == 1 ? 0 : 1;
-        Span<nint> strides = [maxTokenSize, columnStride];
 
-        Tensor<long> tokenization = Tensor.Create<long>(tensorShape, strides); // would like to pool underlying array and use TensorMemory<T>
-        Tensor<long> mask = Tensor.Create<long>(tensorShape, strides);
+        Tensor<long> tokenization = Tensor.Create<long>(tensorShape); // would like to pool underlying array and use TensorMemory<T>
+        Tensor<long> mask = Tensor.Create<long>(tensorShape, tokenization.Strides);
         return new BatchTokenizedResult(tokenization, mask);
     }
 

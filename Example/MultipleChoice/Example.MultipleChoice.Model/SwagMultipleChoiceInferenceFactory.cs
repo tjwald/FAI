@@ -86,7 +86,7 @@ public static class SwagMultipleChoiceInferenceFactory
             classificationBuilder.MaxChoices = 4;
             classificationBuilder
                 .UseTokenizer(tokenizerFactory)
-                .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
+                .UseModelExecutor(() => OnnxModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
         });
     }
 
@@ -114,7 +114,7 @@ public static class SwagMultipleChoiceInferenceFactory
             classificationBuilder.MaxChoices = 4;
             classificationBuilder
                 .UseTokenizer(tokenizerFactory)
-                .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
+                .UseModelExecutor(() => OnnxModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
         });
     }
 }

@@ -54,7 +54,7 @@ public static class SentimentInferenceFactory
                     classificationBuilder
                         .UseChoices(false, true)
                         .UseTokenizer(tokenizerFactory)
-                        .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
+                        .UseModelExecutor(() => OnnxModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
                 });
             });
 
