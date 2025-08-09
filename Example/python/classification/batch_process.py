@@ -53,11 +53,11 @@ def print_run_statistics(end_time, expected_labels, predicted_labels, sentences,
 
 
 data = pd.read_parquet('distilbert-base-uncased-finetuned-sst-2-english/train-00000-of-00001.parquet')
-# sentences = data['sentence'].tolist()
-# labels = data['label'].tolist()
+sentences = data['sentence'].tolist()
+labels = data['label'].tolist()
 
-sentences = data['sentence'].tolist()[:10000]
-labels = data['label'].tolist()[:10000]
+# sentences = data['sentence'].tolist()[:10000]
+# labels = data['label'].tolist()[:10000]
 
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
 model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")

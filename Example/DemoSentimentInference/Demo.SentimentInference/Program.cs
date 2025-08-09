@@ -62,6 +62,11 @@ bool prediction = await sentimentInference.Predict(sentence);
 
 Console.WriteLine($"Does the sentence: '{sentence}' have a positive sentiment? {prediction}\n");
 
+/*
+ * predict example:
+ * Does the sentence: 'This cat is a very cute cat!' have a positive sentiment? True
+ */
+
 #endregion
 
 #region batch prediction
@@ -85,6 +90,15 @@ for (int i = 0; i < sentences.Length; i++)
     Console.WriteLine($"Sentence: '{sentences[i]}' - Is Positive? {predictions[i]}");
 }
 
+/*
+ * batch predict example:
+ * Batch predictions:
+ * Sentence: 'This cat is a very cute cat!' - Is Positive? True
+ * Sentence: 'This dog is not a good dog.' - Is Positive? False
+ * Sentence: 'I love this movie, it's fantastic!' - Is Positive? True
+ * Sentence: 'The weather today is terrible.' - Is Positive? False
+ */
+
 #endregion
 
 #region evaluations
@@ -103,6 +117,13 @@ Console.ReadLine();
 Console.WriteLine("evaluation:");
 
 await evaluationManager.Run(sentimentInference, sampleSize);
+
+/*
+ * evaluation:
+ * elapsed time: 2.3539165s
+ * avg time: 235.3916 µs/it
+ * Correct predictions: 9193/10000=91.93%
+ */
 
 #endregion
 
@@ -129,6 +150,15 @@ sentimentInference = new SentimentInference(pipeline);
 
 await evaluationManager.Run(sentimentInference, sampleSize);
 
+/*
+ * parallel evaluation:
+ * Starting worker thread for processing: ModelProcessChunk
+ * Starting worker thread for processing: PostProcess
+ * elapsed time: 2.0919055s
+ * avg time: 209.1905 µs/it
+ * Correct predictions: 9193/10000=91.93%
+ */
+
 #endregion
 
 #region stage 2.1
@@ -149,26 +179,18 @@ sentimentInference = new SentimentInference(pipeline);
 
 await evaluationManager.Run(sentimentInference, sampleSize);
 
+/*
+ * parallel evaluation (including tokenization):
+ * Starting worker thread for processing: ModelProcessChunk
+ * Starting worker thread for processing: PostProcess
+ * elapsed time: 2.0036037s
+ * avg time: 200.3604 µs/it
+ * Correct predictions: 9193/10000=91.93%
+ */
+
 #endregion
 
 #region stage 3
-
-Console.Write(">");
-Console.ReadLine();
-Console.WriteLine("sorted by token count:");
-
-streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
-    classificationTask,
-    maxBatchSize: maxBatchSize,
-    maxConcurrency: 4,
-    parallelTokenization: false);
-
-var tokenSortingExecutor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(streamedBatchExecutor, tokenizer.Result);
-
-pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(tokenSortingExecutor);
-
-sentimentInference = new SentimentInference(pipeline);
-await evaluationManager.Run(sentimentInference, sampleSize);
 
 /*
  * Padding:
@@ -195,6 +217,32 @@ await evaluationManager.Run(sentimentInference, sampleSize);
  * T T T T T T T T T T
  */
 
+Console.Write(">");
+Console.ReadLine();
+Console.WriteLine("sorted by token count:");
+
+streamedBatchExecutor = new StreamedBatchExecutor<TokenizedText, BatchTokenizedResult, ClassificationResult<bool>[], ClassificationResult<bool>>(
+    classificationTask,
+    maxBatchSize: maxBatchSize,
+    maxConcurrency: 4,
+    parallelTokenization: false);
+
+var tokenSortingExecutor = new TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool>>(streamedBatchExecutor, tokenizer.Result);
+
+pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(tokenSortingExecutor);
+
+sentimentInference = new SentimentInference(pipeline);
+await evaluationManager.Run(sentimentInference, sampleSize);
+
+/*
+ * sorted by token count:
+ * Starting worker thread for processing: ModelProcessChunk
+ * Starting worker thread for processing: PostProcess
+ * elapsed time: 0.8803005s
+ * avg time: 88.0301 µs/it
+ * Correct predictions: 9195/10000=91.95%
+ */
+
 #endregion
 
 #region stage 4
@@ -219,5 +267,14 @@ tokenSortingExecutor = new TokenCountSortingBatchExecutor<TokenizedText, Classif
 pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(tokenSortingExecutor);
 sentimentInference = new SentimentInference(pipeline);
 await evaluationManager.Run(sentimentInference, sampleSize);
+
+/*
+ * dynamic batch size by token count:
+ * Starting worker thread for processing: ModelProcessChunk
+ * Starting worker thread for processing: PostProcess
+ * elapsed time: 0.6609491s
+ * avg time: 66.0949 µs/it
+ * Correct predictions: 9194/10000=91.94%
+ */
 
 #endregion
