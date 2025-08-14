@@ -163,7 +163,7 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
     {
         ReadOnlyTensorSpan<float> x = tensor.GetTensorDataAsTensorSpan<float>();
 
-        Tensor<float> outTensor = Tensor.Create<float>(x.Lengths, x.Strides);
+        Tensor<float> outTensor = Tensor.CreateFromShape<float>(x.Lengths, x.Strides);
         x.CopyTo(outTensor);
 
         return outTensor;

@@ -11,12 +11,12 @@ public static class TensorExtensions
 {
     public static Span<T> AsSpan<T>(this TensorSpan<T> tensor)
     {
-        return MemoryMarshal.CreateSpan(ref tensor.GetPinnableReference(), (int)tensor.FlattenedLength);
+        return MemoryMarshal.CreateSpan(ref TensorMarshal.GetReference(tensor), (int)tensor.FlattenedLength);
     }
 
     public static ReadOnlySpan<T> AsSpan<T>(this ReadOnlyTensorSpan<T> tensor)
     {
-        return MemoryMarshal.CreateReadOnlySpan(in tensor.GetPinnableReference(), (int)tensor.FlattenedLength);
+        return MemoryMarshal.CreateReadOnlySpan(in TensorMarshal.GetReference(tensor), (int)tensor.FlattenedLength);
     }
 
     /// <summary>
@@ -31,7 +31,7 @@ public static class TensorExtensions
     public static Memory<T> AsMemory<T>(this Tensor<T> tensor)
     {
         // Would like this code to be safe!
-        return ExternalClassAccessor<T>.GetValues(tensor).AsMemory();
+        return ExternalClassAccessor<T>.GetValues(tensor).AsMemory(0, (int)tensor.FlattenedLength);
     }
 }
 
