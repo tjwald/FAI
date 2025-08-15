@@ -25,6 +25,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MultipleChoice", "MultipleC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SentimentInference", "SentimentInference", "{A531B898-2FDA-4FE5-A94D-CC4C0BD40FC9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FAI.Vision", "FAI.Vision\FAI.Vision.csproj", "{23DA800F-A205-4887-B884-A8A7264C9DE5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,6 +65,10 @@ Global
 		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B12114F8-5C0C-4D2C-8549-B1BFADC4BB54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23DA800F-A205-4887-B884-A8A7264C9DE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23DA800F-A205-4887-B884-A8A7264C9DE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23DA800F-A205-4887-B884-A8A7264C9DE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23DA800F-A205-4887-B884-A8A7264C9DE5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

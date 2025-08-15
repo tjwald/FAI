@@ -19,7 +19,7 @@ public class ClassificationTask<TInput, TPreprocessContainer, TPreprocess, TClas
     private readonly IModelExecutor<TPreprocess, TScore> _modelExecutor;
     private readonly ClassificationOptions<TClassification> _pipelineOptions;
 
-    public ClassificationTask(IPreprocessor<TInput, TPreprocessContainer, TPreprocess> preprocessor, IModelExecutor<TPreprocess, TScore> modelExecutor,
+    protected ClassificationTask(IPreprocessor<TInput, TPreprocessContainer, TPreprocess> preprocessor, IModelExecutor<TPreprocess, TScore> modelExecutor,
         ClassificationOptions<TClassification> pipelineOptions)
     {
         _preprocessor = preprocessor;
