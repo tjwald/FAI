@@ -10,6 +10,7 @@ public static class ClassificationTensorUtils
     /// <summary>
     /// Generates a classification result from the raw logits produced by the model.
     /// </summary>
+    /// <param name="classificationOptions">The configuration containing the choices and the options for returning the result</param>
     /// <param name="logits">The raw logits produced by the model.</param>
     /// <returns>A classification result containing the predicted label and confidence score.</returns>
     public static ClassificationResult<TClassification, TScore> GetClassificationResult<TClassification, TScore>(
