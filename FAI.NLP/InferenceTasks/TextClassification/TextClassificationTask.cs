@@ -1,8 +1,9 @@
 ﻿using System.Numerics.Tensors;
 using FAI.Core;
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.InferenceTasks;
+using FAI.Core.InferenceTasks.Classification;
 using FAI.Core.ResultTypes;
-using FAI.NLP.Configuration;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextClassification;
@@ -12,11 +13,11 @@ namespace FAI.NLP.InferenceTasks.TextClassification;
 /// </summary>
 /// <typeparam name="TClassification">The type of classification labels.</typeparam>
 public class TextClassification<TClassification>
-    : InferenceSteps<TokenizedText, BatchTokenizedResult, ClassificationResult<TClassification>[], ClassificationResult<TClassification>>
+    : InferenceSteps<TokenizedText, BatchTokenizedResult, ClassificationResult<TClassification, float>[], ClassificationResult<TClassification, float>>
 {
     private readonly PretrainedTokenizer _tokenizer;
     private readonly IModelExecutor<long, float> _modelExecutor;
-    private readonly TextClassificationOptions<TClassification> _pipelineOptions;
+    private readonly ClassificationOptions<TClassification> _pipelineOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TextClassification{TClassification}"/> class.
@@ -27,7 +28,7 @@ public class TextClassification<TClassification>
     public TextClassification(
         PretrainedTokenizer tokenizer,
         IModelExecutor<long, float> modelExecutor,
-        TextClassificationOptions<TClassification> textClassificationOptions)
+        ClassificationOptions<TClassification> textClassificationOptions)
     {
         _tokenizer = tokenizer;
         _modelExecutor = modelExecutor;
@@ -59,17 +60,17 @@ public class TextClassification<TClassification>
     /// <returns>
     /// A task containing an array of <see cref="ClassificationResult{TClassification}"/> corresponding to each input.
     /// </returns>
-    public override async Task<ClassificationResult<TClassification>[]> RunModel(
+    public override async Task<ClassificationResult<TClassification, float>[]> RunModel(
         ReadOnlyMemory<TokenizedText> input,
         BatchTokenizedResult tokenizedResult)
     {
-        var outputs = new ClassificationResult<TClassification>[input.Length];
+        var outputs = new ClassificationResult<TClassification, float>[input.Length];
         await _modelExecutor.RunAsync([tokenizedResult.Tokens, tokenizedResult.Mask], (logits, _) =>
         {
             int indexInBatch = 0;
             foreach (ReadOnlyTensorSpan<float> rowLogits in logits.GetDimensionSpan(0))
             {
-                outputs[indexInBatch] = GetClassificationResult(rowLogits.AsSpan());
+                outputs[indexInBatch] = _pipelineOptions.GetClassificationResult(rowLogits.AsSpan());
                 indexInBatch++;
             }
         });
@@ -86,26 +87,9 @@ public class TextClassification<TClassification>
     public override void PostProcess(
         ReadOnlySpan<TokenizedText> inputs,
         BatchTokenizedResult preprocesses,
-        ClassificationResult<TClassification>[] modelOutput,
-        Span<ClassificationResult<TClassification>> outputs)
+        ClassificationResult<TClassification, float>[] modelOutput,
+        Span<ClassificationResult<TClassification, float>> outputs)
     {
         modelOutput.AsSpan().CopyTo(outputs);
-    }
-
-    /// <summary>
-    /// Generates a classification result from the raw logits produced by the model.
-    /// </summary>
-    /// <param name="logits">The raw logits produced by the model.</param>
-    /// <returns>A classification result containing the predicted label and confidence score.</returns>
-    private ClassificationResult<TClassification> GetClassificationResult(ReadOnlySpan<float> logits)
-    {
-        Span<float> probabilities = stackalloc float[logits.Length];
-        TensorPrimitives.SoftMax(logits, probabilities);
-        int argmax = TensorPrimitives.IndexOfMax<float>(probabilities);
-        float score = TensorPrimitives.Max<float>(probabilities);
-
-        float[]? logitsArray = _pipelineOptions.StoreLogits ? logits.ToArray() : null;
-
-        return new ClassificationResult<TClassification>(_pipelineOptions.Choices[argmax], score, logitsArray);
     }
 }
