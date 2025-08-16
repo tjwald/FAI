@@ -1,4 +1,5 @@
-﻿using System.Numerics.Tensors;
+﻿using System.Collections;
+using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using FAI.Core;
 using FAI.NLP.Configuration;
@@ -13,7 +14,7 @@ namespace FAI.NLP.Tokenization;
 /// <param name="Mask">
 /// The tensor representing the attention mask, indicating which tokens should be processed.
 /// </param>
-public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask)
+public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask) : IEnumerable<Tensor<long>>
 {
     /// <summary>
     /// Gets the batch size, determined by the first dimension of the token tensor.
@@ -24,6 +25,17 @@ public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<l
     /// Gets the maximum token count per sequence, determined by the second dimension of the token tensor.
     /// </summary>
     public int MaxTokenCount => (int)Tokens.Lengths[1];
+
+    public IEnumerator<Tensor<long>> GetEnumerator()
+    {
+        yield return Tokens;
+        yield return Mask;
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 }
 
 /// <summary>

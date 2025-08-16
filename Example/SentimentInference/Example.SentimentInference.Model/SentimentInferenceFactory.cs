@@ -20,15 +20,15 @@ public static class SentimentInferenceFactory
 
         var executorBuilder = CreateBatchGpuExecutorBuilder(options, tokenizerFactory);
 
-        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool>>(await executorBuilder.BuildAsync());
+        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool, float>>(await executorBuilder.BuildAsync());
         return new SentimentInference(pipeline);
     }
 
-    private static IPipelineBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> CreateBatchGpuExecutorBuilder(
+    private static IPipelineBatchExecutorBuilder<TokenizedText, ClassificationResult<bool, float>> CreateBatchGpuExecutorBuilder(
         SentimentInferenceOptions options,
         Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
     {
-        MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool>> builder = new();
+        MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool, float>> builder = new();
         var executorOptions = new OnnxModelExecutorOptions()
             .ConfigureOnnxOptions(onnxOptions =>
             {
@@ -47,7 +47,7 @@ public static class SentimentInferenceFactory
 
         builder
             .UseTokenizer(tokenizerFactory)
-            .UseInnerPipelineExecutor<SerialPipelineExecutorBuilder<TokenizedText, ClassificationResult<bool>>>(builder =>
+            .UseInnerPipelineExecutor<SerialPipelineExecutorBuilder<TokenizedText, ClassificationResult<bool, float>>>(builder =>
             {
                 builder.UseInferenceSteps<TextClassificationBuilder<bool>, TextClassification<bool>>(classificationBuilder =>
                 {

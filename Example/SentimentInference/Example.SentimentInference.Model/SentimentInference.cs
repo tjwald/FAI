@@ -6,16 +6,16 @@ namespace Example.SentimentInference.Model;
 
 public sealed class SentimentInference : IInference<string, bool>
 {
-    private readonly IPipeline<TokenizedText, ClassificationResult<bool>> _pipeline;
+    private readonly IPipeline<TokenizedText, ClassificationResult<bool, float>> _pipeline;
 
-    public SentimentInference(IPipeline<TokenizedText, ClassificationResult<bool>> pipeline)
+    public SentimentInference(IPipeline<TokenizedText, ClassificationResult<bool, float>> pipeline)
     {
         _pipeline = pipeline;
     }
 
     public async Task<bool> Predict(string input)
     {
-        ClassificationResult<bool> classificationResult = await _pipeline.Predict(input);
+        ClassificationResult<bool, float> classificationResult = await _pipeline.Predict(input);
         return classificationResult.Choice;
     }
 
@@ -28,7 +28,7 @@ public sealed class SentimentInference : IInference<string, bool>
             textInputs[i] = inputSpan[i];
         }
 
-        ClassificationResult<bool>[] classificationResults = await _pipeline.BatchPredict(textInputs);
+        ClassificationResult<bool, float>[] classificationResults = await _pipeline.BatchPredict(textInputs);
         return classificationResults.Select(x => x.Choice).ToArray();
     }
 }
