@@ -1,4 +1,4 @@
-﻿using FAI.Core.Abstractions;
+using FAI.Core.Abstractions;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.PipelineBatchExecutors;

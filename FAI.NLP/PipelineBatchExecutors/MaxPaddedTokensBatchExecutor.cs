@@ -77,7 +77,7 @@ public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecu
                 var current = span[currentIndex];
                 candidate = current.MaxTokenLength;
                 int newBatchCount = batchCount + current.SentenceCount;
-                int newPadded = newBatchCount * candidate; // assume input is sorted by MaxTokenLength 
+                int newPadded = newBatchCount * candidate; // assume input is sorted by MaxTokenLength
 
                 // Constraint 1: Check if the padded total exceeds the maximum allowed tokens.
                 if (newPadded > maxTokenCount)

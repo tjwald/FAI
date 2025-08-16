@@ -1,4 +1,4 @@
-﻿using FAI.Core.ResultTypes;
+using FAI.Core.ResultTypes;
 using FAI.NLP.InferenceTasks.TextClassification;
 using FAI.NLP.Tokenization;
 

@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Abstractions;
+namespace FAI.Core.Abstractions;
 
 /// <summary>
 /// Defines the contract for inference steps that process input data and produce output data.

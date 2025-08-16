@@ -12,8 +12,10 @@ using FAI.Onnx.Utils;
 
 namespace Example.MultipleChoice.Model;
 
+#pragma warning disable IDE0065
 using StreamedBatchExecutorBuilder =
     StreamedPipelineExecutorBuilder<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>;
+#pragma warning restore IDE0065
 
 public static class SwagMultipleChoiceInferenceFactory
 {
@@ -26,14 +28,13 @@ public static class SwagMultipleChoiceInferenceFactory
         // MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder = CreateRoutedPipelineBatchExecutorBuilder(options, tokenizerFactory);
         var builder =
             new MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
-                {
-                    MaxPaddedRatio = 0.1,
-                    MaxTokensCount = 8192
-                }
+            {
+                MaxPaddedRatio = 0.1,
+                MaxTokensCount = 8192
+            }
                 .UseTokenizer(tokenizerFactory)
                 .UseInnerPipelineExecutor<StreamedBatchExecutorBuilder>(builder =>
                     CreateGpuPipelineExecutionBuilder(builder, options, tokenizerFactory));
-
 
         var pipeline = new Pipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>(await builder.BuildAsync());
 
@@ -45,10 +46,10 @@ public static class SwagMultipleChoiceInferenceFactory
     {
         MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder =
             new MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
-                {
-                    MaxPaddedRatio = 0.1,
-                    MaxTokensCount = 8192
-                }
+            {
+                MaxPaddedRatio = 0.1,
+                MaxTokensCount = 8192
+            }
                 .UseTokenizer(tokenizerFactory)
                 .UseInnerPipelineExecutor<RoutingPipelineExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>(routingBuilder =>
                 {
@@ -77,7 +78,6 @@ public static class SwagMultipleChoiceInferenceFactory
                 });
                 onnxOptions.ModelDir = options.ModelDir;
             });
-
 
         builder.MaxConcurrency = 4;
         builder.ParallelPreProcessing = false;
@@ -119,7 +119,7 @@ public static class SwagMultipleChoiceInferenceFactory
     }
 }
 
-file class RoutingStrategy : IBatchExecutionRoutingStrategy<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
+file sealed class RoutingStrategy : IBatchExecutionRoutingStrategy<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
 {
     private readonly CircularAtomicCounter _clock = new(50);
 

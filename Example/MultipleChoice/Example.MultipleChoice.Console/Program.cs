@@ -19,7 +19,6 @@ Console.WriteLine("Finished loading training data");
 await RunBatchPredict(model, input, expectedOutput);
 return;
 
-
 static async Task RunBatchPredict(IInference<SwagInput, ChoiceResult<TokenizedText>> sentimentInference, SwagInput[] input, int[] expectedOutput)
 {
     long start = Stopwatch.GetTimestamp();
@@ -35,7 +34,7 @@ static async Task RunBatchPredict(IInference<SwagInput, ChoiceResult<TokenizedTe
     Console.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
 }
 
-async Task<(SwagInput[] input, int[] expectedOutput)> LoadTrainingData(string swagTrainParquet)
+static async Task<(SwagInput[] input, int[] expectedOutput)> LoadTrainingData(string swagTrainParquet)
 {
     IList<TrainingData> data = await TrainingParquetReader.ReadParquetFileAsync(swagTrainParquet);
     SwagInput[] strings = data.Select(x => new SwagInput(x.Context, x.Sentence, [x.Ending0, x.Ending1, x.Ending2, x.Ending3])).ToArray();
@@ -44,7 +43,7 @@ async Task<(SwagInput[] input, int[] expectedOutput)> LoadTrainingData(string sw
     return (strings, labels);
 }
 
-file class TrainingData
+file sealed class TrainingData
 {
     [JsonPropertyName("sent1")] public string Context { get; set; } = null!;
     [JsonPropertyName("sent2")] public string Sentence { get; set; } = null!;

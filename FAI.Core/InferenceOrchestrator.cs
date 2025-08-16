@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Threading.Channels;
 using FAI.Core.Abstractions;
 
@@ -10,7 +10,9 @@ namespace FAI.Core;
 /// <typeparam name="TInference">The type of the inference model implementing <see cref="IInference{TInput,TOutput}"/>.</typeparam>
 /// <typeparam name="TQuery">The type of the input query for inference.</typeparam>
 /// <typeparam name="TResult">The type of the result produced by the inference.</typeparam>
+#pragma warning disable CA1001
 public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInference<TQuery, TResult> where TInference : IInference<TQuery, TResult>
+#pragma warning restore CA1001
 {
     private readonly Lazy<TInference> _modelInstance;
     private readonly int _maxBatchSize;
@@ -106,7 +108,8 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
         using var activity = ActivitySource.StartActivity("orchestrated-predict", ActivityKind.Consumer);
 
         List<(TQuery, TaskCompletionSource<TResult>, ActivityContext?)> requests = GetAvailableRequestsAsync(_maxBatchSize);
-        if (requests.Count == 0) return;
+        if (requests.Count == 0)
+            return;
 
         activity?.SetTag("dynamic_batch_size", requests.Count);
 

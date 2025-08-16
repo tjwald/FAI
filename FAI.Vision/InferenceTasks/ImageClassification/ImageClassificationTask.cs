@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations.InferenceTasks;

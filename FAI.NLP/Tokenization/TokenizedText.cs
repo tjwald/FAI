@@ -1,4 +1,4 @@
-﻿namespace FAI.NLP.Tokenization;
+namespace FAI.NLP.Tokenization;
 
 /// <summary>
 /// Represents a tokenized text input, storing raw text and its corresponding tokenized representation.

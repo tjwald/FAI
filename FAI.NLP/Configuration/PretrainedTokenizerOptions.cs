@@ -1,4 +1,4 @@
-﻿namespace FAI.NLP.Configuration;
+namespace FAI.NLP.Configuration;
 
 /// <summary>
 /// Defines the truncation strategy to use when Context and Text is longer than allowed input length to model.

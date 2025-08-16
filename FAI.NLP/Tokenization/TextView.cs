@@ -1,4 +1,4 @@
-﻿namespace FAI.NLP.Tokenization;
+namespace FAI.NLP.Tokenization;
 
 /// <summary>
 /// Provides a readonly view over a span of tokenized text inputs, allowing access to text content and token assignment.

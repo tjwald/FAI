@@ -30,7 +30,10 @@ public sealed class SemaphoreScope : IDisposable
 /// </summary>
 file sealed class EmptyScope : IDisposable
 {
-    private static Lazy<EmptyScope> _instance = new Lazy<EmptyScope>(() => new EmptyScope());
+#pragma warning disable IDE1006
+    // ReSharper disable once InconsistentNaming
+    private static readonly Lazy<EmptyScope> _instance = new Lazy<EmptyScope>(() => new EmptyScope());
+#pragma warning restore IDE1006
 
     /// <summary>
     /// Gets the singleton instance of the <see cref="EmptyScope"/> class.

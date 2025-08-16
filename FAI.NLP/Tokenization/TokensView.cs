@@ -1,4 +1,4 @@
-﻿namespace FAI.NLP.Tokenization;
+namespace FAI.NLP.Tokenization;
 
 /// <summary>
 /// Represents a readonly view of tokenized text inputs, providing access to token data and size calculations.
@@ -30,7 +30,8 @@ public ref struct TokensView
     {
         get
         {
-            if (_maxTokens >= 0) return _maxTokens;
+            if (_maxTokens >= 0)
+                return _maxTokens;
 
             int maxTokens = -1;
             foreach (var t in _textInputs)

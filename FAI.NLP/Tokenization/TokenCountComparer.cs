@@ -1,4 +1,4 @@
-﻿namespace FAI.NLP.Tokenization;
+namespace FAI.NLP.Tokenization;
 
 /// <summary>
 /// A comparer for tokenizable items, comparing them based on their maximum token length.

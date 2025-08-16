@@ -1,4 +1,4 @@
-﻿using System.Numerics.Tensors;
+using System.Numerics.Tensors;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
 using Microsoft.ML.OnnxRuntime;

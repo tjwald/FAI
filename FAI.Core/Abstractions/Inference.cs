@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Abstractions;
+namespace FAI.Core.Abstractions;
 
 /// <summary>
 /// Defines an interface for performing inference operations.

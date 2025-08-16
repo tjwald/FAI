@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using FAI.Core;
@@ -40,7 +40,7 @@ public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<l
 
 /// <summary>
 /// Represents a pretrained tokenizer used for tokenizing text inputs and managing token-related transformations.
-/// Wraps a <see cref="Microsoft.ML.Tokenizers.Tokenizer"/> and adds batch functionality. 
+/// Wraps a <see cref="Microsoft.ML.Tokenizers.Tokenizer"/> and adds batch functionality.
 /// </summary>
 public sealed class PretrainedTokenizer
 {
@@ -93,7 +93,8 @@ public sealed class PretrainedTokenizer
         IEnumerable<int> tokenizedContextEnumerable = tokenizedContext;
         IEnumerable<int> tokenizedTextEnumerable = tokenizedText;
         int truncationLength = tokenizedContext.Count + tokenizedText.Count - _tokenizerOptions.MaxTokenLength;
-        if (truncationLength <= 0) return (tokenizedContextEnumerable, tokenizedTextEnumerable);
+        if (truncationLength <= 0)
+            return (tokenizedContextEnumerable, tokenizedTextEnumerable);
 
         switch (_tokenizerOptions.TruncationOption)
         {

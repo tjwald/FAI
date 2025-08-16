@@ -10,5 +10,5 @@ public interface IImageProcessor<TPixel, TFloat> : IPreprocessor<Image<TPixel>, 
     where TPixel : unmanaged, IPixel<TPixel>
     where TFloat : IFloatingPointIeee754<TFloat>
 {
-    public Tensor<TFloat> Preprocess(Image<TPixel> image);
+    Tensor<TFloat> Preprocess(Image<TPixel> image);
 }

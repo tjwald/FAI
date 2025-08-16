@@ -1,4 +1,4 @@
-﻿using FAI.NLP.Configuration;
+using FAI.NLP.Configuration;
 using FAI.Onnx.Configuration;
 
 namespace Example.SentimentInference.Model;

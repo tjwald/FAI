@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using FAI.Core.Abstractions;
 
 namespace FAI.Core.PipelineBatchExecutors;
