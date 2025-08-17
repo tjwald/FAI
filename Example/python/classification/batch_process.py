@@ -2,8 +2,7 @@ import time
 from itertools import batched
 
 import pandas as pd
-from transformers import DistilBertTokenizer, \
-    DistilBertForSequenceClassification, pipeline
+from transformers import DistilBertForSequenceClassification, DistilBertTokenizer, pipeline
 
 
 def process_batch(pipeline, sentences, expected_labels):
@@ -16,7 +15,7 @@ def process_batch(pipeline, sentences, expected_labels):
     end_time = time.time()
 
     # Extract predicted labels
-    predicted_labels = [1 if result['label'] == 'POSITIVE' else 0 for result in results]
+    predicted_labels = [1 if result["label"] == "POSITIVE" else 0 for result in results]
 
     # Calculate metrics
     total_time = end_time - start_time
@@ -29,11 +28,11 @@ def process_batch(pipeline, sentences, expected_labels):
     print(f"Accuracy: {accuracy:.2%}")
 
 
-data = pd.read_parquet('distilbert-base-uncased-finetuned-sst-2-english/train-00000-of-00001.parquet')
-sentences = data['sentence'].tolist()
-labels = data['label'].tolist()
+data = pd.read_parquet("distilbert-base-uncased-finetuned-sst-2-english/train-00000-of-00001.parquet")
+sentences = data["sentence"].tolist()
+labels = data["label"].tolist()
 
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
 model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
-pipeline = pipeline('text-classification', tokenizer=tokenizer, model=model, device='cuda:0')
+pipeline = pipeline("text-classification", tokenizer=tokenizer, model=model, device="cuda:0")
 process_batch(pipeline, sentences, labels)

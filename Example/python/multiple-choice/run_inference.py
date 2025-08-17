@@ -1,11 +1,11 @@
 import time
 
 import numpy as np
-from more_itertools import flatten, chunked
-import torch
-from transformers import AutoTokenizer, AutoModelForMultipleChoice
 import pandas as pd
+import torch
+from more_itertools import chunked, flatten
 from tqdm import tqdm
+from transformers import AutoModelForMultipleChoice, AutoTokenizer
 
 # Load the model and tokenizer from disk
 model_directory = "./multiple_choice_model"
@@ -28,10 +28,10 @@ start = time.time()
 option_count = 4
 contexts = flatten([context] * option_count for context in data_df["sent1"].tolist())
 options = (
-    (data_df["sent2"] + " " + data_df['ending0']).tolist() +
-    (data_df["sent2"] + " " + data_df['ending1']).tolist() +
-    (data_df["sent2"] + " " + data_df['ending2']).tolist() +
-    (data_df["sent2"] + " " + data_df['ending3']).tolist()
+    (data_df["sent2"] + " " + data_df["ending0"]).tolist()
+    + (data_df["sent2"] + " " + data_df["ending1"]).tolist()
+    + (data_df["sent2"] + " " + data_df["ending2"]).tolist()
+    + (data_df["sent2"] + " " + data_df["ending3"]).tolist()
 )
 
 inputs = [(context, option) for context, option in zip(contexts, options)]
@@ -67,7 +67,7 @@ with torch.no_grad(), tqdm(total=len(inputs) // option_count, desc="Processing b
 
 end = time.time()
 
-accuracy_score = (data_df['label'].array == np.array(results)).sum() / len(results)
+accuracy_score = (data_df["label"].array == np.array(results)).sum() / len(results)
 
 print(f"Took: {end - start} seconds")
 print(f"Accuracy: {accuracy_score}")

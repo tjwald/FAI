@@ -1,8 +1,0 @@
-pyarrow==18.1.0
-pandas
-transformers[torch]
-onnx==1.16.1
-optimum
-tensorflow
-scikit-learn
-tf-keras
