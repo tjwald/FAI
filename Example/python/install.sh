@@ -1,2 +1,3 @@
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirments.txt
+curl -Ls https://astral.sh/uv/install.sh | bash
+uv venv .venv
+uv pip install .[dev]

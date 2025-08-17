@@ -1,4 +1,4 @@
-﻿using FAI.Core.Configurations.ModelExecutors;
+using FAI.Core.Configurations.ModelExecutors;
 using Microsoft.ML.OnnxRuntime;
 
 namespace FAI.Onnx.Configuration;
@@ -46,19 +46,19 @@ public class OnnxModelExecutorOptions : IModelExecutorConfig
 public class OnnxOptions
 {
     /// <summary>
-    /// The name of the model file to load. 
+    /// The name of the model file to load.
     /// Default is "model_optimized.onnx".
     /// </summary>
     public string ModelFileName { get; set; } = "model_optimized.onnx";
 
     /// <summary>
-    /// The directory where the model file is located. 
+    /// The directory where the model file is located.
     /// Default is the current directory ("./").
     /// </summary>
     public string ModelDir { get; set; } = ".";
 
     /// <summary>
-    /// The full path of the model file, lazily computed by combining 
+    /// The full path of the model file, lazily computed by combining
     /// <see cref="ModelDir"/> and <see cref="ModelFileName"/>.
     /// </summary>
     public string FullModelPath => Path.Combine(ModelDir, ModelFileName);
@@ -74,11 +74,11 @@ public class OnnxOptions
     private Action<RunOptions>? CreateRunOptionsDelegate { get; set; }
 
     /// <summary>
-    /// Configures <see cref="Microsoft.ML.OnnxRuntime.SessionOptions"/> using the provided 
+    /// Configures <see cref="Microsoft.ML.OnnxRuntime.SessionOptions"/> using the provided
     /// configuration function. The configuration function replaces any previously set function.
     /// </summary>
     /// <param name="configurator">
-    /// A function that accepts the default <see cref="Microsoft.ML.OnnxRuntime.SessionOptions"/> 
+    /// A function that accepts the default <see cref="Microsoft.ML.OnnxRuntime.SessionOptions"/>
     /// instance and returns a modified instance.
     /// </param>
     /// <returns>
@@ -91,11 +91,11 @@ public class OnnxOptions
     }
 
     /// <summary>
-    /// Configures <see cref="Microsoft.ML.OnnxRuntime.RunOptions"/> using the provided 
+    /// Configures <see cref="Microsoft.ML.OnnxRuntime.RunOptions"/> using the provided
     /// configuration function. The configuration function replaces any previously set function.
     /// </summary>
     /// <param name="configurator">
-    /// A function that accepts the default <see cref="Microsoft.ML.OnnxRuntime.RunOptions"/> 
+    /// A function that accepts the default <see cref="Microsoft.ML.OnnxRuntime.RunOptions"/>
     /// instance and returns a modified instance.
     /// </param>
     /// <returns>
@@ -118,7 +118,8 @@ public class OnnxOptions
     {
         get
         {
-            if (_sessionOptions is not null) return _sessionOptions;
+            if (_sessionOptions is not null)
+                return _sessionOptions;
 
             var sessionOptions = new SessionOptions();
             CreateSessionOptionsDelegate?.Invoke(sessionOptions);
@@ -139,7 +140,8 @@ public class OnnxOptions
     {
         get
         {
-            if (_runOptions is not null) return _runOptions;
+            if (_runOptions is not null)
+                return _runOptions;
 
             var runOptions = new RunOptions();
             CreateRunOptionsDelegate?.Invoke(runOptions);

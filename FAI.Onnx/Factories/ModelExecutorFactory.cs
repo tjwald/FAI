@@ -1,4 +1,4 @@
-﻿using FAI.Core.Abstractions;
+using FAI.Core.Abstractions;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.ModelExecutors;
 using FAI.Onnx.Configuration;

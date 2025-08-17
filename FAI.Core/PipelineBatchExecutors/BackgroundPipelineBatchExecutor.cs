@@ -3,7 +3,7 @@ using FAI.Core.Abstractions;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
-record BackgroundInput<TInput, TOutput>(ReadOnlyMemory<TInput> Inputs, Memory<TOutput> Outputs, TaskCompletionSource TaskCompletionSource);
+internal sealed record BackgroundInput<TInput, TOutput>(ReadOnlyMemory<TInput> Inputs, Memory<TOutput> Outputs, TaskCompletionSource TaskCompletionSource);
 
 public class BackgroundPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {

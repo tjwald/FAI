@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Configurations.PipelineBatchExecutors;
+namespace FAI.Core.Configurations.PipelineBatchExecutors;
 
 /// <summary>
 /// Represents the type of pipeline executor used for processing batches.

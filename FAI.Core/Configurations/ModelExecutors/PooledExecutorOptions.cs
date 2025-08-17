@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Configurations.ModelExecutors;
+namespace FAI.Core.Configurations.ModelExecutors;
 
 /// <summary>
 /// Represents options for configuring an executors that pooles the internal executor.

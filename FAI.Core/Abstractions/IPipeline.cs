@@ -1,7 +1,7 @@
-﻿namespace FAI.Core.Abstractions;
+namespace FAI.Core.Abstractions;
 
 /// <summary>
-/// Represents a pipeline that processes input of type <typeparamref name="TInput"/> 
+/// Represents a pipeline that processes input of type <typeparamref name="TInput"/>
 /// and produces output of type <typeparamref name="TOutput"/>.
 /// </summary>
 /// <typeparam name="TInput">The type of the input data.</typeparam>

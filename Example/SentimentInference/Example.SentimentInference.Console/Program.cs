@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.SentimentInference.Model;
 using FAI.Core.Abstractions;
@@ -16,7 +16,6 @@ Console.WriteLine("Finished loading training data");
 await RunBatchPredict(model, input, expectedOutput);
 return;
 
-
 static async Task RunBatchPredict(IInference<string, bool> sentimentInference, string[] strings, bool[] bools)
 {
     long start = Stopwatch.GetTimestamp();
@@ -32,7 +31,7 @@ static async Task RunBatchPredict(IInference<string, bool> sentimentInference, s
     Console.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
 }
 
-async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)
+static async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)
 {
     IList<TrainingData> data = await TrainingParquetReader.ReadParquetFileAsync(s);
     string[] strings = data.Select(x => x.Sentence).ToArray();
@@ -41,12 +40,11 @@ async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)
     return (strings, bools);
 }
 
-internal class TrainingData
+internal sealed class TrainingData
 {
     [JsonPropertyName("sentence")] public string Sentence { get; set; } = null!;
     [JsonPropertyName("label")] public long Label { get; set; }
 }
-
 
 internal static class TrainingParquetReader
 {

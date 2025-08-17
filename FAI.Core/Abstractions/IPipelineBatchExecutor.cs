@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Abstractions;
+namespace FAI.Core.Abstractions;
 
 /// <summary>
 /// Represents a contract for executing batch predictions in a machine learning pipeline.

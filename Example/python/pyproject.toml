@@ -1,0 +1,59 @@
+[project]
+name = "inference-examples"
+version = "0.1.0"
+description = "inference examples for ml tasks"
+requires-python = ">=3.12"
+
+dependencies = [
+    "pyarrow==18.1.0",
+    "pandas",
+    "torch",
+    "transformers",
+    "onnx==1.16.1",
+    "optimum",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "black",
+    "flake8",
+    "isort",
+    "pylint",
+    "flake8-pyproject"
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128" },
+]
+torchvision = [
+  { index = "pytorch-cu128" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+
+[tool.black]
+line-length = 160
+include_trailing_comma = true
+
+[tool.pylint]
+max-line-length = 160
+
+[tool.isort]
+line_length = 160
+profile = "black"
+
+[tool.flake8]
+extend-ignore = "E203"
+max-line-length = 160
+
+[dependency-groups]
+dev = [
+    "flake8-pyproject>=1.2.3",
+]

@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Numerics.Tensors;
 using System.Runtime.InteropServices;
 using FAI.Core;

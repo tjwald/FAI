@@ -1,4 +1,4 @@
-﻿namespace FAI.Core.Abstractions;
+namespace FAI.Core.Abstractions;
 
 /// <summary>
 /// Represents a machine learning pipeline that processes input data and produces output data.

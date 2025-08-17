@@ -1,4 +1,4 @@
-﻿using System.Numerics.Tensors;
+using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.InferenceTasks.Classification;
@@ -6,7 +6,7 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextClassification;
 
-class TokenizerWrapper : IPreprocessor<TokenizedText, BatchTokenizedResult, long>
+internal sealed class TokenizerWrapper : IPreprocessor<TokenizedText, BatchTokenizedResult, long>
 {
     private readonly PretrainedTokenizer _tokenizer;
 

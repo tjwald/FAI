@@ -1,4 +1,4 @@
-﻿using FAI.Onnx.Configuration;
+using FAI.Onnx.Configuration;
 using Microsoft.ML.OnnxRuntime;
 
 namespace FAI.Onnx.Utils;
@@ -17,7 +17,7 @@ internal sealed class InferenceSessionFactory
     public RunOptions RunOptions { get; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="InferenceSessionFactory"/> class 
+    /// Initializes a new instance of the <see cref="InferenceSessionFactory"/> class
     /// with the specified ONNX configuration options.
     /// </summary>
     /// <param name="options">The ONNX options used to configure the inference session.</param>

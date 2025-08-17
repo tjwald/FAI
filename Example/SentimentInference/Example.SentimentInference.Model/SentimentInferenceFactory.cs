@@ -1,4 +1,4 @@
-﻿using FAI.Core.Abstractions;
+using FAI.Core.Abstractions;
 using FAI.Core.Configurations.PipelineBatchExecutors;
 using FAI.Core.ResultTypes;
 using FAI.NLP.Configuration;

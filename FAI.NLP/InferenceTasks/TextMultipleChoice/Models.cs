@@ -26,7 +26,8 @@ public record TextMultipleChoiceInput(string Context, TokenizedText[] Choices) :
     {
         get
         {
-            if (_tokenCount == -1) throw new InvalidOperationException("Tokenized text is not tokenized.");
+            if (_tokenCount == -1)
+                throw new InvalidOperationException("Tokenized text is not tokenized.");
             return _tokenCount;
         }
     }
@@ -40,7 +41,8 @@ public record TextMultipleChoiceInput(string Context, TokenizedText[] Choices) :
     {
         get
         {
-            if (_maxTokenLength == -1) throw new InvalidOperationException("Tokenized text is not tokenized.");
+            if (_maxTokenLength == -1)
+                throw new InvalidOperationException("Tokenized text is not tokenized.");
             return _maxTokenLength;
         }
     }
@@ -57,7 +59,8 @@ public record TextMultipleChoiceInput(string Context, TokenizedText[] Choices) :
     /// <param name="pretrainedTokenizer">The tokenizer to use for tokenizing the choices.</param>
     public void Tokenize(PretrainedTokenizer pretrainedTokenizer)
     {
-        if (_tokenCount > 0) return;
+        if (_tokenCount > 0)
+            return;
 
         _tokenCount = 0;
         _maxTokenLength = 0;

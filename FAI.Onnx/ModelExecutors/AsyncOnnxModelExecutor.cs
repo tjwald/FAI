@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Numerics.Tensors;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
@@ -95,7 +95,8 @@ file struct DisposableCollection<T> : IDisposableReadOnlyCollection<T> where T :
 
     private void Dispose(bool disposing)
     {
-        if (_disposed || !disposing) return;
+        if (_disposed || !disposing)
+            return;
 
         // Dispose in the reverse order.
         // Objects should typically be destroyed/disposed
