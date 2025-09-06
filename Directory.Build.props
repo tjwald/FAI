@@ -1,5 +1,0 @@
-<Project>
-  <ItemGroup>
-    <PackageReference Include="Workleap.DotNet.CodingStandards" Version="1.1.23-preview.2"/>
-  </ItemGroup>
-</Project>
