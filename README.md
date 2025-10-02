@@ -11,6 +11,8 @@ FAI (Fast AI) is a library design to maximize the performance of your models by 
 * Enjoy a nice User Friendly API for consuming code via Pipeline abstraction
 * Bootstrap inference algorithms for different applications by providing a common abstraction to build on.
 
+[![AI Community Standup Video](https://img.youtube.com/vi/ptdNWGj8CN8/0.jpg)](https://www.youtube.com/watch?v=ptdNWGj8CN8)
+
 ## Results
 
 Under the [Example](Example) folder, you can find projects written using the standard python stack and compare it with
