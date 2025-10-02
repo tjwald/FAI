@@ -1,4 +1,4 @@
-namespace FAI.Core.Extensions.DI;
+namespace FAI.Extensions.DependencyInjection.LocalServices;
 
 public static class LocalServicesExtensions
 {
