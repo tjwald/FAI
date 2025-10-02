@@ -11,9 +11,9 @@ public abstract class TextInferenceStepsBuilder<TToken, TResult, TInference, TSe
 {
     private PretrainedTokenizer? _tokenizer;
     private Func<ValueTask<PretrainedTokenizer>>? _tokenizerFactory;
-    private Func<ValueTask<IModelExecutor<long, float>>>? _executorFactory;
+    private Func<IModelExecutor<long, float>>? _executorFactory;
 
-    protected Func<ValueTask<IModelExecutor<long, float>>> ExecutorFactory
+    protected Func<IModelExecutor<long, float>> ExecutorFactory
     {
         get => _executorFactory!;
         private set => _executorFactory = value;
@@ -42,7 +42,7 @@ public abstract class TextInferenceStepsBuilder<TToken, TResult, TInference, TSe
         return _tokenizer;
     }
 
-    public TSelf UseModelExecutor(Func<ValueTask<IModelExecutor<long, float>>> executor)
+    public TSelf UseModelExecutor(Func<IModelExecutor<long, float>> executor)
     {
         ExecutorFactory = executor;
         return (TSelf)this;

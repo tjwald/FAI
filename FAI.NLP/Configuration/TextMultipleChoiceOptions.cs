@@ -19,6 +19,6 @@ public class TextMultipleChoiceBuilder
         var tokenizerTask = GetTokenizer();
         var modelExecutorTask = ExecutorFactory();
 
-        return new TextMultipleChoiceTask(await tokenizerTask, await modelExecutorTask, new(MaxChoices, StoreLogits));
+        return new TextMultipleChoiceTask(await tokenizerTask, modelExecutorTask, new(MaxChoices, StoreLogits));
     }
 }

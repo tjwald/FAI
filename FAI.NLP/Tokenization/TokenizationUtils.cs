@@ -47,12 +47,12 @@ public static class TokenizationUtils
     /// <returns>
     /// A task representing the asynchronous operation, returning a <see cref="PretrainedTokenizer"/> initialized with BERT settings.
     /// </returns>
-    public static async Task<PretrainedTokenizer> BERTTokenizerFromPretrained(string path, PretrainedTokenizerOptions tokenizerOptions)
+    public static PretrainedTokenizer BERTTokenizerFromPretrained(string path, PretrainedTokenizerOptions tokenizerOptions)
     {
         var streamVocab = File.OpenRead(Path.Combine(path, "vocab.txt"));
         var streamConfig = File.OpenRead(Path.Combine(path, "tokenizer_config.json"));
         var config = JsonSerializer.Deserialize(streamConfig, TokenizationOptionsJsonSerializerContext.Default.BertOptions);
-        var tokenizer = await BertTokenizer.CreateAsync(streamVocab, config);
+        var tokenizer = BertTokenizer.Create(streamVocab, config);
         return new PretrainedTokenizer(tokenizer, tokenizerOptions);
     }
 

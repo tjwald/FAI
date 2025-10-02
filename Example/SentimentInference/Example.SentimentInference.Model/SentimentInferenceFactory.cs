@@ -1,32 +1,65 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.InferenceTasks;
+using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Configurations.PipelineBatchExecutors;
+using FAI.Core.PipelineBatchExecutors;
 using FAI.Core.ResultTypes;
 using FAI.NLP.Configuration;
 using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.InferenceTasks.TextClassification;
+using FAI.NLP.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Example.SentimentInference.Model;
 
 public static class SentimentInferenceFactory
 {
-    public static async Task<IInference<string, bool>> CreateSentimentInference(SentimentInferenceOptions options)
+    public static IServiceCollection AddDefaultSentimentInference(this IServiceCollection services, SentimentInferenceOptions options)
     {
-        Console.WriteLine($"Model: {options.ModelDir}");
-        Func<Task<PretrainedTokenizer>> tokenizer = () => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory = tokenizer.GetTokenizerFactory();
+        services
+           .AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification")
+           .AddConfigurationAndBind<SerialPipelineBatchExecutorOptions>("SentimentInference:BatchExecutors:SerialPipeline")
+           .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
 
-        var executorBuilder = CreateBatchGpuExecutorBuilder(options, tokenizerFactory);
+        services.AddSentimentInference()
+            .AddTokenizer(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions))
+            .AddLocal<IModelExecutorConfig, OnnxModelExecutorOptions>(new OnnxModelExecutorOptions()
+                .ConfigureOnnxOptions(onnxOptions =>
+                {
+                    onnxOptions.ConfigureSessionOptions(sessionOptions =>
+                    {
+                        sessionOptions.AppendExecutionProvider_CUDA();
+                        Console.WriteLine("Using GPU accelerator");
 
-        var pipeline = new Pipeline<TokenizedText, ClassificationResult<bool, float>>(await executorBuilder.BuildAsync());
-        return new SentimentInference(pipeline);
+                        sessionOptions.AppendExecutionProvider_CPU();
+                    });
+                    onnxOptions.ModelDir = options.ModelDir;
+                })
+            ).AddModelExecutor(sp =>
+            {
+                var executorOptions = sp.GetRequiredService<IModelExecutorConfig>();
+                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
+            })
+            .AddInferenceSteps<TextClassification<bool>>()
+            .AddBatchExecutor(s =>
+            {
+                new DecoratorChainBuilder(s)
+                    .AddInitial<SerialPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                    .Decorate<MaxPaddedTokensBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                    .Decorate<TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                    .Build<IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
+            })
+            .Build();
+
+        return services;
     }
 
     private static IPipelineBatchExecutorBuilder<TokenizedText, ClassificationResult<bool, float>> CreateBatchGpuExecutorBuilder(
         SentimentInferenceOptions options,
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
+        PretrainedTokenizer tokenizerFactory)
     {
         MaxPaddedTokensBatchExecutorBuilder<TokenizedText, ClassificationResult<bool, float>> builder = new();
         var executorOptions = new OnnxModelExecutorOptions()

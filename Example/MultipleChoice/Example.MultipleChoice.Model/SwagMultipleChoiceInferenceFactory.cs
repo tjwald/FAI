@@ -22,8 +22,7 @@ public static class SwagMultipleChoiceInferenceFactory
     public static async Task<IInference<SwagInput, ChoiceResult<TokenizedText>>> CreateMultipleChoiceInference(SwagMultipleChoiceInferenceOptions options)
     {
         Console.WriteLine($"Model: {options.ModelDir}");
-        Func<Task<PretrainedTokenizer>> tokenizer = () => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory = tokenizer.GetTokenizerFactory();
+        PretrainedTokenizer tokenizer = TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
 
         // MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder = CreateRoutedPipelineBatchExecutorBuilder(options, tokenizerFactory);
         var builder =
@@ -32,9 +31,9 @@ public static class SwagMultipleChoiceInferenceFactory
                 MaxPaddedRatio = 0.1,
                 MaxTokensCount = 8192
             }
-                .UseTokenizer(tokenizerFactory)
+                .UseTokenizer(tokenizer)
                 .UseInnerPipelineExecutor<StreamedBatchExecutorBuilder>(builder =>
-                    CreateGpuPipelineExecutionBuilder(builder, options, tokenizerFactory));
+                    CreateGpuPipelineExecutionBuilder(builder, options, tokenizer));
 
         var pipeline = new Pipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>(await builder.BuildAsync());
 
@@ -42,7 +41,7 @@ public static class SwagMultipleChoiceInferenceFactory
     }
 
     private static MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> CreateRoutedPipelineBatchExecutorBuilder(
-        SwagMultipleChoiceInferenceOptions options, Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
+        SwagMultipleChoiceInferenceOptions options, PretrainedTokenizer tokenizer)
     {
         MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder =
             new MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
@@ -50,14 +49,14 @@ public static class SwagMultipleChoiceInferenceFactory
                 MaxPaddedRatio = 0.1,
                 MaxTokensCount = 8192
             }
-                .UseTokenizer(tokenizerFactory)
+                .UseTokenizer(tokenizer)
                 .UseInnerPipelineExecutor<RoutingPipelineExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>(routingBuilder =>
                 {
                     routingBuilder.UseRoutingStrategy(new RoutingStrategy())
                         .UsePipelineExecutorBuilder<StreamedBatchExecutorBuilder>(builder =>
-                            CreateGpuPipelineExecutionBuilder(builder, options, tokenizerFactory))
+                            CreateGpuPipelineExecutionBuilder(builder, options, tokenizer))
                         .UsePipelineExecutorBuilder<StreamedBatchExecutorBuilder>(builder =>
-                            CreateCpuExecutorBuilder(builder, options, tokenizerFactory));
+                            CreateCpuExecutorBuilder(builder, options, tokenizer));
                 });
         return builder;
     }
@@ -65,7 +64,7 @@ public static class SwagMultipleChoiceInferenceFactory
     private static void CreateGpuPipelineExecutionBuilder(
         StreamedBatchExecutorBuilder builder,
         SwagMultipleChoiceInferenceOptions options,
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
+        PretrainedTokenizer tokenizerFactory)
     {
         var executorOptions = new OnnxModelExecutorOptions()
             .ConfigureOnnxOptions(onnxOptions =>
@@ -93,7 +92,7 @@ public static class SwagMultipleChoiceInferenceFactory
     private static void CreateCpuExecutorBuilder(
         StreamedBatchExecutorBuilder builder,
         SwagMultipleChoiceInferenceOptions options,
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
+        PretrainedTokenizer tokenizer)
     {
         var executorOptions = new OnnxModelExecutorOptions()
             .ConfigureOnnxOptions(onnxOptions =>
@@ -113,7 +112,7 @@ public static class SwagMultipleChoiceInferenceFactory
         {
             classificationBuilder.MaxChoices = 4;
             classificationBuilder
-                .UseTokenizer(tokenizerFactory)
+                .UseTokenizer(tokenizer)
                 .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
         });
     }

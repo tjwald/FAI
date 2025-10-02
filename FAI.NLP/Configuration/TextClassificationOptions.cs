@@ -24,6 +24,6 @@ public class TextClassificationBuilder<TClassification>
 
         ArgumentNullException.ThrowIfNull(Choices, nameof(Choices));
 
-        return new TextClassification<TClassification>(await tokenizerTask, await modelExecutorTask, new(Choices, StoreLogits));
+        return new TextClassification<TClassification>(await tokenizerTask, modelExecutorTask, new(Choices, StoreLogits));
     }
 }

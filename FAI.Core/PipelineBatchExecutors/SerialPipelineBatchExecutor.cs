@@ -2,6 +2,11 @@ using FAI.Core.Abstractions;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
+public sealed class SerialPipelineBatchExecutorOptions
+{
+    public int? MaxBatchSize { get; set; }
+}
+
 /// <summary>
 /// Pipeline executor that processes batches in sequence.
 /// </summary>
@@ -21,6 +26,12 @@ public class SerialPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecut
     {
         _inferenceSteps = inferenceSteps;
         _maxBatchSize = maxBatchSize;
+    }
+
+    public SerialPipelineBatchExecutor(IInferenceSteps<TInput, TOutput> inferenceSteps, SerialPipelineBatchExecutorOptions options)
+        : this(inferenceSteps, options.MaxBatchSize)
+    {
+
     }
 
     /// <summary>
