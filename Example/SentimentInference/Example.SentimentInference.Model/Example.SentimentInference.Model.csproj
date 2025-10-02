@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\FAI.Core.Extensions.DI\FAI.Core.Extensions.DI.csproj" />
         <ProjectReference Include="..\..\..\FAI.NLP\FAI.NLP.csproj"/>
         <ProjectReference Include="..\..\..\FAI.Onnx\FAI.Onnx.csproj"/>
         <ProjectReference Include="..\..\..\FAI.Core\FAI.Core.csproj"/>

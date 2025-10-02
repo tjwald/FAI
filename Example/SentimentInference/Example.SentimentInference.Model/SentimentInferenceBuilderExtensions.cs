@@ -1,12 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using FAI.Core.Abstractions;
+using FAI.Core.Extensions.DI;
 using FAI.Core.ResultTypes;
 using FAI.NLP.Tokenization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Example.SentimentInference.Model;
 
-using PipelineBatchExecutor = IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>;
 
 public static class SentimentInferenceBuilderExtensions
 {
@@ -21,111 +21,43 @@ public static class SentimentInferenceBuilderExtensions
     }
 }
 
-public class SentimentInferenceBuilder
+public class SentimentInferenceBuilder : PipelineBuilder<TokenizedText, ClassificationResult<bool, float>, SentimentInferenceBuilder>
 {
-    private readonly IServiceCollection _builder;
-    private readonly IServiceCollection _services;
-    private readonly string? _key;
-    private bool _isBuilt;
-
-    public SentimentInferenceBuilder(IServiceCollection builder, string? key = null)
+    public SentimentInferenceBuilder(IServiceCollection globalServices, string? key = null) : base(globalServices, key)
     {
-        _builder = builder;
-        _key = key;
-        _services = new ServiceCollection();
-    }
-
-    public SentimentInferenceBuilder AddLocal<TService, TImplementation>(TImplementation implementation)
-        where TService : class where TImplementation : class, TService
-    {
-        _services.AddSingleton<TService>(implementation);
-        return this;
     }
 
     public SentimentInferenceBuilder AddTokenizer(Func<IServiceProvider, PretrainedTokenizer> tokenizerFactory)
     {
-        _services.AddSingleton(tokenizerFactory);
-        return this;
+        return AddLocal(tokenizerFactory);
     }
 
-
-    public SentimentInferenceBuilder AddModelExecutor<TModelInput, TModelOutput>(Func<IServiceProvider, IModelExecutor<TModelInput, TModelOutput>> func)
+    public override IServiceCollection Build()
     {
-        _services.AddSingleton(func);
-        return this;
-    }
+        base.Build();
 
-    public SentimentInferenceBuilder AddInferenceSteps<TInferenceSteps>()
-        where TInferenceSteps : class, IInferenceSteps<TokenizedText, ClassificationResult<bool, float>>
-    {
-        _services.AddSingleton<IInferenceSteps<TokenizedText, ClassificationResult<bool, float>>, TInferenceSteps>();
-        return this;
-    }
-
-    public SentimentInferenceBuilder AddBatchExecutor<TBatchExecutor>() where TBatchExecutor : class, PipelineBatchExecutor
-    {
-        _services.AddSingleton<PipelineBatchExecutor, TBatchExecutor>();
-        return this;
-    }
-
-    public SentimentInferenceBuilder AddBatchExecutor<TBatchExecutor>(
-        Func<IServiceProvider, TBatchExecutor> batchExecutorFactory) where TBatchExecutor : class, PipelineBatchExecutor
-    {
-        _services.AddSingleton(batchExecutorFactory);
-        return this;
-    }
-
-    public SentimentInferenceBuilder AddBatchExecutor(Action<IServiceCollection> batchExecutorFactory)
-    {
-        batchExecutorFactory(_services);
-        return this;
-    }
-
-    public IServiceCollection Build()
-    {
-        _isBuilt = _isBuilt ? throw new InvalidOperationException("This builder has already been built.") : true;
-
-        _services.AddSingleton<IPipeline<TokenizedText, ClassificationResult<bool, float>>, Pipeline<TokenizedText, ClassificationResult<bool, float>>>();
         _services.AddSingleton<SentimentInference>();
 
         if (_key is null)
         {
-            _builder.AddSingleton(BuildSentimentInference);
+            _globalServices.AddSingleton(BuildSentimentInference);
         }
         else
         {
-            _services.AddKeyedSingleton(_key, BuildSentimentInference);
+            _globalServices.AddKeyedSingleton(_key, BuildSentimentInference);
         }
 
-        return _builder;
+        return _globalServices;
     }
 
     private IInference<string, bool> BuildSentimentInference(IServiceProvider globalServiceProvider)
     {
-        foreach (ServiceDescriptor serviceDescriptor in _builder)
+        foreach (ServiceDescriptor serviceDescriptor in _globalServices)
         {
             _services.Add(serviceDescriptor);
         }
         var localServiceProvider = _services.BuildServiceProvider();
         return ActivatorUtilities.CreateInstance<SentimentInference>(localServiceProvider);
-    }
-}
-
-
-public class HybridServiceProvider : IServiceProvider
-{
-    private readonly IServiceProvider _local;
-    private readonly IServiceProvider _global;
-
-    public HybridServiceProvider(IServiceProvider local, IServiceProvider global)
-    {
-        _local = local;
-        _global = global;
-    }
-
-    public object? GetService(Type serviceType)
-    {
-        return _local.GetService(serviceType) ?? _global.GetService(serviceType);
     }
 }
 
