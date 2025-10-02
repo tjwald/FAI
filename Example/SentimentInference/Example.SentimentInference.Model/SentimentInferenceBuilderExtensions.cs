@@ -10,56 +10,14 @@ namespace Example.SentimentInference.Model;
 
 public static class SentimentInferenceBuilderExtensions
 {
-    public static SentimentInferenceBuilder AddSentimentInference(this IServiceCollection services)
+    public static PipelineBuilder<TokenizedText, ClassificationResult<bool, float>> AddSentimentInference(this IServiceCollection serviceCollection)
     {
-        return new SentimentInferenceBuilder(services);
-    }
+        serviceCollection.AddSingleton<IInference<string, bool>, SentimentInference>();
 
-    public static SentimentInferenceBuilder AddKeyedSentimentInference(this IServiceCollection services, string key)
-    {
-        return new SentimentInferenceBuilder(services, key);
+        return new PipelineBuilder<TokenizedText, ClassificationResult<bool, float>>(serviceCollection);
     }
 }
 
-public class SentimentInferenceBuilder : PipelineBuilder<TokenizedText, ClassificationResult<bool, float>, SentimentInferenceBuilder>
-{
-    public SentimentInferenceBuilder(IServiceCollection globalServices, string? key = null) : base(globalServices, key)
-    {
-    }
-
-    public SentimentInferenceBuilder AddTokenizer(Func<IServiceProvider, PretrainedTokenizer> tokenizerFactory)
-    {
-        return AddLocal(tokenizerFactory);
-    }
-
-    public override IServiceCollection Build()
-    {
-        base.Build();
-
-        _services.AddSingleton<SentimentInference>();
-
-        if (_key is null)
-        {
-            _globalServices.AddSingleton(BuildSentimentInference);
-        }
-        else
-        {
-            _globalServices.AddKeyedSingleton(_key, BuildSentimentInference);
-        }
-
-        return _globalServices;
-    }
-
-    private IInference<string, bool> BuildSentimentInference(IServiceProvider globalServiceProvider)
-    {
-        foreach (ServiceDescriptor serviceDescriptor in _globalServices)
-        {
-            _services.Add(serviceDescriptor);
-        }
-        var localServiceProvider = _services.BuildServiceProvider();
-        return ActivatorUtilities.CreateInstance<SentimentInference>(localServiceProvider);
-    }
-}
 
 public class DecoratorChainBuilder
 {

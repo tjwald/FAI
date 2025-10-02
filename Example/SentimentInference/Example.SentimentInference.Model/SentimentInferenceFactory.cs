@@ -2,6 +2,7 @@ using FAI.Core.Abstractions;
 using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Configurations.PipelineBatchExecutors;
+using FAI.Core.Extensions.DI;
 using FAI.Core.PipelineBatchExecutors;
 using FAI.Core.ResultTypes;
 using FAI.NLP.Configuration;
@@ -19,14 +20,14 @@ public static class SentimentInferenceFactory
 {
     public static IServiceCollection AddDefaultSentimentInference(this IServiceCollection services, SentimentInferenceOptions options)
     {
-        services
-           .AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification")
-           .AddConfigurationAndBind<SerialPipelineBatchExecutorOptions>("SentimentInference:BatchExecutors:SerialPipeline")
-           .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
+        return services.AddLocalServices(localServices =>
+        {
+            localServices
+                .AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification")
+                .AddConfigurationAndBind<SerialPipelineBatchExecutorOptions>("SentimentInference:BatchExecutors:SerialPipeline")
+                .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
 
-        services.AddSentimentInference()
-            .AddTokenizer(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions))
-            .AddLocal<IModelExecutorConfig, OnnxModelExecutorOptions>(new OnnxModelExecutorOptions()
+            localServices.AddSingleton<IModelExecutorConfig, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
@@ -38,23 +39,29 @@ public static class SentimentInferenceFactory
                     });
                     onnxOptions.ModelDir = options.ModelDir;
                 })
-            ).AddModelExecutor(sp =>
-            {
-                var executorOptions = sp.GetRequiredService<IModelExecutorConfig>();
-                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
-            })
-            .AddInferenceSteps<TextClassification<bool>>()
-            .AddBatchExecutor(s =>
-            {
-                new DecoratorChainBuilder(s)
-                    .AddInitial<SerialPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
-                    .Decorate<MaxPaddedTokensBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
-                    .Decorate<TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
-                    .Build<IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
-            })
-            .Build();
+            );
 
-        return services;
+            localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+
+            localServices.AddSentimentInference()
+                .AddModelExecutor(sp =>
+                {
+                    var executorOptions = sp.GetRequiredService<IModelExecutorConfig>();
+                    return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
+                })
+                .AddInferenceSteps<TextClassification<bool>>()
+                .AddBatchExecutor(s =>
+                {
+                    new DecoratorChainBuilder(s)
+                        .AddInitial<SerialPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                        .Decorate<MaxPaddedTokensBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                        .Decorate<TokenCountSortingBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
+                        .Build<IPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
+                })
+                .Build();
+
+            localServices.CopyToGlobal<IInference<string, bool>>();
+        });
     }
 
     private static IPipelineBatchExecutorBuilder<TokenizedText, ClassificationResult<bool, float>> CreateBatchGpuExecutorBuilder(

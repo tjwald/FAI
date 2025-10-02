@@ -43,6 +43,5 @@ repos:
         name: dotnet format
         language: system
         entry: dotnet format
-        args: [--verify-no-changes]
         types_or: [c#]
         pass_filenames: false

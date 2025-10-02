@@ -1,74 +1,55 @@
 using FAI.Core.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Extensions.DI;
 
-public class PipelineBuilder<TInput, TOutput, TSelf> where TSelf : PipelineBuilder<TInput, TOutput, TSelf>
+public class PipelineBuilder<TInput, TOutput>
 {
-    protected readonly IServiceCollection _globalServices;
-    protected readonly IServiceCollection _services;
-    protected readonly string? _key;
+    protected readonly IServiceCollection _serviceCollection;
     private bool _isBuilt;
 
-    public PipelineBuilder(IServiceCollection globalServices, string? key = null)
+    public PipelineBuilder(IServiceCollection serviceCollection, string? key = null)
     {
-        _globalServices = globalServices;
-        _key = key;
-        _services = new ServiceCollection();
+        _serviceCollection = serviceCollection;
     }
 
-    public TSelf AddLocal<TService>(Func<IServiceProvider, TService> factory)
-        where TService : class
+    public PipelineBuilder<TInput, TOutput> AddModelExecutor<TModelInput, TModelOutput>(Func<IServiceProvider, IModelExecutor<TModelInput, TModelOutput>> func)
     {
-        _services.AddSingleton(factory);
-        return (TSelf)this;
+        _serviceCollection.AddSingleton(func);
+        return this;
     }
 
-    public TSelf AddLocal<TService, TImplementation>(TImplementation implementation)
-        where TService : class where TImplementation : class, TService
-    {
-        _services.AddSingleton<TService>(implementation);
-        return (TSelf)this;
-    }
-
-    public TSelf AddModelExecutor<TModelInput, TModelOutput>(Func<IServiceProvider, IModelExecutor<TModelInput, TModelOutput>> func)
-    {
-        _services.AddSingleton(func);
-        return (TSelf)this;
-    }
-
-    public TSelf AddInferenceSteps<TInferenceSteps>()
+    public PipelineBuilder<TInput, TOutput> AddInferenceSteps<TInferenceSteps>()
         where TInferenceSteps : class, IInferenceSteps<TInput, TOutput>
     {
-        _services.AddSingleton<IInferenceSteps<TInput, TOutput>, TInferenceSteps>();
-        return (TSelf)this;
+        _serviceCollection.AddSingleton<IInferenceSteps<TInput, TOutput>, TInferenceSteps>();
+        return this;
     }
 
-    public TSelf AddBatchExecutor<TBatchExecutor>() where TBatchExecutor : class, IPipelineBatchExecutor<TInput, TOutput>
+    public PipelineBuilder<TInput, TOutput> AddBatchExecutor<TBatchExecutor>() where TBatchExecutor : class, IPipelineBatchExecutor<TInput, TOutput>
     {
-        _services.AddSingleton<IPipelineBatchExecutor<TInput, TOutput>, TBatchExecutor>();
-        return (TSelf)this;
+        _serviceCollection.AddSingleton<IPipelineBatchExecutor<TInput, TOutput>, TBatchExecutor>();
+        return this;
     }
 
-    public TSelf AddBatchExecutor<TBatchExecutor>(
+    public PipelineBuilder<TInput, TOutput> AddBatchExecutor<TBatchExecutor>(
         Func<IServiceProvider, TBatchExecutor> batchExecutorFactory) where TBatchExecutor : class, IPipelineBatchExecutor<TInput, TOutput>
     {
-        _services.AddSingleton(batchExecutorFactory);
-        return (TSelf)this;
+        _serviceCollection.AddSingleton(batchExecutorFactory);
+        return this;
     }
 
-    public TSelf AddBatchExecutor(Action<IServiceCollection> batchExecutorFactory)
+    public PipelineBuilder<TInput, TOutput> AddBatchExecutor(Action<IServiceCollection> batchExecutorFactory)
     {
-        batchExecutorFactory(_services);
-        return (TSelf)this;
+        batchExecutorFactory(_serviceCollection);
+        return this;
     }
 
-    public virtual IServiceCollection Build()
+    public IServiceCollection Build()
     {
         _isBuilt = _isBuilt ? throw new InvalidOperationException("This builder has already been built.") : true;
 
-        _services.AddSingleton<IPipeline<TInput, TOutput>, Pipeline<TInput, TOutput>>();
+        _serviceCollection.AddSingleton<IPipeline<TInput, TOutput>, Pipeline<TInput, TOutput>>();
 
-        return _globalServices;
+        return _serviceCollection;
     }
 }
