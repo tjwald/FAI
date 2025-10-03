@@ -12,31 +12,52 @@ public class LocalServiceCollection : ServiceCollection
         _globalServices = globalServices;
     }
 
-    public LocalServiceCollection CopyToGlobal<TService, TImplementation>()
+    public LocalServiceCollection CopyToGlobal<TService, TImplementation>(string? key = null)
         where TService : class where TImplementation : class, TService
     {
-        return AddGlobalHelper<TService, TImplementation>();
+        return AddGlobalHelper<TService, TImplementation>(key);
     }
 
-    public LocalServiceCollection CopyToGlobal<TService>()
+    public LocalServiceCollection CopyToGlobal<TService>(string? key = null)
         where TService : class
     {
-        return AddGlobalHelper<TService>();
+        return AddGlobalHelper<TService>(key);
     }
 
-    private LocalServiceCollection AddGlobalHelper<TService>() where TService : class
+    private LocalServiceCollection AddGlobalHelper<TService>(string? key = null) where TService : class
     {
-        _globalServices.AddSingleton(ServiceFactory<TService>);
+        if (key is null)
+        {
+            _globalServices.AddSingleton(ServiceFactory<TService>);
+        }
+        else
+        {
+            _globalServices.AddKeyedSingleton(key, ServiceFactory<TService>);
+        }
+
         return this;
     }
 
-    private LocalServiceCollection AddGlobalHelper<TService, TImplementation>() where TService : class where TImplementation : class, TService
+    private LocalServiceCollection AddGlobalHelper<TService, TImplementation>(string? key = null) where TService : class where TImplementation : class, TService
     {
-        _globalServices.AddSingleton<TService, TImplementation>(ServiceFactory<TImplementation>);
+        if (key is null)
+        {
+            _globalServices.AddSingleton<TService, TImplementation>(ServiceFactory<TImplementation>);
+        }
+        else
+        {
+            _globalServices.AddKeyedSingleton<TService, TImplementation>(key, ServiceFactory<TImplementation>);
+        }
+
         return this;
     }
 
-    private TService ServiceFactory<TService>(IServiceProvider _) where TService : notnull
+    private TService ServiceFactory<TService>(IServiceProvider sp) where TService : notnull
+    {
+        return ServiceFactory<TService>(sp, null);
+    }
+
+    private TService ServiceFactory<TService>(IServiceProvider sp, object? o) where TService : notnull
     {
         InitServiceProvider();
 
@@ -45,7 +66,26 @@ public class LocalServiceCollection : ServiceCollection
             return ActivatorUtilities.CreateInstance<TService>(_serviceProvider);
         }
 
-        ServiceDescriptor descriptor = this.First(x => x.ServiceType == typeof(TService));
+        ServiceDescriptor? descriptor = null;
+        if (o is not null)
+        {
+            descriptor = this.FirstOrDefault(x => x.ImplementationType == typeof(TService) && (!x.IsKeyedService || x.ServiceKey == o));
+        }
+
+        descriptor ??= this.First(x => x.ServiceType == typeof(TService));
+
+        if (descriptor.IsKeyedService)
+        {
+            if (descriptor.KeyedImplementationInstance is not null)
+            {
+                return (TService)descriptor.KeyedImplementationInstance;
+            }
+
+            if (descriptor.KeyedImplementationFactory is not null)
+            {
+                return (TService)descriptor.KeyedImplementationFactory(_serviceProvider, o);
+            }
+        }
 
         if (descriptor.ImplementationInstance is not null)
         {

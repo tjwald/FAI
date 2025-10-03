@@ -1,23 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using FAI.Core.Abstractions;
-using FAI.Core.Extensions.DI;
-using FAI.Core.ResultTypes;
-using FAI.NLP.Tokenization;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace Example.SentimentInference.Model;
-
-
-public static class SentimentInferenceBuilderExtensions
-{
-    public static PipelineBuilder<TokenizedText, ClassificationResult<bool, float>> AddSentimentInference(this IServiceCollection serviceCollection)
-    {
-        serviceCollection.AddSingleton<IInference<string, bool>, SentimentInference>();
-
-        return new PipelineBuilder<TokenizedText, ClassificationResult<bool, float>>(serviceCollection);
-    }
-}
-
+namespace FAI.Core.Extensions.DI;
 
 public class DecoratorChainBuilder
 {
@@ -50,7 +33,7 @@ public class DecoratorChainBuilder
         return this;
     }
 
-    public DecoratorChainBuilder Build<TService>() where TService : class
+    public Func<IServiceProvider, TService> Build<TService>() where TService : class
     {
         GuardTypeInitialized();
         if (!_currentType.IsAssignableTo(typeof(TService)))
@@ -59,8 +42,12 @@ public class DecoratorChainBuilder
         }
         var currentType = this._currentType;
 
-        _services.AddSingleton<TService>(sp => (TService)sp.GetRequiredService(currentType));
-        return this;
+        return (sp => (TService)sp.GetRequiredService(currentType));
+    }
+
+    public IServiceCollection RegisterAs<TService>() where TService : class
+    {
+        return _services.AddSingleton(Build<TService>());
     }
 
     [MemberNotNull(nameof(_currentType))]

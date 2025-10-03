@@ -40,8 +40,8 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
         (List<List<int>?> tokensList, int maxChoiceCount, int maxTokenCount) =
             input[0].IsTokenized ? FlattenTokensWithPadding(input) : FlattenBatchTokenize(input);
 
-        Tensor<long> tokenTensor = Tensor.Create<long>([input.Length * maxChoiceCount, maxTokenCount]);
-        Tensor<long> maskTensor = Tensor.Create<long>([input.Length * maxChoiceCount, maxTokenCount]);
+        Tensor<long> tokenTensor = Tensor.CreateFromShape<long>([input.Length * maxChoiceCount, maxTokenCount]);
+        Tensor<long> maskTensor = Tensor.CreateFromShape<long>([input.Length * maxChoiceCount, maxTokenCount]);
 
         var tokenTensorSpan = tokenTensor.GetDimensionSpan(0);
         var maskTensorSpan = maskTensor.GetDimensionSpan(0);
@@ -56,7 +56,6 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
                 continue;
             }
 
-            // When AsSpan is merged - use it!
             var tokenRow = tokenTensorSpan[outputRow].AsSpan();
             var maskRow = maskTensorSpan[outputRow].AsSpan();
 
@@ -66,7 +65,7 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
             outputRow++;
         }
 
-        Span<nint> shape = [input.Length, maxChoiceCount, -1];
+        Span<nint> shape = [input.Length, maxChoiceCount, maxTokenCount];
         return new BatchTokenizedResult(tokenTensor.Reshape(shape), maskTensor.Reshape(shape));
     }
 

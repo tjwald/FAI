@@ -1,7 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Example.SentimentInference.Model;
+namespace FAI.Extensions.DependencyInjection.LocalServices;
 
 public static class BuilderExtensions
 {

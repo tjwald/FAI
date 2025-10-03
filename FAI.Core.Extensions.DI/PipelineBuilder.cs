@@ -38,9 +38,9 @@ public class PipelineBuilder<TInput, TOutput>
         return this;
     }
 
-    public PipelineBuilder<TInput, TOutput> AddBatchExecutor(Action<IServiceCollection> batchExecutorFactory)
+    public PipelineBuilder<TInput, TOutput> AddBatchExecutor(Func<IServiceCollection, Func<IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>>> batchExecutorFactory)
     {
-        batchExecutorFactory(_serviceCollection);
+        _serviceCollection.AddSingleton(batchExecutorFactory(_serviceCollection));
         return this;
     }
 

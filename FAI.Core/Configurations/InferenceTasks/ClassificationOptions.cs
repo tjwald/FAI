@@ -2,20 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FAI.Core.Configurations.InferenceTasks;
 
-public class ClassificationOptions<TClassification>
-{
-    public ClassificationOptions()
-    {
-
-    }
-
-    public ClassificationOptions(TClassification[] choices, bool storeLogits = false)
-    {
-        Choices = choices;
-        StoreLogits = storeLogits;
-    }
-
+public sealed record ClassificationOptions<TClassification>(
     [Required]
-    public TClassification[] Choices { get; set; }
-    public bool StoreLogits { get; set; }
+    [MinLength(2)]
+    TClassification[] Choices,
+    bool StoreLogits = false)
+{
+    public ClassificationOptions() : this([]) { }
 }

@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.PipelineBatchExecutors;
@@ -12,6 +13,10 @@ public class TokenBatchSizeBatchExecutor<TToken, TOutput> : IPipelineBatchExecut
 {
     private readonly int _maxTokenCount;
     private readonly IPipelineBatchExecutor<TToken, TOutput> _executor;
+
+    public TokenBatchSizeBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, TokenBatchSizeBatchExecutorOptions options)
+        : this(executor, options.MaxTokensCount) { }
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TokenBatchSizeBatchExecutor{TToken, TOutput}"/> class.

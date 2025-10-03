@@ -23,7 +23,7 @@ public static class ModelExecutorFactory
     /// </exception>
     public static IModelExecutor<long, float> CreateModelExecutor(
         ModelExecutorType executorType,
-        IModelExecutorConfig modelExecutorOptions)
+        IModelExecutorOptions modelExecutorOptions)
     {
         switch (modelExecutorOptions)
         {

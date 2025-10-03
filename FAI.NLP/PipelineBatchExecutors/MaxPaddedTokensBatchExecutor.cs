@@ -1,15 +1,8 @@
-using System.ComponentModel.DataAnnotations;
 using FAI.Core.Abstractions;
+using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.PipelineBatchExecutors;
-
-public sealed class MaxPaddedTokensBatchExecutorOptions
-{
-    [Range(minimum: 0.01, maximum: 0.99)]
-    public double MaxPaddedTokenRatio { get; set; }
-    public int MaxTokenCount { get; set; }
-}
 
 /// <summary>
 /// Represents a batch executor that limits the number of padded tokens in each batch

@@ -2,7 +2,7 @@ using FAI.Core.Configurations.ModelExecutors;
 
 namespace FAI.Onnx.Configuration;
 
-public class MultiDeviceExecutorOptions : IModelExecutorConfig
+public class MultiDeviceExecutorOptions : IModelExecutorOptions
 {
     private readonly List<Action<OnnxModelExecutorOptions>> _configureOptions = [];
 

@@ -6,7 +6,7 @@ namespace FAI.Onnx.Configuration;
 /// <summary>
 /// Represents the configuration options for the OnnxModelExecutor.
 /// </summary>
-public class OnnxModelExecutorOptions : IModelExecutorConfig
+public class OnnxModelExecutorOptions : IModelExecutorOptions
 {
     private Action<OnnxOptions>? _configureOptions;
 
