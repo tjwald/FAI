@@ -3,9 +3,10 @@ root = true
 # All files
 [*]
 indent_style = space
+max_line_length = 160
 
 # Xml files
-[*.xml]
+[*.{xml,slnx,csproj}]
 indent_size = 2
 
 # C# files
