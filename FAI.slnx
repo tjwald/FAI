@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/Example/" />
+  <Folder Name="/Example/MultipleChoice/">
+    <Project Path="Example/MultipleChoice/Example.MultipleChoice.Console/Example.MultipleChoice.Console.csproj" />
+    <Project Path="Example/MultipleChoice/Example.MultipleChoice.Model/Example.MultipleChoice.Model.csproj" />
+  </Folder>
+  <Folder Name="/Example/SentimentInference/">
+    <Project Path="Example/SentimentInference/Example.SentimentInference.Api/Example.SentimentInference.Api.csproj" />
+    <Project Path="Example/SentimentInference/Example.SentimentInference.Console/Example.SentimentInference.Console.csproj" />
+    <Project Path="Example/SentimentInference/Example.SentimentInference.Model/Example.SentimentInference.Model.csproj" />
+  </Folder>
+  <Project Path="FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj" />
+  <Project Path="FAI.Core/FAI.Core.csproj" />
+  <Project Path="FAI.Extensions.DependencyInjection.LocalServices/FAI.Extensions.DependencyInjection.LocalServices.csproj" />
+  <Project Path="FAI.NLP/FAI.NLP.csproj" />
+  <Project Path="FAI.Onnx/FAI.Onnx.csproj" />
+  <Project Path="FAI.Vision/FAI.Vision.csproj" />
+</Solution>
