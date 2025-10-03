@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.PipelineBatchExecutors;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
@@ -28,6 +29,9 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private readonly int? _maxBatchSize;
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
+
+    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, StreamedPipelineExecutorOptions options)
+        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamedBatchExecutor{TInput, TPreprocess, TModelOutput, TOutput}"/> class.

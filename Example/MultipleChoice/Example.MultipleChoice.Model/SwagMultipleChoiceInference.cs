@@ -9,9 +9,9 @@ public record struct SwagInput(string Context, string Text, string[] Endings);
 
 public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<TokenizedText>>
 {
-    private readonly Pipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> _pipeline;
+    private readonly IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> _pipeline;
 
-    public SwagMultipleChoiceInference(Pipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> pipeline)
+    public SwagMultipleChoiceInference(IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> pipeline)
     {
         _pipeline = pipeline;
     }

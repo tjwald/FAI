@@ -38,11 +38,11 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// </summary>
     /// <param name="options">The configuration options for the model executor.</param>
     /// <returns>A task representing the asynchronous operation, containing the created <see cref="OnnxModelTensorExecutor"/>.</returns>
-    public static async Task<OnnxModelTensorExecutor> FromPretrained(OnnxModelExecutorOptions options)
+    public static OnnxModelTensorExecutor FromPretrained(OnnxModelExecutorOptions options)
     {
         var factory = new InferenceSessionFactory(options.OnnxOptions);
 
-        var session = await Task.Run(() => factory.Create());
+        var session = factory.Create();
 
         return Create(session, factory.RunOptions, options);
     }

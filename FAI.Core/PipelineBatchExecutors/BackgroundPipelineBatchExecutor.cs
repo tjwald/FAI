@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.PipelineBatchExecutors;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
@@ -18,6 +19,9 @@ public class BackgroundPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchEx
     // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
     private readonly Task[] _backgroundTasks;
     private readonly IPipelineBatchExecutor<TInput, TOutput> _next;
+
+    public BackgroundPipelineBatchExecutor(IPipelineBatchExecutor<TInput, TOutput> next, BackgroundPipelineBatchExecutorOptions options)
+        : this(next, options.MaxConcurrency) { }
 
     public BackgroundPipelineBatchExecutor(IPipelineBatchExecutor<TInput, TOutput> next, int workerCount)
     {

@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.PipelineBatchExecutors;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
@@ -12,6 +13,10 @@ public class ParallelPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExec
     private readonly int _maxBatchSize;
     private readonly int? _maxConcurrency;
     private readonly IInferenceSteps<TInput, TOutput> _inferenceSteps;
+
+    public ParallelPipelineBatchExecutor(IInferenceSteps<TInput, TOutput> inferenceSteps, ParallelPipelineExecutorOptions options)
+        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency) { }
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ParallelPipelineBatchExecutor{TInput, TOutput}"/> class.

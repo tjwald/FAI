@@ -1,121 +1,147 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Configurations.PipelineBatchExecutors;
+using FAI.Core.Extensions.DI;
 using FAI.Core.PipelineBatchExecutors;
 using FAI.Core.ResultTypes;
+using FAI.Extensions.DependencyInjection.LocalServices;
 using FAI.NLP.Configuration;
 using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
+using FAI.NLP.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
 using FAI.Onnx.Utils;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Example.MultipleChoice.Model;
 
-#pragma warning disable IDE0065
-using StreamedBatchExecutorBuilder =
-    StreamedPipelineExecutorBuilder<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>;
-#pragma warning restore IDE0065
-
 public static class SwagMultipleChoiceInferenceFactory
 {
-    public static async Task<IInference<SwagInput, ChoiceResult<TokenizedText>>> CreateMultipleChoiceInference(SwagMultipleChoiceInferenceOptions options)
+    public static IServiceCollection AddDefaultSwagInference(this IServiceCollection services, SwagMultipleChoiceInferenceOptions options)
     {
-        Console.WriteLine($"Model: {options.ModelDir}");
-        Func<Task<PretrainedTokenizer>> tokenizer = () => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions);
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory = tokenizer.GetTokenizerFactory();
+        services
+            .AddConfigurationAndBind<TextMultipleChoiceOptions>("SwagInference:MultipleChoice")
+            .AddConfigurationAndBind<StreamedPipelineExecutorOptions>("SwagInference:BatchExecutors:Streamed")
+            .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SwagInference:BatchExecutors:MaxPaddedTokens");
 
-        // MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder = CreateRoutedPipelineBatchExecutorBuilder(options, tokenizerFactory);
-        var builder =
-            new MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
-            {
-                MaxPaddedRatio = 0.1,
-                MaxTokensCount = 8192
-            }
-                .UseTokenizer(tokenizerFactory)
-                .UseInnerPipelineExecutor<StreamedBatchExecutorBuilder>(builder =>
-                    CreateGpuPipelineExecutionBuilder(builder, options, tokenizerFactory));
-
-        var pipeline = new Pipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>(await builder.BuildAsync());
-
-        return new SwagMultipleChoiceInference(pipeline);
-    }
-
-    private static MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> CreateRoutedPipelineBatchExecutorBuilder(
-        SwagMultipleChoiceInferenceOptions options, Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
-    {
-        MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> builder =
-            new MaxPaddedTokensBatchExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>
-            {
-                MaxPaddedRatio = 0.1,
-                MaxTokensCount = 8192
-            }
-                .UseTokenizer(tokenizerFactory)
-                .UseInnerPipelineExecutor<RoutingPipelineExecutorBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>(routingBuilder =>
-                {
-                    routingBuilder.UseRoutingStrategy(new RoutingStrategy())
-                        .UsePipelineExecutorBuilder<StreamedBatchExecutorBuilder>(builder =>
-                            CreateGpuPipelineExecutionBuilder(builder, options, tokenizerFactory))
-                        .UsePipelineExecutorBuilder<StreamedBatchExecutorBuilder>(builder =>
-                            CreateCpuExecutorBuilder(builder, options, tokenizerFactory));
-                });
-        return builder;
-    }
-
-    private static void CreateGpuPipelineExecutionBuilder(
-        StreamedBatchExecutorBuilder builder,
-        SwagMultipleChoiceInferenceOptions options,
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
-    {
-        var executorOptions = new OnnxModelExecutorOptions()
+        services.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
             .ConfigureOnnxOptions(onnxOptions =>
             {
                 onnxOptions.ConfigureSessionOptions(sessionOptions =>
                 {
                     sessionOptions.AppendExecutionProvider_CUDA();
                     Console.WriteLine("Using GPU accelerator");
+
                     sessionOptions.AppendExecutionProvider_CPU();
                 });
                 onnxOptions.ModelDir = options.ModelDir;
-            });
+            })
+        );
 
-        builder.MaxConcurrency = 4;
-        builder.ParallelPreProcessing = false;
-        builder.UseInferenceSteps<TextMultipleChoiceBuilder, TextMultipleChoiceTask>(classificationBuilder =>
-        {
-            classificationBuilder.MaxChoices = 4;
-            classificationBuilder
-                .UseTokenizer(tokenizerFactory)
-                .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
-        });
+        services.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+        services.AddSingleton<InferenceSteps<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>, TextMultipleChoiceTask>();
+
+        services.AddPipelineBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>()
+            .AddModelExecutor(sp =>
+            {
+                var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
+                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
+            })
+            .AddBatchExecutor(s => new DecoratorChainBuilder(s)
+                .AddInitial<StreamedBatchExecutor<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>>()
+                .Decorate<MaxPaddedTokensBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>()
+                .Decorate<TokenCountSortingBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>()
+                .Build<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>())
+            .Build();
+
+        services.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();
+
+        return services;
     }
 
-    private static void CreateCpuExecutorBuilder(
-        StreamedBatchExecutorBuilder builder,
-        SwagMultipleChoiceInferenceOptions options,
-        Func<ValueTask<PretrainedTokenizer>> tokenizerFactory)
+    public static IServiceCollection AddRoutedSwagInference(this IServiceCollection services, SwagMultipleChoiceInferenceOptions options)
     {
-        var executorOptions = new OnnxModelExecutorOptions()
-            .ConfigureOnnxOptions(onnxOptions =>
-            {
-                onnxOptions.ConfigureSessionOptions(sessionOptions =>
+        services
+            .AddConfigurationAndBind<TextMultipleChoiceOptions>("SwagInference:MultipleChoice")
+            .AddConfigurationAndBind<StreamedPipelineExecutorOptions>("SwagInference:BatchExecutors:Streamed")
+            .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SwagInference:BatchExecutors:MaxPaddedTokens");
+
+        services.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+
+        services.AddLocalServices(gpuServices =>
+        {
+            gpuServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
+                .ConfigureOnnxOptions(onnxOptions =>
                 {
-                    sessionOptions.InterOpNumThreads = 2;
-                    sessionOptions.IntraOpNumThreads = 2;
-                    sessionOptions.AppendExecutionProvider_CPU();
-                });
-                onnxOptions.ModelDir = options.ModelDir;
+                    onnxOptions.ConfigureSessionOptions(sessionOptions =>
+                    {
+                        sessionOptions.AppendExecutionProvider_CUDA();
+                        Console.WriteLine("Using GPU accelerator");
+
+                        sessionOptions.AppendExecutionProvider_CPU();
+                    });
+                    onnxOptions.ModelDir = options.ModelDir;
+                })
+            );
+
+            gpuServices.AddSingleton(sp =>
+            {
+                var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
+                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
             });
 
-        builder.BatchSize = 5;
-        builder.MaxConcurrency = 4;
-        builder.UseInferenceSteps<TextMultipleChoiceBuilder, TextMultipleChoiceTask>(classificationBuilder =>
-        {
-            classificationBuilder.MaxChoices = 4;
-            classificationBuilder
-                .UseTokenizer(tokenizerFactory)
-                .UseModelExecutor(() => ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions));
+            gpuServices.AddDecoratedChain()
+                .AddInitial<ParallelPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>()
+                .Decorate<MaxPaddedTokensBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>()
+                .RegisterAs<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
+
+            gpuServices.CopyToGlobal<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
         });
+
+        services.AddLocalServices(cpuServices =>
+        {
+            cpuServices.AddSingleton(new StreamedPipelineExecutorOptions(5, 4));
+            cpuServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
+                .ConfigureOnnxOptions(onnxOptions =>
+                {
+                    onnxOptions.ConfigureSessionOptions(sessionOptions =>
+                    {
+                        sessionOptions.InterOpNumThreads = 2;
+                        sessionOptions.IntraOpNumThreads = 2;
+                        sessionOptions.AppendExecutionProvider_CPU();
+                    });
+                    onnxOptions.ModelDir = options.ModelDir;
+                }));
+
+            cpuServices.AddSingleton(sp =>
+            {
+                var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
+                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
+            });
+
+            cpuServices
+                .AddSingleton<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>,
+                    StreamedBatchExecutor<TextMultipleChoiceInput, BatchTokenizedResult, ChoiceResult<TokenizedText>[], ChoiceResult<TokenizedText>>>();
+
+            cpuServices.CopyToGlobal<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
+        });
+
+
+        services.AddPipelineBuilder<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>()
+            .AddInferenceSteps<TextMultipleChoiceTask>()
+            .AddBatchExecutor((IServiceProvider sp) =>
+            {
+                var executors = sp.GetServices<IPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>().ToArray();
+
+                return new RoutingPipelineBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>(executors, new RoutingStrategy());
+            })
+            .Build();
+
+        services.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();
+
+        return services;
     }
 }
 

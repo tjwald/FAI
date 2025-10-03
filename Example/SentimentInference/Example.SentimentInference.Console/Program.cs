@@ -2,14 +2,22 @@ using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.SentimentInference.Model;
 using FAI.Core.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Parquet;
 using Parquet.Data;
+
+var builder = Host.CreateApplicationBuilder(args);
 
 const string fileName = "train-00000-of-00001.parquet";
 
 var options = SentimentInferenceOptions.DefaultConfig;
 
-IInference<string, bool> model = await SentimentInferenceFactory.CreateSentimentInference(options);
+builder.Services.AddDefaultSentimentInference(options);
+
+var app = builder.Build();
+
+var model = app.Services.GetRequiredService<IInference<string, bool>>();
 
 (string[] input, bool[] expectedOutput) = await LoadTrainingData(fileName);
 Console.WriteLine("Finished loading training data");

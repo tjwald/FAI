@@ -21,18 +21,15 @@ public static class ModelExecutorFactory
     /// <exception cref="NotImplementedException">
     /// Thrown when the specified <paramref name="executorType"/> is not implemented.
     /// </exception>
-    public static async ValueTask<IModelExecutor<long, float>> CreateModelExecutor(
+    public static IModelExecutor<long, float> CreateModelExecutor(
         ModelExecutorType executorType,
-        IModelExecutorConfig modelExecutorOptions)
+        IModelExecutorOptions modelExecutorOptions)
     {
         switch (modelExecutorOptions)
         {
             case MultiDeviceExecutorOptions multiDeviceExecutorOptions:
-                List<Task<OnnxModelExecutorBase>> tasks = multiDeviceExecutorOptions.ExecutorOptions
+                List<OnnxModelExecutorBase> executors = multiDeviceExecutorOptions.ExecutorOptions
                     .Select(options => CreateOnnxModelExecutor(executorType, options)).ToList();
-                await Task.WhenAll(tasks);
-
-                List<OnnxModelExecutorBase> executors = tasks.Select(modelCreationTask => modelCreationTask.Result).ToList();
 
                 return new PooledModelExecutor<long, float>(new MultiDeviceObjectPool(executors));
             case PooledExecutorOptions<OnnxModelExecutorOptions> pooledExecutorOptions:
@@ -49,19 +46,19 @@ public static class ModelExecutorFactory
             }
         }
 
-        return await CreateOnnxModelExecutor(executorType, (OnnxModelExecutorOptions)modelExecutorOptions);
+        return CreateOnnxModelExecutor(executorType, (OnnxModelExecutorOptions)modelExecutorOptions);
     }
 
-    private static async Task<OnnxModelExecutorBase> CreateOnnxModelExecutor(
+    private static OnnxModelExecutorBase CreateOnnxModelExecutor(
         ModelExecutorType executorType,
         OnnxModelExecutorOptions onnxModelExecutorOptions)
     {
         Console.WriteLine($"Using model executor {executorType}");
         return executorType switch
         {
-            ModelExecutorType.Simple => await OnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
-            ModelExecutorType.Async => await AsyncOnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
-            ModelExecutorType.Tensor => await OnnxModelTensorExecutor.FromPretrained(onnxModelExecutorOptions),
+            ModelExecutorType.Simple => OnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
+            ModelExecutorType.Async => AsyncOnnxModelExecutor.FromPretrained(onnxModelExecutorOptions),
+            ModelExecutorType.Tensor => OnnxModelTensorExecutor.FromPretrained(onnxModelExecutorOptions),
             _ => throw new NotImplementedException(nameof(executorType)),
         };
     }

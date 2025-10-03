@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.PipelineBatchExecutors;
@@ -29,6 +30,9 @@ public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecu
         _maxTokenCount = maxTokenCount;
         _executor = executor;
     }
+
+    public MaxPaddedTokensBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, MaxPaddedTokensBatchExecutorOptions options) : this(executor, options.MaxPaddedTokenRatio, options.MaxTokenCount)
+    { }
 
     /// <summary>
     /// Executes batch prediction asynchronously by splitting the input into valid ranges

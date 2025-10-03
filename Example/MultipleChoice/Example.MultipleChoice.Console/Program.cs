@@ -4,13 +4,21 @@ using Example.MultipleChoice.Model;
 using FAI.Core.Abstractions;
 using FAI.Core.ResultTypes;
 using FAI.NLP.Tokenization;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Parquet;
 
 const string fileName = "swag_train.parquet";
 
+var builder = Host.CreateApplicationBuilder(args);
+
 var options = SwagMultipleChoiceInferenceOptions.DefaultConfig;
 
-IInference<SwagInput, ChoiceResult<TokenizedText>> model = await SwagMultipleChoiceInferenceFactory.CreateMultipleChoiceInference(options);
+builder.Services.AddDefaultSwagInference(options);
+
+var app = builder.Build();
+
+var model = app.Services.GetRequiredService<IInference<SwagInput, ChoiceResult<TokenizedText>>>();
 
 (SwagInput[] input, int[] expectedOutput) = await LoadTrainingData(fileName);
 
