@@ -1,20 +1,20 @@
 <Solution>
-  <Folder Name="/Example/"/>
-  <Folder Name="/Example/MultipleChoice/">
-    <Project Path="Example/MultipleChoice/Example.MultipleChoice.Console/Example.MultipleChoice.Console.csproj"/>
-    <Project Path="Example/MultipleChoice/Example.MultipleChoice.Model/Example.MultipleChoice.Model.csproj"/>
+  <Folder Name="/Examples/"/>
+  <Folder Name="/Examples/MultipleChoice/">
+    <Project Path="Examples/MultipleChoice/Example.MultipleChoice.Console/Example.MultipleChoice.Console.csproj" />
+    <Project Path="Examples/MultipleChoice/Example.MultipleChoice.Model/Example.MultipleChoice.Model.csproj" />
   </Folder>
-  <Folder Name="/Example/SentimentInference/">
-    <Project Path="Example/SentimentInference/Example.SentimentInference.Api/Example.SentimentInference.Api.csproj"/>
-    <Project Path="Example/SentimentInference/Example.SentimentInference.Console/Example.SentimentInference.Console.csproj"/>
-    <Project Path="Example/SentimentInference/Example.SentimentInference.Model/Example.SentimentInference.Model.csproj"/>
+  <Folder Name="/Examples/SentimentInference/">
+    <Project Path="Examples/SentimentInference/Example.SentimentInference.Api/Example.SentimentInference.Api.csproj" />
+    <Project Path="Examples/SentimentInference/Example.SentimentInference.Console/Example.SentimentInference.Console.csproj" />
+    <Project Path="Examples/SentimentInference/Example.SentimentInference.Model/Example.SentimentInference.Model.csproj" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj"/>
-    <Project Path="src/FAI.Core/FAI.Core.csproj"/>
-    <Project Path="src/FAI.Extensions.DependencyInjection.LocalServices/FAI.Extensions.DependencyInjection.LocalServices.csproj"/>
-    <Project Path="src/FAI.NLP/FAI.NLP.csproj"/>
-    <Project Path="src/FAI.Onnx/FAI.Onnx.csproj"/>
-    <Project Path="src/FAI.Vision/FAI.Vision.csproj"/>
+    <Project Path="src/FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj" />
+    <Project Path="src/FAI.Core/FAI.Core.csproj" />
+    <Project Path="src/FAI.Extensions.DependencyInjection.LocalServices/FAI.Extensions.DependencyInjection.LocalServices.csproj" />
+    <Project Path="src/FAI.NLP/FAI.NLP.csproj" />
+    <Project Path="src/FAI.Onnx/FAI.Onnx.csproj" />
+    <Project Path="src/FAI.Vision/FAI.Vision.csproj" />
   </Folder>
 </Solution>
