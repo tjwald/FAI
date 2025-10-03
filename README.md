@@ -15,7 +15,7 @@ FAI (Fast AI) is a library design to maximize the performance of your models by 
 
 ## Results
 
-Under the [Example](Example) folder, you can find projects written using the standard python stack and compare it with
+Under the [Examples](Examples) folder, you can find projects written using the standard python stack and compare it with
 the same task written using this library. </br>
 The results in the examples are anywhere between 7X and 14X that is for offline batch inference, for online Web
 inference, the gains can be a lot more.
