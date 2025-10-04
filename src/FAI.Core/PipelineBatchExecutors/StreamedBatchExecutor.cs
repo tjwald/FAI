@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations.PipelineBatchExecutors;
+using Microsoft.Extensions.Logging;
 
 namespace FAI.Core.PipelineBatchExecutors;
 
@@ -13,6 +14,8 @@ namespace FAI.Core.PipelineBatchExecutors;
 /// <typeparam name="TOutput">The type of the final output data.</typeparam>
 public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
+    private readonly ILogger<StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>> _logger;
+
     private static readonly UnboundedChannelOptions UnboundedChannelOptions = new()
     {
         AllowSynchronousContinuations = false,
@@ -30,8 +33,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     private readonly bool _parallelTokenization;
     private readonly ParallelOptions _parallelOptions;
 
-    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, StreamedPipelineExecutorOptions options)
-        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing) { }
+    public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps,
+        ILogger<StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>> logger,
+        StreamedPipelineExecutorOptions options)
+        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing)
+    {
+        _logger = logger;
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamedBatchExecutor{TInput, TPreprocess, TModelOutput, TOutput}"/> class.
@@ -138,9 +146,9 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// <summary>
     /// Starts a background worker to process items from the specified channel using the provided function.
     /// </summary>
-    private static Task BackgroundWorker<T>(Channel<T> channel, ParallelOptions parallelOptions, Func<T, CancellationToken, ValueTask> func)
+    private Task BackgroundWorker<T>(Channel<T> channel, ParallelOptions parallelOptions, Func<T, CancellationToken, ValueTask> func)
     {
-        Console.WriteLine($"Starting worker thread for processing: {func.Method.Name}");
+        _logger.LogInformation("Starting worker thread for processing: {workerType}", func.Method.Name);
         return Parallel.ForEachAsync(channel.Reader.ReadAllAsync(), parallelOptions, func);
     }
 

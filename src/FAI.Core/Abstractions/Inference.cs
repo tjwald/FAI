@@ -11,13 +11,18 @@ public interface IInference<TInput, TOutput>
     /// Predicts the output based on a single input.
     /// </summary>
     /// <param name="input">The input data for the prediction.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains the predicted output.</returns>
     Task<TOutput> Predict(TInput input);
 
     /// <summary>
     /// Predicts the outputs for a batch of inputs.
     /// </summary>
     /// <param name="input">A read-only memory containing the batch of input data for the predictions.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains an array of predicted outputs.</returns>
     Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> input);
+
+    /// <summary>
+    /// Predicts the outputs for a batch of inputs.
+    /// </summary>
+    /// <param name="input">A read-only memory containing the batch of input data for the predictions.</param>
+    /// <param name="output">An output buffer for the results</param>
+    Task BatchPredict(ReadOnlyMemory<TInput> input, Memory<TOutput> output);
 }

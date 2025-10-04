@@ -21,6 +21,14 @@ public sealed class SentimentInference : IInference<string, bool>
 
     public async Task<bool[]> BatchPredict(ReadOnlyMemory<string> input)
     {
+        var output = new bool[input.Length];
+        await BatchPredict(input, output);
+        return output;
+    }
+
+    public async Task BatchPredict(ReadOnlyMemory<string> input, Memory<bool> output)
+    {
+        var classificationResults = new ClassificationResult<bool, float>[input.Length];
         var textInputs = new TokenizedText[input.Length];
         ReadOnlySpan<string> inputSpan = input.Span;
         for (int i = 0; i < input.Length; i++)
@@ -28,7 +36,12 @@ public sealed class SentimentInference : IInference<string, bool>
             textInputs[i] = inputSpan[i];
         }
 
-        ClassificationResult<bool, float>[] classificationResults = await _pipeline.BatchPredict(textInputs);
-        return classificationResults.Select(x => x.Choice).ToArray();
+        await _pipeline.BatchPredict(textInputs, classificationResults);
+
+        Span<bool> outputSpan = output.Span;
+        for (int i = 0; i < classificationResults.Length; i++)
+        {
+            outputSpan[i] = classificationResults[i].Choice;
+        }
     }
 }

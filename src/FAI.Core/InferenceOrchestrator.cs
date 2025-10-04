@@ -165,4 +165,9 @@ public sealed class InferenceOrchestrator<TInference, TQuery, TResult> : IInfere
     /// <param name="input">A read-only memory containing the batch of input queries.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains an array of predicted results.</returns>
     public Task<TResult[]> BatchPredict(ReadOnlyMemory<TQuery> input) => _modelInstance.Value.BatchPredict(input);
+
+    public Task BatchPredict(ReadOnlyMemory<TQuery> input, Memory<TResult> output)
+    {
+        return _modelInstance.Value.BatchPredict(input, output);
+    }
 }

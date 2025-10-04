@@ -38,11 +38,13 @@ public class Pipeline<TInput, TOutput> : IPipeline<TInput, TOutput>
     /// <returns>A task that represents the asynchronous operation, containing the prediction results as an array.</returns>
     public async Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> inputs)
     {
-        var outputs = new TOutput[inputs.Length];
-        Memory<TOutput> outputSpan = outputs.AsMemory();
+        var output = new TOutput[inputs.Length];
+        await _executor.ExecuteBatchPredict(inputs, output);
+        return output;
+    }
 
-        await _executor.ExecuteBatchPredict(inputs, outputSpan);
-
-        return outputs;
+    public Task BatchPredict(ReadOnlyMemory<TInput> input, Memory<TOutput> output)
+    {
+        return _executor.ExecuteBatchPredict(input, output);
     }
 }
