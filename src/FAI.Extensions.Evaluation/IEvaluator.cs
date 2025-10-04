@@ -1,4 +1,4 @@
-namespace FAI.Evaluation;
+namespace FAI.Extensions.Evaluation;
 
 public interface IEvaluator<TInferenceInput, TInferenceOutput, TEvaluationResult>
 {

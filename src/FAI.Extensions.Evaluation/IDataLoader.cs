@@ -1,4 +1,4 @@
-namespace FAI.Evaluation;
+namespace FAI.Extensions.Evaluation;
 
 public interface IDataLoader<in TLoaderInput, out TLoadedInput, TInferenceInput>
     where TLoadedInput : IInferenceInputGetter<TInferenceInput>

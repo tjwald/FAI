@@ -4,7 +4,7 @@ using FAI.Core.Abstractions;
 using Microsoft.Extensions.Logging;
 using Open.ChannelExtensions;
 
-namespace FAI.Evaluation;
+namespace FAI.Extensions.Evaluation;
 
 public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TInferenceOutput, TEvaluationResult>
     where TLoadedInput : IInferenceInputGetter<TInferenceInput>

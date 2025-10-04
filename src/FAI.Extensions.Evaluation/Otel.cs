@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 
-namespace FAI.Evaluation;
+namespace FAI.Extensions.Evaluation;
 
 internal static class Otel
 {
