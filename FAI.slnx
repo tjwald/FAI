@@ -1,5 +1,5 @@
 <Solution>
-  <Folder Name="/Examples/"/>
+  <Folder Name="/Examples/" />
   <Folder Name="/Examples/MultipleChoice/">
     <Project Path="Examples/MultipleChoice/Example.MultipleChoice.Console/Example.MultipleChoice.Console.csproj" />
     <Project Path="Examples/MultipleChoice/Example.MultipleChoice.Model/Example.MultipleChoice.Model.csproj" />
@@ -16,5 +16,6 @@
     <Project Path="src/FAI.NLP/FAI.NLP.csproj" />
     <Project Path="src/FAI.Onnx/FAI.Onnx.csproj" />
     <Project Path="src/FAI.Vision/FAI.Vision.csproj" />
+    <Project Path="src\FAI.Evaluation\FAI.Evaluation.csproj" Type="Classic C#" />
   </Folder>
 </Solution>
