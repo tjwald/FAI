@@ -13,6 +13,7 @@ using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Example.SentimentInference.Model;
 
@@ -27,13 +28,13 @@ public static class SentimentInferenceFactory
                 .AddConfigurationAndBind<SerialPipelineBatchExecutorOptions>("SentimentInference:BatchExecutors:SerialPipeline")
                 .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
 
-            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
+            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(sp => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
                     {
                         sessionOptions.AppendExecutionProvider_CUDA();
-                        Console.WriteLine("Using GPU accelerator");
+                        sp.GetRequiredService<ILogger<OnnxModelExecutorOptions>>().LogInformation("Using GPU accelerator");
 
                         sessionOptions.AppendExecutionProvider_CPU();
                     });

@@ -1,64 +1,49 @@
-using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Example.SentimentInference.Model;
-using FAI.Core.Abstractions;
+using FAI.Extensions.Evaluation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Parquet;
 using Parquet.Data;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+builder.ConfigureOpenTelemetry();
 
 const string fileName = "train-00000-of-00001.parquet";
 
 var options = SentimentInferenceOptions.DefaultConfig;
 
 builder.Services.AddDefaultSentimentInference(options);
+builder.Services.AddSingleton(new EvaluationPipelineOptions());
+builder.Services.AddSingleton<IDataLoader<string, TrainingData, string>, TrainingParquetReader>();
+builder.Services.AddSingleton<IEvaluator<TrainingData, bool, EvaluationSummary>, Evaluator>();
+builder.Services.AddSingleton<EvaluationPipeline<string, TrainingData, string, bool, EvaluationSummary>>();
 
 var app = builder.Build();
 
-var model = app.Services.GetRequiredService<IInference<string, bool>>();
+var evaluationPipeline = app.Services.GetRequiredService<EvaluationPipeline<string, TrainingData, string, bool, EvaluationSummary>>();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var evaluationPipelineResult = await evaluationPipeline.Evaluate(fileName);
 
-(string[] input, bool[] expectedOutput) = await LoadTrainingData(fileName);
-Console.WriteLine("Finished loading training data");
-await RunBatchPredict(model, input, expectedOutput);
-return;
+logger.LogInformation($"elapsed time: {evaluationPipelineResult.InferenceRuntime.TotalSeconds}s");
+logger.LogInformation($"avg time: {evaluationPipelineResult.AveragePerSample.TotalMilliseconds}ms/it");
+logger.LogInformation($"Correct predictions: {evaluationPipelineResult.Evaluation}");
 
-static async Task RunBatchPredict(IInference<string, bool> sentimentInference, string[] strings, bool[] bools)
-{
-    long start = Stopwatch.GetTimestamp();
 
-    bool[] output = await sentimentInference.BatchPredict(strings);
-    var end = Stopwatch.GetElapsedTime(start);
-
-    Console.WriteLine($"elapsed time: {end.TotalSeconds}s");
-    Console.WriteLine($"avg time: {end.TotalMilliseconds / strings.Length}ms/it");
-
-    int correct = output.Where((t, i) => t == bools[i]).Count();
-
-    Console.WriteLine($"Correct predictions: {correct}/{output.Length}={correct * 1.0 / output.Length}");
-}
-
-static async Task<(string[] input, bool[] expectedOutput)> LoadTrainingData(string s)
-{
-    IList<TrainingData> data = await TrainingParquetReader.ReadParquetFileAsync(s);
-    string[] strings = data.Select(x => x.Sentence).ToArray();
-    Console.WriteLine($"Parquet file loaded with sentences: {strings.Length}");
-    bool[] bools = data.Select(x => x.Label == 1).ToArray();
-    return (strings, bools);
-}
-
-internal sealed class TrainingData
+internal sealed class TrainingData : IInferenceInputGetter<string>
 {
     [JsonPropertyName("sentence")] public string Sentence { get; set; } = null!;
     [JsonPropertyName("label")] public long Label { get; set; }
+
+    public string InferenceInput => Sentence;
 }
 
-internal static class TrainingParquetReader
+internal class TrainingParquetReader : IDataLoader<string, TrainingData, string>
 {
-    internal static async Task<List<TrainingData>> ReadParquetFileAsync(string filePath)
+    public async IAsyncEnumerable<TrainingData> LoadData(string filePath)
     {
-        var trainingDataList = new List<TrainingData>();
         await using Stream fs = File.OpenRead(filePath);
         using ParquetReader reader = await ParquetReader.CreateAsync(fs);
         var sentenceField = reader.Schema.FindDataField("sentence");
@@ -72,10 +57,45 @@ internal static class TrainingParquetReader
             for (int j = 0; j < sentenceColumn.Data.Length; j++)
             {
                 var trainingData = new TrainingData { Sentence = (string)sentenceColumn.Data.GetValue(j)!, Label = (long)labelColumn.Data.GetValue(j)! };
-                trainingDataList.Add(trainingData);
+                yield return trainingData;
             }
         }
+    }
+}
 
-        return trainingDataList;
+
+internal class Evaluator : IEvaluator<TrainingData, bool, EvaluationSummary>
+{
+    private readonly ILogger<Evaluator> _logger;
+
+    public Evaluator(ILogger<Evaluator> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task<EvaluationSummary> Evaluate(IAsyncEnumerable<(TrainingData[], bool[])> inferenceResults)
+    {
+        int count = 0;
+        int correct = 0;
+        await foreach (var (inputs, outputs) in inferenceResults)
+        {
+            count += inputs.Length;
+            correct += inputs.Zip(outputs).Count(s => (s.First.Label == 1) == s.Second);
+        }
+        _logger.LogInformation("Total count: {count}", count);
+        _logger.LogInformation("Correct predictions: {correct}", correct);
+        _logger.LogInformation("Incorrect predictions: {incorrect}", count - correct);
+        _logger.LogInformation("Accuracy: {accuracy}%", correct * 100.0 / count);
+        return new EvaluationSummary(count, correct);
+    }
+}
+
+internal record EvaluationSummary(int SampleSize, int Correct)
+{
+    public double Accuracy => (double)Correct / SampleSize;
+
+    public override string ToString()
+    {
+        return $"{Correct}/{SampleSize}={Accuracy:%}";
     }
 }

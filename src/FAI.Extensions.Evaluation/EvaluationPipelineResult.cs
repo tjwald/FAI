@@ -1,3 +1,6 @@
 namespace FAI.Extensions.Evaluation;
 
-public class EvaluationPipelineResult<TEvaluation>(TEvaluation evaluation, int dataCount, TimeSpan inferenceRuntime);
+public record EvaluationPipelineResult<TEvaluation>(TEvaluation Evaluation, int SampleSize, TimeSpan InferenceRuntime)
+{
+    public TimeSpan AveragePerSample => InferenceRuntime / SampleSize;
+}
