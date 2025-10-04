@@ -24,6 +24,13 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
 
     public async Task<ChoiceResult<TokenizedText>[]> BatchPredict(ReadOnlyMemory<SwagInput> input)
     {
+        var output = new ChoiceResult<TokenizedText>[input.Length];
+        await BatchPredict(input, output);
+        return output;
+    }
+
+    public async Task BatchPredict(ReadOnlyMemory<SwagInput> input, Memory<ChoiceResult<TokenizedText>> output)
+    {
         var pipelineInput = new TextMultipleChoiceInput[input.Length];
         ReadOnlySpan<SwagInput> inputSpan = input.Span;
         for (int i = 0; i < inputSpan.Length; i++)
@@ -31,7 +38,7 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
             pipelineInput[i] = MapSwagInputToPipelineInput(inputSpan[i]);
         }
 
-        return await _pipeline.BatchPredict(pipelineInput);
+        await _pipeline.BatchPredict(pipelineInput, output);
     }
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)
