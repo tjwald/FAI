@@ -6,8 +6,11 @@ indent_style = space
 max_line_length = 160
 
 # Xml files
-[*.{xml,slnx,csproj}]
+[*.xml]
 indent_size = 2
+
+[*.{csproj,slnx}]
+indent_size = 4
 
 # C# files
 [*.cs]
