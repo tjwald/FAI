@@ -36,9 +36,8 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps,
         ILogger<StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>> logger,
         StreamedPipelineExecutorOptions options)
-        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing)
+        : this(inferenceSteps, options.BatchSize, options.MaxConcurrency, options.ParallelPreProcessing, logger)
     {
-        _logger = logger;
     }
 
     /// <summary>
@@ -48,11 +47,13 @@ public sealed class StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOu
     /// <param name="maxBatchSize">The maximum size of a batch to process.</param>
     /// <param name="maxConcurrency">The maximum degree of parallelism for processing tasks.</param>
     /// <param name="parallelTokenization">Indicates whether tokenization should be parallelized.</param>
+    /// <param name="logger">Logger</param>
     public StreamedBatchExecutor(InferenceSteps<TInput, TPreprocess, TModelOutput, TOutput> inferenceSteps, int? maxBatchSize, int? maxConcurrency,
-        bool parallelTokenization)
+        bool parallelTokenization, ILogger<StreamedBatchExecutor<TInput, TPreprocess, TModelOutput, TOutput>> logger)
     {
         _maxBatchSize = maxBatchSize;
         _parallelTokenization = parallelTokenization;
+        _logger = logger;
         _inference = inferenceSteps;
         _parallelOptions = maxConcurrency.HasValue ? new ParallelOptions { MaxDegreeOfParallelism = maxConcurrency.Value } : new ParallelOptions();
 
