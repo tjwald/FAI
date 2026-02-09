@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 
 namespace FAI.Core.Extensions.DI;
 
