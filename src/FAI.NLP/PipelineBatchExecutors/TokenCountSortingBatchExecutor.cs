@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.NLP.Configuration.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.PipelineBatchExecutors;
@@ -11,6 +12,7 @@ namespace FAI.NLP.PipelineBatchExecutors;
 public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExecutor<TToken, TOutput> where TToken : ITokenizable
 {
     private readonly PretrainedTokenizer _tokenizer;
+    private readonly TokenCountSortingBatchExecutorOptions _options;
     private readonly IPipelineBatchExecutor<TToken, TOutput> _executor;
 
     /// <summary>
@@ -18,9 +20,10 @@ public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExe
     /// </summary>
     /// <param name="executor">The underlying batch executor responsible for predictions.</param>
     /// <param name="tokenizer">The tokenizer used for tokenizing input items.</param>
-    public TokenCountSortingBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, PretrainedTokenizer tokenizer)
+    public TokenCountSortingBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, PretrainedTokenizer tokenizer, TokenCountSortingBatchExecutorOptions options)
     {
         _tokenizer = tokenizer;
+        _options = options;
         _executor = executor;
     }
 
@@ -39,7 +42,7 @@ public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExe
 
         Parallel.ForEach(inputsSorted, input => input.Tokenize(_tokenizer));
 
-        var tokenComparer = new TokenCountComparer<TToken>();
+        var tokenComparer = new TokenCountComparer<TToken>(_options.Ascending);
 
         MemoryExtensions.Sort<TToken, int, TokenCountComparer<TToken>>(inputsSorted, inputsSortedIndices, tokenComparer);
         await _executor.ExecuteBatchPredict(inputsSorted, outputSpan);

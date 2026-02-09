@@ -26,7 +26,8 @@ public static class SentimentInferenceFactory
             localServices
                 .AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification")
                 .AddConfigurationAndBind<SerialPipelineBatchExecutorOptions>("SentimentInference:BatchExecutors:SerialPipeline")
-                .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
+                .AddConfigurationAndBind<MaxPaddedTokensBatchExecutorOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens")
+                .AddConfigurationAndBind<TokenCountSortingBatchExecutorOptions>("SentimentInference:BatchExecutors:TokenCountSorting");
 
             localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(sp => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
