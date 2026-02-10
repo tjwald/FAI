@@ -45,7 +45,7 @@ public static class SwagMultipleChoiceInferenceFactory
                 var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
                 return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
             })
-            .UseTokenSorting()
+            .UseTokenizing()
             .UsePartitioning(partitionBuilder =>
             {
                 partitionBuilder.WithMaxPaddedTokens(section: "SwagInference:BatchExecutors:MaxPaddedTokens")

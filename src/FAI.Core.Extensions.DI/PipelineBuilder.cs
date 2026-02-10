@@ -47,6 +47,11 @@ public class PipelineBuilder<TInput, TOutput>
         return this;
     }
 
+    public PipelineBuilder<TInput, TOutput> Use<TBatchExecutor>() where TBatchExecutor : IPipelineBatchExecutor<TInput, TOutput>
+    {
+        return this.Use<TBatchExecutor>((next, sp) => ActivatorUtilities.CreateInstance<TBatchExecutor>(sp, next));
+    }
+
     public PipelineBuilder<TInput, TOutput> Use<TBatchExecutor>(Func<IPipelineBatchExecutor<TInput, TOutput>, IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>> factory) where TBatchExecutor : IPipelineBatchExecutor<TInput, TOutput>
     {
         _batchExecutorFactories.Add(factory);

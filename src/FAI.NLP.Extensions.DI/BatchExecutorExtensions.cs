@@ -25,8 +25,15 @@ public static class BatchExecutorExtensions
         public PipelineBuilder<TInput, TOutput> UseTokenSorting(string section)
         {
             builder.AddServices(sp => sp.AddConfigurationAndBind<TokenCountSortingBatchExecutorOptions>(section));
-            return builder.Use<TokenCountSortingBatchExecutor<TInput, TOutput>>((next, sp)
-                => ActivatorUtilities.CreateInstance<TokenCountSortingBatchExecutor<TInput, TOutput>>(sp, next));
+            return builder.Use<TokenCountSortingBatchExecutor<TInput, TOutput>>();
+        }
+    }
+
+    extension<TInput, TOutput>(PipelineBuilder<TInput, TOutput> builder) where TInput : ITokenizable
+    {
+        public PipelineBuilder<TInput, TOutput> UseTokenizing()
+        {
+            return builder.Use<TokenizerBatchExecutor<TInput, TOutput>>();
         }
     }
 
