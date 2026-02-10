@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Example.SentimentInference.Console;
 using Example.SentimentInference.Model;
 using FAI.Extensions.Evaluation;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,73 +32,71 @@ logger.LogInformation($"elapsed time: {evaluationPipelineResult.InferenceRuntime
 logger.LogInformation($"avg time: {evaluationPipelineResult.AveragePerSample.TotalMilliseconds}ms/it");
 logger.LogInformation($"Correct predictions: {evaluationPipelineResult.Evaluation}");
 
-namespace Example.SentimentInference.Console
+internal sealed class TrainingData : IInferenceInputGetter<string>
 {
-    internal sealed class TrainingData : IInferenceInputGetter<string>
-    {
-        [JsonPropertyName("sentence")] public string Sentence { get; set; } = null!;
-        [JsonPropertyName("label")] public long Label { get; set; }
+    [JsonPropertyName("sentence")] public string Sentence { get; set; } = null!;
+    [JsonPropertyName("label")] public long Label { get; set; }
 
-        public string InferenceInput => Sentence;
-    }
+    public string InferenceInput => Sentence;
+}
 
-    internal class TrainingParquetReader : IDataLoader<string, TrainingData, string>
+internal class TrainingParquetReader : IDataLoader<string, TrainingData, string>
+{
+    public async IAsyncEnumerable<TrainingData> LoadData(string filePath)
     {
-        public async IAsyncEnumerable<TrainingData> LoadData(string filePath)
+        await using Stream fs = File.OpenRead(filePath);
+        using ParquetReader reader = await ParquetReader.CreateAsync(fs);
+        var sentenceField = reader.Schema.FindDataField("sentence");
+        var labelField = reader.Schema.FindDataField("label");
+
+        for (int i = 0; i < reader.RowGroupCount; i++)
         {
-            await using Stream fs = File.OpenRead(filePath);
-            using ParquetReader reader = await ParquetReader.CreateAsync(fs);
-            var sentenceField = reader.Schema.FindDataField("sentence");
-            var labelField = reader.Schema.FindDataField("label");
-
-            for (int i = 0; i < reader.RowGroupCount; i++)
+            using ParquetRowGroupReader rowGroupReader = reader.OpenRowGroupReader(i);
+            DataColumn sentenceColumn = await rowGroupReader.ReadColumnAsync(sentenceField);
+            DataColumn labelColumn = await rowGroupReader.ReadColumnAsync(labelField);
+            for (int j = 0; j < sentenceColumn.Data.Length; j++)
             {
-                using ParquetRowGroupReader rowGroupReader = reader.OpenRowGroupReader(i);
-                DataColumn sentenceColumn = await rowGroupReader.ReadColumnAsync(sentenceField);
-                DataColumn labelColumn = await rowGroupReader.ReadColumnAsync(labelField);
-                for (int j = 0; j < sentenceColumn.Data.Length; j++)
-                {
-                    var trainingData = new TrainingData { Sentence = (string)sentenceColumn.Data.GetValue(j)!, Label = (long)labelColumn.Data.GetValue(j)! };
-                    yield return trainingData;
-                }
+                var trainingData = new TrainingData { Sentence = (string)sentenceColumn.Data.GetValue(j)!, Label = (long)labelColumn.Data.GetValue(j)! };
+                yield return trainingData;
             }
         }
     }
+}
 
 
-    internal class Evaluator : IEvaluator<TrainingData, bool, EvaluationSummary>
+internal class Evaluator : IEvaluator<TrainingData, bool, EvaluationSummary>
+{
+    private readonly ILogger<Evaluator> _logger;
+
+    public Evaluator(ILogger<Evaluator> logger)
     {
-        private readonly ILogger<Evaluator> _logger;
-
-        public Evaluator(ILogger<Evaluator> logger)
-        {
-            _logger = logger;
-        }
-
-        public async Task<EvaluationSummary> Evaluate(IAsyncEnumerable<(TrainingData[], bool[])> inferenceResults)
-        {
-            int count = 0;
-            int correct = 0;
-            await foreach (var (inputs, outputs) in inferenceResults)
-            {
-                count += inputs.Length;
-                correct += inputs.Zip(outputs).Count(s => (s.First.Label == 1) == s.Second);
-            }
-            _logger.LogInformation("Total count: {count}", count);
-            _logger.LogInformation("Correct predictions: {correct}", correct);
-            _logger.LogInformation("Incorrect predictions: {incorrect}", count - correct);
-            _logger.LogInformation("Accuracy: {accuracy}%", correct * 100.0 / count);
-            return new EvaluationSummary(count, correct);
-        }
+        _logger = logger;
     }
 
-    internal record EvaluationSummary(int SampleSize, int Correct)
+    public async Task<EvaluationSummary> Evaluate(IAsyncEnumerable<(TrainingData[], bool[])> inferenceResults)
     {
-        public double Accuracy => (double)Correct / SampleSize;
-
-        public override string ToString()
+        int count = 0;
+        int correct = 0;
+        await foreach (var (inputs, outputs) in inferenceResults)
         {
-            return $"{Correct}/{SampleSize}={Accuracy:%}";
+            count += inputs.Length;
+            correct += inputs.Zip(outputs).Count(s => (s.First.Label == 1) == s.Second);
         }
+
+        _logger.LogInformation("Total count: {count}", count);
+        _logger.LogInformation("Correct predictions: {correct}", correct);
+        _logger.LogInformation("Incorrect predictions: {incorrect}", count - correct);
+        _logger.LogInformation("Accuracy: {accuracy}%", correct * 100.0 / count);
+        return new EvaluationSummary(count, correct);
+    }
+}
+
+internal record EvaluationSummary(int SampleSize, int Correct)
+{
+    public double Accuracy => (double)Correct / SampleSize;
+
+    public override string ToString()
+    {
+        return $"{Correct}/{SampleSize}={Accuracy:%}";
     }
 }
