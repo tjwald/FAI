@@ -34,9 +34,30 @@ public interface IPreprocessor<TInput, out TPreprocessContainer, TFloat> where T
     TPreprocessContainer Preprocess(ReadOnlySpan<TInput> input);
 }
 
-public interface IBatchExecutorSchedular<TIn, TOut>
+public interface IBatchSchedular<TIn, TOut>
 {
-    Task Run(IPipelineBatchExecutor<TIn, TOut> executor, IEnumerable<Range> ranges, ReadOnlyMemory<TIn> inputs, Memory<TOut> outputs);
+    Task RunInExecutor(IPipelineBatchExecutor<TIn, TOut> executor, IEnumerable<Range> ranges, ReadOnlyMemory<TIn> inputs, Memory<TOut> outputs);
+}
+
+public interface IBatchSlicer<TIn>
+{
+    IEnumerable<Range> Slice(ReadOnlyMemory<TIn> inputs);
+}
+
+public interface IFailedBatchPolicy<TInput, TOutput>
+{
+    /// <summary>
+    /// Handles a batch failure. The policy can choose to:
+    /// 1. Retry execution using the provided 'executor'.
+    /// 2. Log the error and rethrow (default).
+    /// 3. Fill 'outputs' with fallback values and return (suppress error).
+    /// </summary>
+    Task HandleAsync(
+        ReadOnlyMemory<TInput> inputs,
+        Memory<TOutput> outputs,
+        IPipelineBatchExecutor<TInput, TOutput> executor,
+        Exception originalException,
+        CancellationToken ct);
 }
 
 /// <summary>

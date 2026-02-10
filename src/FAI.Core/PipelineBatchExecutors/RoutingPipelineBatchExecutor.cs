@@ -12,7 +12,7 @@ public interface IBatchExecutionRoutingStrategy<TInput, TOutput>
     List<BatchExecutionRoutingResult<TInput, TOutput>> Route(IPipelineBatchExecutor<TInput, TOutput>[] executors, ReadOnlyMemory<TInput> inputs);
 }
 
-public class RoutingPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
+public sealed class RoutingPipelineBatchExecutor<TInput, TOutput> : IPipelineBatchExecutor<TInput, TOutput>
 {
     private readonly IBatchExecutionRoutingStrategy<TInput, TOutput> _routingStrategy;
     private readonly IPipelineBatchExecutor<TInput, TOutput>[] _executors;
