@@ -1,11 +1,7 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations.PipelineBatchExecutors;
 
 namespace FAI.Core.BatchSchedulers;
-
-public sealed class ParallelBatchSchedularOptions
-{
-    public int MaxParallelism { get; init; } = Environment.ProcessorCount;
-}
 
 public class ParallelBatchSchedular<TIn, TOut> : IBatchSchedular<TIn, TOut>
 {
@@ -13,7 +9,7 @@ public class ParallelBatchSchedular<TIn, TOut> : IBatchSchedular<TIn, TOut>
 
     public ParallelBatchSchedular(ParallelBatchSchedularOptions options)
     {
-        _parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = options.MaxParallelism };
+        _parallelOptions = options.MaxConcurrency.HasValue ? new ParallelOptions { MaxDegreeOfParallelism = options.MaxConcurrency.Value } : new ParallelOptions();
     }
 
     public async Task RunInExecutor(IPipelineBatchExecutor<TIn, TOut> executor, IEnumerable<Range> ranges, ReadOnlyMemory<TIn> inputs, Memory<TOut> outputs)

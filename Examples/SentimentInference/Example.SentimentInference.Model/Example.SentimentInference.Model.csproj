@@ -9,7 +9,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\src\FAI.Core.Extensions.DI\FAI.Core.Extensions.DI.csproj" />
-        <ProjectReference Include="..\..\..\src\FAI.Extensions.DependencyInjection.LocalServices\FAI.Extensions.DependencyInjection.LocalServices.csproj" />
+        <ProjectReference Include="..\..\..\src\FAI.NLP.Extensions.DI\FAI.NLP.Extensions.DI.csproj" />
         <ProjectReference Include="..\..\..\src\FAI.NLP\FAI.NLP.csproj"/>
         <ProjectReference Include="..\..\..\src\FAI.Onnx\FAI.Onnx.csproj"/>
         <ProjectReference Include="..\..\..\src\FAI.Core\FAI.Core.csproj"/>

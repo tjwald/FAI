@@ -31,7 +31,7 @@ public class MaxPaddedTokensBatchExecutor<TToken, TOutput> : IPipelineBatchExecu
         _executor = executor;
     }
 
-    public MaxPaddedTokensBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, MaxPaddedTokensBatchExecutorOptions options) : this(executor, options.MaxPaddedTokenRatio, options.MaxTokenCount)
+    public MaxPaddedTokensBatchExecutor(IPipelineBatchExecutor<TToken, TOutput> executor, MaxPaddedTokensSlicerOptions options) : this(executor, options.MaxPaddedTokenRatio, options.MaxTokenCount)
     { }
 
     /// <summary>

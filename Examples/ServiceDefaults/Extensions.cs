@@ -1,9 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 
-namespace Microsoft.Extensions.Hosting;
+namespace ServiceDefaults;
 
 public static class Extensions
 {
