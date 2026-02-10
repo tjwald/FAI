@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace FAI.Extensions.DependencyInjection.LocalServices;
+namespace FAI.Core.Extensions.DI;
 
 public static class BuilderExtensions
 {

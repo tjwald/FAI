@@ -4,8 +4,10 @@ namespace FAI.NLP.Tokenization;
 /// A comparer for tokenizable items, comparing them based on their maximum token length.
 /// </summary>
 /// <typeparam name="TToken">The type of tokenizable items to compare.</typeparam>
-public readonly struct TokenCountComparer<TToken> : IComparer<TToken> where TToken : ITokenizable
+public readonly struct TokenCountComparer<TToken>(bool ascending) : IComparer<TToken> where TToken : ITokenizable
 {
+    private bool Ascending { get; } = ascending;
+
     /// <summary>
     /// Compares two tokenizable items based on their maximum token length.
     /// </summary>
@@ -15,6 +17,6 @@ public readonly struct TokenCountComparer<TToken> : IComparer<TToken> where TTok
         int xCount = x!.MaxTokenLength;
         int yCount = y!.MaxTokenLength;
 
-        return xCount.CompareTo(yCount);
+        return Ascending ? xCount.CompareTo(yCount) : yCount.CompareTo(xCount);
     }
 }

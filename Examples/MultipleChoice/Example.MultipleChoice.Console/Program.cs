@@ -51,6 +51,7 @@ static async Task<(SwagInput[] input, int[] expectedOutput)> LoadTrainingData(st
     return (strings, labels);
 }
 
+
 file sealed class TrainingData
 {
     [JsonPropertyName("sent1")] public string Context { get; set; } = null!;

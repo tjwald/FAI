@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace FAI.Extensions.DependencyInjection.LocalServices;
+namespace FAI.Core.Extensions.DI;
 
 public class LocalServiceCollection : ServiceCollection
 {

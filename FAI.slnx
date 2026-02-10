@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/Examples/">
-    <Project Path="Examples/ServiceDefaults\ServiceDefaults.csproj"/>
+    <Project Path="Examples/ServiceDefaults\ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/Examples/MultipleChoice/">
     <Project Path="Examples/MultipleChoice/Example.MultipleChoice.Console/Example.MultipleChoice.Console.csproj" />
@@ -14,7 +14,7 @@
   <Folder Name="/src/">
     <Project Path="src/FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj" />
     <Project Path="src/FAI.Core/FAI.Core.csproj" />
-    <Project Path="src/FAI.Extensions.DependencyInjection.LocalServices/FAI.Extensions.DependencyInjection.LocalServices.csproj" />
+    <Project Path="src/FAI.NLP.Extensions.DI/FAI.NLP.Extensions.DI.csproj" />
     <Project Path="src/FAI.NLP/FAI.NLP.csproj" />
     <Project Path="src/FAI.Onnx/FAI.Onnx.csproj" />
     <Project Path="src/FAI.Vision/FAI.Vision.csproj" />

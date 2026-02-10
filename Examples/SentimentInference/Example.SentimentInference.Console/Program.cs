@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Parquet;
 using Parquet.Data;
+using ServiceDefaults;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -30,7 +31,6 @@ var evaluationPipelineResult = await evaluationPipeline.Evaluate(fileName);
 logger.LogInformation($"elapsed time: {evaluationPipelineResult.InferenceRuntime.TotalSeconds}s");
 logger.LogInformation($"avg time: {evaluationPipelineResult.AveragePerSample.TotalMilliseconds}ms/it");
 logger.LogInformation($"Correct predictions: {evaluationPipelineResult.Evaluation}");
-
 
 internal sealed class TrainingData : IInferenceInputGetter<string>
 {
@@ -82,6 +82,7 @@ internal class Evaluator : IEvaluator<TrainingData, bool, EvaluationSummary>
             count += inputs.Length;
             correct += inputs.Zip(outputs).Count(s => (s.First.Label == 1) == s.Second);
         }
+
         _logger.LogInformation("Total count: {count}", count);
         _logger.LogInformation("Correct predictions: {correct}", correct);
         _logger.LogInformation("Incorrect predictions: {incorrect}", count - correct);
