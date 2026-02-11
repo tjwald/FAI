@@ -35,15 +35,15 @@ public class ClassificationTaskTests
     public async Task RunModel_CorrectlyProcessesLogits()
     {
         // Arrange
-        var choices = new[] { "Negative", "Positive" };
+        string[] choices = ["Negative", "Positive"];
         var options = new ClassificationOptions<string>(choices);
         var preprocessor = Substitute.For<IPreprocessor<string, Tensor<float>[], float>>();
         var modelExecutor = new MockModelExecutor();
 
         var task = new TestClassificationTask(preprocessor, modelExecutor, options);
 
-        var inputs = new[] { "input1", "input2" };
-        var tensors = new[] { Tensor.Create<float>([2, 5]) }; // 2 items, 5 features (but we only need 2 for choices)
+        string[] inputs = ["input1", "input2"];
+        Tensor<float>[] tensors = [Tensor.Create<float>([2, 5])]; // 2 items, 5 features (but we only need 2 for choices)
 
         // Act
         var results = await task.RunModel(inputs.AsMemory(), tensors);
@@ -60,9 +60,9 @@ public class ClassificationTaskTests
     public void GetClassificationResult_ReturnsHighestProbability()
     {
         // Arrange
-        var choices = new[] { "A", "B", "C" };
+        string[] choices = ["A", "B", "C"];
         var options = new ClassificationOptions<string>(choices);
-        var logits = new[] { 1.0f, 5.0f, 2.0f };
+        float[] logits = [1.0f, 5.0f, 2.0f];
 
         // Act
         var result = options.GetClassificationResult<string, float>(logits);

@@ -23,8 +23,9 @@ public class PipelineLinkBatchExecutorTests
         await executor.ExecuteBatchPredict(inputs, outputs);
 
         // Assert
+        var expectedArray = (string[])["1", "2", "3"];
         await nextPipeline.Received(1).BatchPredict(
-            Arg.Is<ReadOnlyMemory<string>>(m => m.Length == 3 && m.ToArray()[0] == "1" && m.ToArray()[1] == "2" && m.ToArray()[2] == "3"),
+            Arg.Is<ReadOnlyMemory<string>>(m => m.ToArray().SequenceEqual(expectedArray)),
             Arg.Is<Memory<int>>(m => m.Length == 3));
     }
 }

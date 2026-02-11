@@ -3,17 +3,33 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.Tests.Tokenization;
 
-public class PretrainedTokenizerTests
+public class PretrainedTokenizerFixture : IDisposable
 {
+    public PretrainedTokenizer Tokenizer { get; } = DummyTokenizerFactory.Create();
+
+    public void Dispose()
+    {
+        // Cleanup if needed
+    }
+}
+
+public class PretrainedTokenizerTests : IClassFixture<PretrainedTokenizerFixture>
+{
+    private readonly PretrainedTokenizer _tokenizer;
+
+    public PretrainedTokenizerTests(PretrainedTokenizerFixture fixture)
+    {
+        _tokenizer = fixture.Tokenizer;
+    }
+
     [Fact]
     public void Tokenize_SingleInput_ReturnsCorrectIds()
     {
         // Arrange
-        var tokenizer = DummyTokenizerFactory.Create();
         string text = "hello world";
 
         // Act
-        var ids = tokenizer.Tokenize(text);
+        var ids = _tokenizer.Tokenize(text);
 
         // Assert
         // Based on the dummy vocab:
@@ -26,11 +42,10 @@ public class PretrainedTokenizerTests
     public void BatchTokenize_Strings_ReturnsCorrectTensorShape()
     {
         // Arrange
-        var tokenizer = DummyTokenizerFactory.Create(maxTokenLength: 10);
         string[] inputs = ["hello", "hello world"];
 
         // Act
-        var result = tokenizer.BatchTokenize(inputs);
+        var result = _tokenizer.BatchTokenize(inputs);
 
         // Assert
         Assert.Equal(2, result.BatchSize);
@@ -42,11 +57,10 @@ public class PretrainedTokenizerTests
     public void BatchTokensToTensors_PadsCorrectly()
     {
         // Arrange
-        var tokenizer = DummyTokenizerFactory.Create();
         List<int>[] inputs = [[15], [15, 16]]; // hello, hello world
 
         // Act
-        var result = tokenizer.BatchTokensToTensors(inputs, maxTokenSize: 2);
+        var result = _tokenizer.BatchTokensToTensors(inputs, maxTokenSize: 2);
 
         // Assert
         Assert.Equal(2, result.BatchSize);

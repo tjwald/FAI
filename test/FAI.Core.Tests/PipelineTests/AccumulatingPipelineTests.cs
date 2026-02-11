@@ -103,4 +103,38 @@ public class AccumulatingPipelineTests
         Assert.Equal(-1, result);
         await policy.Received(1).HandleAsync(Arg.Any<ReadOnlyMemory<int>>(), Arg.Any<Memory<int>>(), executor, exception, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Predict_Disposed_ThrowsObjectDisposedException()
+    {
+        // Arrange
+        var executor = Substitute.For<IPipelineBatchExecutor<int, int>>();
+        var options = new AccumulatingPipelineOptions
+        {
+            MaxBatchSize = 10,
+            MaxLatency = TimeSpan.FromSeconds(10)
+        };
+        var policy = Substitute.For<IFailedBatchPolicy<int, int>>();
+        var pipeline = new AccumulatingPipeline<int, int>(executor, options, policy, NullLogger<AccumulatingPipeline<int, int>>.Instance);
+
+        pipeline.Dispose();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => pipeline.Predict(2));
+    }
+
+    [Fact]
+    public async Task BatchPredict_EmptyInput_ReturnsEmptyResults()
+    {
+        // Arrange
+        var executor = Substitute.For<IPipelineBatchExecutor<int, int>>();
+        var options = new AccumulatingPipelineOptions { MaxBatchSize = 1 };
+        var pipeline = new AccumulatingPipeline<int, int>(executor, options, Substitute.For<IFailedBatchPolicy<int, int>>(), NullLogger<AccumulatingPipeline<int, int>>.Instance);
+
+        // Act
+        var results = await pipeline.BatchPredict(ReadOnlyMemory<int>.Empty);
+
+        // Assert
+        Assert.Empty(results);
+    }
 }

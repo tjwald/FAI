@@ -28,7 +28,7 @@ public class InferenceStepsTests
     {
         // Arrange
         var steps = new TestInferenceSteps();
-        var inputs = new[] { "a", "b", "c" };
+        string[] inputs = ["a", "b", "c"];
         var outputs = new string[3];
 
         // Act
@@ -68,7 +68,7 @@ public class InferenceStepsTests
     {
         // Arrange
         var steps = new MockInferenceSteps();
-        var inputs = new[] { "a", "b" }.AsMemory();
+        ReadOnlyMemory<string> inputs = (string[])["a", "b"];
         var outputs = new string[2].AsMemory();
 
         // Act
