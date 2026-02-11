@@ -1,0 +1,34 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  check:
+    name: Build, Lint and Test
+    runs-on: ubuntu-latest
+    env:
+      CONFIGURATION: Release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore FAI.slnx
+
+      - name: Build
+        run: dotnet build FAI.slnx --no-restore --configuration ${{ env.CONFIGURATION }}
+
+      - name: Check format (Lint)
+        run: dotnet format FAI.slnx --verify-no-changes --no-restore
+
+      - name: Test
+        run: dotnet test --no-build --configuration ${{ env.CONFIGURATION }}
