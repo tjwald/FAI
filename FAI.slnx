@@ -28,5 +28,6 @@
     <Project Path="test/FAI.NLP.Tests/FAI.NLP.Tests.csproj" />
     <Project Path="test/FAI.Onnx.Tests/FAI.Onnx.Tests.csproj" />
     <Project Path="test/FAI.Vision.Tests/FAI.Vision.Tests.csproj" />
+    <Project Path="test/FAI.IntegrationTests/FAI.IntegrationTests.csproj" />
   </Folder>
 </Solution>
