@@ -247,6 +247,7 @@ dependencies = [
 dev = [
     { name = "black" },
     { name = "flake8" },
+    { name = "flake8-pyproject" },
     { name = "isort" },
     { name = "pre-commit" },
     { name = "pylint" },
@@ -261,6 +262,7 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "flake8", marker = "extra == 'dev'" },
+    { name = "flake8-pyproject", marker = "extra == 'dev'" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "onnx", specifier = "==1.16.1" },
     { name = "optimum" },
