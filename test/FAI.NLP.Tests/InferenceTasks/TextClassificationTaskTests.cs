@@ -24,7 +24,7 @@ public class TextClassificationTaskTests
 
         var task = new TextClassification<string>(tokenizer, modelExecutor, options);
 
-        var inputs = new TokenizedText[] { new("hello") };
+        TokenizedText[] inputs = [new("hello")];
         var outputs = new ClassificationResult<string, float>[1];
 
         // Mock model output: 2 labels, [0.1f, 0.9f] -> Positive

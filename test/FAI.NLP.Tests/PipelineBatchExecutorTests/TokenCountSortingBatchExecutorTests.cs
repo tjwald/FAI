@@ -25,7 +25,7 @@ public class TokenCountSortingBatchExecutorTests
         var options = new TokenCountSortingBatchExecutorOptions { Ascending = true };
         var executor = new TokenCountSortingBatchExecutor<TestTokenizable, int>(mockExecutor, tokenizer, options);
 
-        var inputs = new TestTokenizable[] { new(10), new(2), new(5) };
+        TestTokenizable[] inputs = [new(10), new(2), new(5)];
         var outputs = new int[3];
 
         // We expect the executor to receive [new(2), new(5), new(10)]

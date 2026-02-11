@@ -2,9 +2,9 @@ name: PR Check
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [develop]
   push:
-    branches: [main, master]
+    branches: [develop]
 
 jobs:
   check:

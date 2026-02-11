@@ -9,9 +9,9 @@ public class OnnxTensorUtilsTests
     public void ToOrtValues_ShouldCreateCorrectNumberOfOrtValues()
     {
         // Arrange
-        var data1 = new float[] { 1, 2, 3 }.AsMemory();
-        var data2 = new float[] { 4, 5, 6 }.AsMemory();
-        Memory<float>[] inputsArray = [data1, data2];
+        float[] d1 = [1f, 2f, 3f];
+        float[] d2 = [4f, 5f, 6f];
+        Memory<float>[] inputsArray = [d1, d2];
         Span<Memory<float>> inputs = inputsArray.AsSpan();
         long[] dims = [1, 3];
 

@@ -20,6 +20,11 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Stability & Testing
 - **Library Stability**: When working on tests, NEVER change the library code unless implementing a new feature (follow TDD).
+- **Testing Style Guide**:
+    - **Assertions**: Use explicit collection matching for ranges and outputs. Avoid partial assertions like `Assert.Single` when the full state can be verified.
+    - **Mocks**: When testing components that offload work (e.g., `BackgroundPipelineBatchExecutor`), always verify that the exact data passed to the component reached the inner dependency.
+    - **DI Testing**: Focus on verifying that the correct implementation types are resolved and that the component chain is assembled in the intended order.
+    - **Collection Expressions**: Use `[1, 2, 3]` instead of `new int[] { 1, 2, 3 }` in all test code.
 
 ## Critical Patterns
 - **Middleware Chain**: `IPipelineBatchExecutor` follows a decorator/middleware pattern.

@@ -26,7 +26,7 @@ public class ClassificationTaskTests
 
         public Task RunAsync(Tensor<float>[] inputs, Action<ReadOnlyTensorSpan<float>, int> postProcess)
         {
-            postProcess(new ReadOnlyTensorSpan<float>(new float[] { 1.0f, 2.0f, -1.0f, 5.0f }, [2, 2]), 0);
+            postProcess(new ReadOnlyTensorSpan<float>([1.0f, 2.0f, -1.0f, 5.0f], [2, 2]), 0);
             return Task.CompletedTask;
         }
     }

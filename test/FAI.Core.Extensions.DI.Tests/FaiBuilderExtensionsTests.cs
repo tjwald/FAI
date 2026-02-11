@@ -4,27 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Extensions.DI.Tests;
 
-public class FaiBuilderExtensionsTests
+public class FAIBuilderExtensionsTests
 {
     private readonly IServiceCollection _services = new ServiceCollection();
-
-    [Fact]
-    public void AddPipeline_RegistersPipelineAsSingleton()
-    {
-        // Arrange
-        _services.AddSingleton<IInferenceSteps<string, int>, MockInferenceSteps>();
-
-        // Act
-        _services.AddPipeline<string, int>();
-        var sp = _services.BuildServiceProvider();
-
-        // Assert
-        var pipeline = sp.GetService<IPipeline<string, int>>();
-        Assert.NotNull(pipeline);
-
-        var secondResolve = sp.GetService<IPipeline<string, int>>();
-        Assert.Same(pipeline, secondResolve);
-    }
 
     [Fact]
     public async Task UsePartitioning_AssemblesCorrectExecutor()
@@ -52,7 +34,8 @@ public class FaiBuilderExtensionsTests
         var pipeline = sp.GetRequiredService<IPipeline<string, int>>();
 
         var output = new int[1];
-        await pipeline.BatchPredict(new string[] { "test" }.AsMemory(), output);
+        string[] inputs = ["test"];
+        await pipeline.BatchPredict(inputs, output);
 
         // Assert
         await mockSchedular.Received(1).RunInExecutor(

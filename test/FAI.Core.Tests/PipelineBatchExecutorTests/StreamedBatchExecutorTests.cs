@@ -7,104 +7,206 @@ namespace FAI.Core.Tests.PipelineBatchExecutorTests;
 
 public class StreamedBatchExecutorTests
 {
-    private class TestInferenceSteps : InferenceSteps<int, int, int, int>
+    /// <summary>
+    /// Simulates image preprocessing: counts pixels, runs classification model, assigns class labels
+    /// </summary>
+    private class ImageClassificationInferenceSteps : InferenceSteps<string, int, float[], string>
     {
-        public override int Preprocess(ReadOnlySpan<int> input) => input.Length;
+        // Preprocess: Count characters in image path (simulating pixel counting)
+        public override int Preprocess(ReadOnlySpan<string> input) => input[0].Length;
 
-        public override Task<int> RunModel(ReadOnlyMemory<int> input, int preprocesses)
+        // RunModel: Simulate neural network producing classification scores
+        public override Task<float[]> RunModel(ReadOnlyMemory<string> input, int pixelCount)
         {
-            return Task.FromResult(preprocesses * 10);
+            // Generate mock confidence scores based on pixel count
+            float[] scores = [pixelCount / 100f, (100 - pixelCount) / 100f, 0.5f];
+            return Task.FromResult(scores);
         }
 
-        public override void PostProcess(ReadOnlySpan<int> inputs, int preprocesses, int modelOutput, Span<int> outputs)
+        // PostProcess: Convert scores to class labels
+        public override void PostProcess(ReadOnlySpan<string> inputs, int preprocesses, float[] modelOutput, Span<string> outputs)
         {
             for (int i = 0; i < outputs.Length; i++)
             {
-                outputs[i] = modelOutput + i;
+                int maxIndex = 0;
+                for (int j = 1; j < modelOutput.Length; j++)
+                {
+                    if (modelOutput[j] > modelOutput[maxIndex])
+                        maxIndex = j;
+                }
+                outputs[i] = maxIndex == 0 ? "cat" : maxIndex == 1 ? "dog" : "bird";
             }
         }
     }
 
     [Fact]
-    public async Task ExecuteBatchPredict_ProcessesThroughAllStages()
+    public async Task ExecuteBatchPredict_StreamsImageClassificationThroughPipeline()
     {
-        // Arrange
-        var inference = new TestInferenceSteps();
-        var executor = new StreamedBatchExecutor<int, int, int, int>(inference, null, null, false, NullLogger<StreamedBatchExecutor<int, int, int, int>>.Instance);
-        var inputs = new int[3] { 1, 2, 3 }.AsMemory();
-        var outputs = new int[3].AsMemory();
+        // Arrange: Demonstrate streaming pipeline with Preprocess → Model → PostProcess stages
+        var inference = new ImageClassificationInferenceSteps();
+        var executor = new StreamedBatchExecutor<string, int, float[], string>(
+            inference,
+            maxBatchSize: null,
+            maxConcurrency: null,
+            parallelTokenization: false,
+            NullLogger<StreamedBatchExecutor<string, int, float[], string>>.Instance);
+
+        string[] imagePathsArray = ["images/cat_001.jpg", "images/dog_002.jpg", "images/bird_003.jpg"];
+        ReadOnlyMemory<string> imagePaths = imagePathsArray.AsMemory();
+        Memory<string> predictions = new string[3];
 
         // Act
-        await executor.ExecuteBatchPredict(inputs, outputs);
+        await executor.ExecuteBatchPredict(imagePaths, predictions);
 
-        // Assert
-        // Preprocess returns 3. RunModel returns 30. PostProcess adds index.
-        Assert.Equal(30, outputs.Span[0]);
-        Assert.Equal(31, outputs.Span[1]);
-        Assert.Equal(32, outputs.Span[2]);
+        // Assert: Verify full pipeline execution
+        Assert.Equal("dog", predictions.Span[0]); // cat_001.jpg → 18 chars → dog wins
+        Assert.Equal("dog", predictions.Span[1]); // dog_002.jpg → 18 chars → dog wins
+        Assert.Equal("dog", predictions.Span[2]); // bird_003.jpg → 19 chars → dog wins
+    }
+
+    /// <summary>
+    /// Simulates text sentiment analysis with realistic preprocessing and scoring
+    /// </summary>
+    private class SentimentAnalysisInferenceSteps : InferenceSteps<string, int, float, bool>
+    {
+        // Preprocess: Token count
+        public override int Preprocess(ReadOnlySpan<string> input) => input[0].Split(' ').Length;
+
+        // RunModel: Sentiment score (-1 to 1)
+        public override Task<float> RunModel(ReadOnlyMemory<string> input, int tokenCount)
+        {
+            // Longer texts tend to be more positive (simplified heuristic)
+            float sentimentScore = (tokenCount - 5) / 10f;
+            return Task.FromResult(sentimentScore);
+        }
+
+        // PostProcess: Convert to binary positive/negative
+        public override void PostProcess(ReadOnlySpan<string> inputs, int preprocesses, float modelOutput, Span<bool> outputs)
+        {
+            for (int i = 0; i < outputs.Length; i++)
+            {
+                outputs[i] = modelOutput > 0; // Positive if score > 0
+            }
+        }
     }
 
     [Fact]
-    public async Task ExecuteBatchPredict_WithBatching_ProcessesAllChunks()
+    public async Task ExecuteBatchPredict_ProcessesBatchesWithChunking()
     {
-        // Arrange
-        var inference = new TestInferenceSteps();
-        var executor = new StreamedBatchExecutor<int, int, int, int>(inference, 2, 1, false, NullLogger<StreamedBatchExecutor<int, int, int, int>>.Instance);
-        var inputs = new int[5] { 1, 2, 3, 4, 5 }.AsMemory();
-        var outputs = new int[5].AsMemory();
+        // Arrange: Demonstrate chunked processing for large batches
+        var inference = new SentimentAnalysisInferenceSteps();
+        var executor = new StreamedBatchExecutor<string, int, float, bool>(
+            inference,
+            maxBatchSize: 2,  // Process 2 reviews at a time
+            maxConcurrency: 1,
+            parallelTokenization: false,
+            NullLogger<StreamedBatchExecutor<string, int, float, bool>>.Instance);
+
+        string[] reviewsArray = [
+            "Great product",                    // 2 tokens → -0.3 → negative
+            "Absolutely loved it highly recommend", // 5 tokens → 0.0 → negative
+            "Best purchase I have ever made in my entire life", // 10 tokens → 0.5 → positive
+            "Amazing quality and fast shipping service", // 6 tokens → 0.1 → positive
+            "Perfect"                          // 1 token → -0.4 → negative
+        ];
+        ReadOnlyMemory<string> reviews = reviewsArray.AsMemory();
+        Memory<bool> sentiments = new bool[5];
 
         // Act
-        await executor.ExecuteBatchPredict(inputs, outputs);
+        await executor.ExecuteBatchPredict(reviews, sentiments);
 
-        // Assert
-        // Chunk 1 (size 2): 20, 21
-        // Chunk 2 (size 2): 20, 21
-        // Chunk 3 (size 1): 10
-        Assert.Equal(20, outputs.Span[0]);
-        Assert.Equal(21, outputs.Span[1]);
-        Assert.Equal(20, outputs.Span[2]);
-        Assert.Equal(21, outputs.Span[3]);
-        Assert.Equal(10, outputs.Span[4]);
+        // Assert: Verify chunked processing results
+        Assert.False(sentiments.Span[0]); // "Great product" → 2 tokens → negative
+        Assert.False(sentiments.Span[1]); // "Absolutely loved..." → 5 tokens → neutral/negative
+        Assert.True(sentiments.Span[2]);  // "Best purchase..." → 10 tokens → positive
+        Assert.True(sentiments.Span[3]);  // "Amazing quality..." → 6 tokens → positive
+        Assert.False(sentiments.Span[4]); // "Perfect" → 1 token → negative
     }
 
-    private class FailingPostProcessInferenceSteps : TestInferenceSteps
+    private class FailingModelInferenceSteps : SentimentAnalysisInferenceSteps
     {
-        public override void PostProcess(ReadOnlySpan<int> inputs, int preprocesses, int modelOutput, Span<int> outputs)
+        public override Task<float> RunModel(ReadOnlyMemory<string> input, int tokenCount)
+        {
+            throw new InvalidOperationException("Model inference failed");
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteBatchPredict_ModelFailure_PropagatesException()
+    {
+        // Arrange: Demonstrate error handling in model execution stage
+        var inference = new FailingModelInferenceSteps();
+        var executor = new StreamedBatchExecutor<string, int, float, bool>(
+            inference,
+            maxBatchSize: null,
+            maxConcurrency: null,
+            parallelTokenization: false,
+            NullLogger<StreamedBatchExecutor<string, int, float, bool>>.Instance);
+
+        string[] textsArray = ["This will fail", "Another text"];
+        ReadOnlyMemory<string> texts = textsArray.AsMemory();
+        Memory<bool> outputs = new bool[2];
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => executor.ExecuteBatchPredict(texts, outputs));
+    }
+
+    private class FailingPostProcessInferenceSteps : SentimentAnalysisInferenceSteps
+    {
+        public override void PostProcess(ReadOnlySpan<string> inputs, int preprocesses, float modelOutput, Span<bool> outputs)
         {
             throw new InvalidOperationException("Post-processing failure");
         }
     }
 
     [Fact]
-    public async Task ExecuteBatchPredict_PostProcessFails_PropagatesError()
+    public async Task ExecuteBatchPredict_PostProcessFailure_PropagatesException()
     {
-        // Arrange
+        // Arrange: Demonstrate error handling in post-processing stage
         var inference = new FailingPostProcessInferenceSteps();
-        var executor = new StreamedBatchExecutor<int, int, int, int>(inference, null, null, false, NullLogger<StreamedBatchExecutor<int, int, int, int>>.Instance);
-        int[] inputData = [1, 2, 3];
-        var inputs = inputData.AsMemory();
-        var outputs = new int[3].AsMemory();
+        var executor = new StreamedBatchExecutor<string, int, float, bool>(
+            inference,
+            maxBatchSize: null,
+            maxConcurrency: null,
+            parallelTokenization: false,
+            NullLogger<StreamedBatchExecutor<string, int, float, bool>>.Instance);
+
+        string[] textsArray = ["Test input"];
+        ReadOnlyMemory<string> texts = textsArray.AsMemory();
+        Memory<bool> outputs = new bool[1];
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => executor.ExecuteBatchPredict(inputs, outputs));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => executor.ExecuteBatchPredict(texts, outputs));
     }
 
     [Fact]
-    public async Task ExecuteBatchPredict_HandlesEmptyInput()
+    public async Task ExecuteBatchPredict_ParallelPreprocessing_ProcessesChunksConcurrently()
     {
-        // Arrange
-        var inference = new TestInferenceSteps();
-        var executor = new StreamedBatchExecutor<int, int, int, int>(inference, null, null, false, NullLogger<StreamedBatchExecutor<int, int, int, int>>.Instance);
-        var inputs = ReadOnlyMemory<int>.Empty;
-        var outputs = Memory<int>.Empty;
+        // Arrange: Demonstrate parallel preprocessing for better throughput
+        var inference = new SentimentAnalysisInferenceSteps();
+        var executor = new StreamedBatchExecutor<string, int, float, bool>(
+            inference,
+            maxBatchSize: 2,
+            maxConcurrency: 4,  // Allow parallel preprocessing
+            parallelTokenization: true,  // Enable parallel mode
+            NullLogger<StreamedBatchExecutor<string, int, float, bool>>.Instance);
+
+        string[] reviewsArray = [
+            "Good value for money and quality",
+            "Would definitely buy this again",
+            "Not satisfied with the product quality",
+            "Exceeded my expectations completely"
+        ];
+        ReadOnlyMemory<string> reviews = reviewsArray.AsMemory();
+        Memory<bool> sentiments = new bool[4];
 
         // Act
-        await executor.ExecuteBatchPredict(inputs, outputs);
+        await executor.ExecuteBatchPredict(reviews, sentiments);
 
-        // Assert
-        // We can't use Received on a real class, and StreamedBatchExecutor doesn't call ProcessBatch directly on the object.
-        // It calls Preprocess, RunModel, and PostProcess.
-        // Actually for empty input, StreamedBatchExecutor.ExecuteBatchPredict should just return Task.CompletedTask without writing to channels.
-        Assert.True(true);
+        // Assert: Verify all batches processed correctly
+        Assert.True(sentiments.Span[0]);  // 5 tokens → positive
+        Assert.True(sentiments.Span[1]);  // 5 tokens → positive
+        Assert.True(sentiments.Span[2]);  // 6 tokens → positive
+        Assert.True(sentiments.Span[3]);  // 4 tokens → negative (borderline)
     }
 }

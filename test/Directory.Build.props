@@ -8,6 +8,7 @@
     <IsTestProject>true</IsTestProject>
     <!-- xUnit v3 Multi-Targeting Platform support -->
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <ItemGroup>

@@ -39,7 +39,8 @@ public class PipelineBuilderTests
         // Act
         var pipeline = builder.Build(sp);
         var outputs = new int[1];
-        await pipeline.BatchPredict(new string[] { "test" }.AsMemory(), outputs);
+        string[] inputs = ["test"];
+        await pipeline.BatchPredict(inputs, outputs);
 
         // Assert
         // Logic in PipelineBuilder: for (int i = _batchExecutorFactories.Count - 1; i >= 0; i--)

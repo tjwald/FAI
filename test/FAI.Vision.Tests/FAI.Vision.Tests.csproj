@@ -1,7 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\FAI.Vision\FAI.Vision.csproj" />
-  </ItemGroup>
-
-</Project>
