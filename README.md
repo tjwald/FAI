@@ -20,17 +20,6 @@ the same task written using this library. </br>
 The results in the examples are anywhere between 7X and 14X that is for offline batch inference, for online Web
 inference, the gains can be a lot more.
 
-## Production Readiness
-
-**THIS PROJECT IS NOT READY FOR PRODUCTION USE.**
-
-This project uses preview and experimental features of dotnet, as well as having 0 test coverage.
-
-In addition, the design is still evolving and many more ML tasks need to be implemented before a preview release can be
-considered.
-
-Would love the assistance to get it there.
-
 ## Background 
 
 Many AI projects start from a researcher developing or customizing existing models to specific tasks.
