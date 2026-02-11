@@ -1,5 +1,9 @@
 # FAI - Fast AI on A Budget
 
+[![Build Status](https://github.com/tjwald/FAI/actions/workflows/publish-nuget.yml/badge.svg)](https://github.com/tjwald/FAI/actions/workflows/publish-nuget.yml)
+[![NuGet](https://img.shields.io/nuget/v/FAI.Core.svg)](https://www.nuget.org/packages/FAI.Core)
+[![License](https://img.shields.io/github/license/tjwald/FAI)](https://github.com/tjwald/FAI/blob/main/LICENSE)
+
 <img src="/docs/Images/FAI%20Logo.jpg" alt="FAI logo" width="300" height="300"/></br>
 
 FAI (Fast AI) is a library design to maximize the performance of your models by giving you the best tools to do so:
@@ -13,6 +17,16 @@ FAI (Fast AI) is a library design to maximize the performance of your models by 
 
 [![AI Community Standup Video](https://img.youtube.com/vi/ptdNWGj8CN8/0.jpg)](https://www.youtube.com/watch?v=ptdNWGj8CN8)
 
+## 📦 NuGet Packages
+
+| Package | Version | Description |
+|---------|---------|-------------|
+| [FAI.Core](https://www.nuget.org/packages/FAI.Core/) | ![NuGet](https://img.shields.io/nuget/v/FAI.Core) | Core abstractions for scheduling & batching |
+| [FAI.Core.Extensions.DI](https://www.nuget.org/packages/FAI.Core.Extensions.DI/) | ![NuGet](https://img.shields.io/nuget/v/FAI.Core.Extensions.DI) | Dependency injection extensions for FAI.Core |
+| [FAI.NLP](https://www.nuget.org/packages/FAI.NLP/) | ![NuGet](https://img.shields.io/nuget/v/FAI.NLP) | NLP tasks and inference |
+| [FAI.NLP.Extensions.DI](https://www.nuget.org/packages/FAI.NLP.Extensions.DI/) | ![NuGet](https://img.shields.io/nuget/v/FAI.NLP.Extensions.DI) | Dependency injection extensions for FAI.NLP |
+| [FAI.Onnx](https://www.nuget.org/packages/FAI.Onnx/) | ![NuGet](https://img.shields.io/nuget/v/FAI.Onnx) | OnnxRuntime Integration |
+
 ## Results
 
 Under the [Examples](Examples) folder, you can find projects written using the standard python stack and compare it with
@@ -20,7 +34,7 @@ the same task written using this library. </br>
 The results in the examples are anywhere between 7X and 14X that is for offline batch inference, for online Web
 inference, the gains can be a lot more.
 
-## Background 
+## Background
 
 Many AI projects start from a researcher developing or customizing existing models to specific tasks.
 
@@ -84,7 +98,7 @@ These can be mixed and matched to tailor the performance and behaviour of most N
 ### Model Executors
 These actually run the model. You can switch from ONNX to another implementation without effecting the other building blocks.
 
-You can also see that there are multiple ONNX runners, with a pooled wrapper that can pool multiple instances. 
+You can also see that there are multiple ONNX runners, with a pooled wrapper that can pool multiple instances.
 
 Currently supported:
 
