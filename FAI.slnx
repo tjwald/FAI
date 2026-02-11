@@ -20,4 +20,13 @@
     <Project Path="src/FAI.Vision/FAI.Vision.csproj" />
     <Project Path="src\FAI.Extensions.Evaluation\FAI.Extensions.Evaluation.csproj" />
   </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/FAI.Core.Extensions.DI.Tests/FAI.Core.Extensions.DI.Tests.csproj" />
+    <Project Path="test/FAI.Core.Tests/FAI.Core.Tests.csproj" />
+    <Project Path="test/FAI.Extensions.Evaluation.Tests/FAI.Extensions.Evaluation.Tests.csproj" />
+    <Project Path="test/FAI.NLP.Extensions.DI.Tests/FAI.NLP.Extensions.DI.Tests.csproj" />
+    <Project Path="test/FAI.NLP.Tests/FAI.NLP.Tests.csproj" />
+    <Project Path="test/FAI.Onnx.Tests/FAI.Onnx.Tests.csproj" />
+    <Project Path="test/FAI.Vision.Tests/FAI.Vision.Tests.csproj" />
+  </Folder>
 </Solution>
