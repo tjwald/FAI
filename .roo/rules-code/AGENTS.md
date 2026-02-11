@@ -9,6 +9,13 @@ This file provides guidance to agents when working in Code mode within this repo
 - **Concurrency**: Use `SemaphoreSlim` for throttling and `Channel<T>` for producer/consumer patterns to manage throughput without blocking.
 
 ## Coding Rules (Non-Obvious)
+- **Project Commands**:
+    - **Build**: `dotnet build FAI.slnx`
+    - **Lint**: `dotnet format`
+    - **Test**: `dotnet test`
+    - **Post-Test**:
+        - Always run `dotnet format` after tests pass.
+        - Commit units of work after tests pass.
 - **Modern C# (.NET 10 / C# 14)**:
     - Prefer collection expressions `[1, 2, 3]` over `new float[] { 1, 2, 3 }`.
     - Use `System.Threading.Lock` instead of `new object()` for locking.

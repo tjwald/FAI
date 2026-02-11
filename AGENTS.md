@@ -6,6 +6,9 @@ This file provides guidance to agents when working with code in this repository.
 - **Build**: `dotnet build FAI.slnx`
 - **Lint**: `dotnet format` (part of pre-commit hooks)
 - **Test**: `dotnet test` (Infrastructure initialized using `xunit.v3` and MTP in `test/` folder)
+- **Post-Test**:
+    - Always run `dotnet format` after tests pass.
+    - Commit units of work after tests pass.
 
 ## Code Style (Non-Obvious)
 - **Formatting**: 4 spaces, `LF` line endings, 160 chars max width.
