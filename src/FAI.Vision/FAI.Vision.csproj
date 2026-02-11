@@ -5,6 +5,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>FAI.Vision</RootNamespace>
+        <!-- Not ready for NuGet publishing yet -->
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,0 +1,49 @@
+<Project>
+    <PropertyGroup>
+        <!-- Package Metadata -->
+        <Authors>Tal Wald</Authors>
+        <Company>FAI</Company>
+        <Copyright>Copyright © 2025 Tal Wald</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+        <!-- Repository Information -->
+        <RepositoryUrl>https://github.com/tjwald/fai</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/tjwald/fai</PackageProjectUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+
+        <!-- Package Tags -->
+        <PackageTags>ai;ml;machine-learning;inference;onnx;performance;batching;nlp;fast;dotnet;csharp;high-performance;tensor</PackageTags>
+
+        <!-- Package Description (can be overridden in individual projects) -->
+        <Description>High-performance ML inference library for .NET achieving 7X-14X speedup over standard Python stacks. Part of the FAI (Fast AI) framework.</Description>
+
+        <!-- Package Settings -->
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <IsPackable>true</IsPackable>
+
+        <!-- Version Management (injected by CI/CD) -->
+        <Version Condition="'$(Version)' == ''">0.0.1-local</Version>
+
+        <!-- Symbol Packages for Debugging -->
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <!-- Source Link Support -->
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+        <!-- Deterministic Builds -->
+        <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <!-- Include README in all packages -->
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+    <!-- Source Link Package Reference -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    </ItemGroup>
+</Project>

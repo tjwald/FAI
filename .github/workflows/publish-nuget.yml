@@ -1,0 +1,99 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.0.1-test)"
+        required: true
+        default: "0.0.1-test"
+      skip_publish:
+        description: "Skip NuGet publish step (dry run)"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: Build, Test, and Publish NuGet Packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CONFIGURATION: Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Extract version from tag or input
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Package version: $VERSION"
+
+      - name: Restore dependencies
+        run: dotnet restore FAI.slnx
+
+      - name: Build solution
+        run: dotnet build FAI.slnx --no-restore --configuration ${{ env.CONFIGURATION }}
+
+      - name: Run tests
+        run: dotnet test --no-build --configuration ${{ env.CONFIGURATION }} --verbosity normal
+
+      - name: Pack FAI.Core
+        run: dotnet pack src/FAI.Core/FAI.Core.csproj --configuration ${{ env.CONFIGURATION }} --no-build --output ./packages /p:Version=${{ env.VERSION }}
+
+      - name: Pack FAI.Core.Extensions.DI
+        run: dotnet pack src/FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj --configuration ${{ env.CONFIGURATION }} --no-build --output ./packages /p:Version=${{ env.VERSION }}
+
+      - name: Pack FAI.NLP
+        run: dotnet pack src/FAI.NLP/FAI.NLP.csproj --configuration ${{ env.CONFIGURATION }} --no-build --output ./packages /p:Version=${{ env.VERSION }}
+
+      - name: Pack FAI.NLP.Extensions.DI
+        run: dotnet pack src/FAI.NLP.Extensions.DI/FAI.NLP.Extensions.DI.csproj --configuration ${{ env.CONFIGURATION }} --no-build --output ./packages /p:Version=${{ env.VERSION }}
+
+      - name: Pack FAI.Onnx
+        run: dotnet pack src/FAI.Onnx/FAI.Onnx.csproj --configuration ${{ env.CONFIGURATION }} --no-build --output ./packages /p:Version=${{ env.VERSION }}
+
+      - name: List generated packages
+        run: ls -lh ./packages/
+
+      - name: Publish to NuGet
+        if: github.event_name == 'push' || github.event.inputs.skip_publish != 'true'
+        run: dotnet nuget push ./packages/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Upload packages as artifacts (for manual trigger dry runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ env.VERSION }}
+          path: ./packages/*.nupkg
+          retention-days: 7
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./packages/*.nupkg
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
