@@ -7,31 +7,31 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.23.2" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.10.3" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.24.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.12.40" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\FAI.Core\FAI.Core.csproj"/>
-    <ProjectReference Include="..\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj"/>
+    <ProjectReference Include="..\..\..\src\FAI.Core\FAI.Core.csproj" />
+    <ProjectReference Include="..\Example.SentimentInference.Model\Example.SentimentInference.Model.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Remove="ClassificationModelResources\tokenizer_config.json"/>
-    <Content Remove="ClassificationModelResources\vocab.json"/>
-    <None Remove="ClassificationModelResources\model.onnx"/>
-    <Content Remove="ClassificationModelResources\config.json"/>
-    <Content Remove="ClassificationModelResources\added_tokens.json"/>
-    <Content Remove="ClassificationModelResources\tokenizer.json"/>
-    <Content Remove="ClassificationModelResources\special_tokens_map.json"/>
+    <Content Remove="ClassificationModelResources\tokenizer_config.json" />
+    <Content Remove="ClassificationModelResources\vocab.json" />
+    <None Remove="ClassificationModelResources\model.onnx" />
+    <Content Remove="ClassificationModelResources\config.json" />
+    <Content Remove="ClassificationModelResources\added_tokens.json" />
+    <Content Remove="ClassificationModelResources\tokenizer.json" />
+    <Content Remove="ClassificationModelResources\special_tokens_map.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <_ContentIncludedByDefault Remove="ClassificationModelResources\added_tokens.json"/>
-    <_ContentIncludedByDefault Remove="ClassificationModelResources\config.json"/>
-    <_ContentIncludedByDefault Remove="ClassificationModelResources\special_tokens_map.json"/>
-    <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer.json"/>
-    <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer_config.json"/>
+    <_ContentIncludedByDefault Remove="ClassificationModelResources\added_tokens.json" />
+    <_ContentIncludedByDefault Remove="ClassificationModelResources\config.json" />
+    <_ContentIncludedByDefault Remove="ClassificationModelResources\special_tokens_map.json" />
+    <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer.json" />
+    <_ContentIncludedByDefault Remove="ClassificationModelResources\tokenizer_config.json" />
   </ItemGroup>
 </Project>

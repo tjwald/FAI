@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -12,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="1.0.1" />
+    <PackageReference Include="xunit.v3" Version="1.1.0" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
   </ItemGroup>
 
