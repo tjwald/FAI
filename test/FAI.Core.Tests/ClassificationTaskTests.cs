@@ -2,8 +2,6 @@ using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.InferenceTasks.Classification;
-using FAI.Core.ResultTypes;
-using NSubstitute;
 
 namespace FAI.Core.Tests;
 
@@ -65,7 +63,7 @@ public class ClassificationTaskTests
         float[] logits = [1.0f, 5.0f, 2.0f];
 
         // Act
-        var result = options.GetClassificationResult<string, float>(logits);
+        var result = options.GetClassificationResult(logits);
 
         // Assert
         Assert.Equal("B", result.Choice);

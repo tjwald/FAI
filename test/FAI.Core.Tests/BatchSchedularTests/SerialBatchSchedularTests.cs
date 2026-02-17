@@ -1,6 +1,5 @@
 using FAI.Core.Abstractions;
 using FAI.Core.BatchSchedulers;
-using NSubstitute;
 
 namespace FAI.Core.Tests.BatchSchedularTests;
 

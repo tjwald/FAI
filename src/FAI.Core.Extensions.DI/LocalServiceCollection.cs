@@ -94,7 +94,7 @@ public class LocalServiceCollection : ServiceCollection
 
         if (descriptor.ImplementationType is not null)
         {
-            return (TService)ActivatorUtilities.CreateInstance(_serviceProvider, descriptor.ImplementationType)!;
+            return (TService)ActivatorUtilities.CreateInstance(_serviceProvider, descriptor.ImplementationType);
         }
 
         if (descriptor.ImplementationFactory is not null)

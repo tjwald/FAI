@@ -1,5 +1,4 @@
 using System.Numerics.Tensors;
-using FAI.Core;
 
 namespace FAI.Core.Tests;
 
@@ -48,7 +47,7 @@ public class TensorExtensionsTests
     {
         // Arrange
         float[] data = [1.0f, 2.0f, 3.0f];
-        var tensor = Tensor.Create<float>(data, [3]);
+        var tensor = Tensor.Create(data, [3]);
 
         // Act
         var memory = tensor.AsMemory();

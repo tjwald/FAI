@@ -1,5 +1,4 @@
 using FAI.Core.Abstractions;
-using FAI.Core.PipelineBatchExecutors;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Extensions.DI.Tests;
@@ -30,8 +29,8 @@ public class PipelineBuilderTests
         _services.AddSingleton(tracker);
 
         var builder = new PipelineBuilder<string, int>(_services);
-        builder.Use<OrderTrackingExecutor>((next, sp) => new OrderTrackingExecutor(next, "First", sp.GetRequiredService<List<string>>()));
-        builder.Use<OrderTrackingExecutor>((next, sp) => new OrderTrackingExecutor(next, "Second", sp.GetRequiredService<List<string>>()));
+        builder.Use((next, sp) => new OrderTrackingExecutor(next, "First", sp.GetRequiredService<List<string>>()));
+        builder.Use((next, sp) => new OrderTrackingExecutor(next, "Second", sp.GetRequiredService<List<string>>()));
         builder.UseSink<OrderTrackingSink>(sp => new OrderTrackingSink("Sink", sp.GetRequiredService<List<string>>()));
 
         var sp = _services.BuildServiceProvider();
@@ -75,7 +74,7 @@ public class PipelineBuilderTests
         var mockExecutor = Substitute.For<IModelExecutor<string, int>>();
 
         // Act
-        builder.AddModelExecutor<string, int>(_ => mockExecutor);
+        builder.AddModelExecutor(_ => mockExecutor);
 
         // Assert
         var sp = _services.BuildServiceProvider();

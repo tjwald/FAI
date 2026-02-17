@@ -1,5 +1,4 @@
 using FAI.Onnx.Utils;
-using Microsoft.ML.OnnxRuntime;
 
 namespace FAI.Onnx.Tests.Utils;
 

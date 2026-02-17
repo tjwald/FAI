@@ -1,6 +1,3 @@
-using System.Numerics.Tensors;
-using FAI.Onnx.Configuration;
-using FAI.Onnx.ModelExecutors;
 using Microsoft.ML.OnnxRuntime;
 
 namespace FAI.Onnx.Tests.Utils;

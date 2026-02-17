@@ -379,3 +379,13 @@ dotnet_naming_style.s_camelcase.required_prefix = s_
 dotnet_naming_style.s_camelcase.required_suffix =
 dotnet_naming_style.s_camelcase.word_separator =
 dotnet_naming_style.s_camelcase.capitalization = camel_case
+
+
+# Docs
+dotnet_diagnostic.CS1591.severity = suggestion
+
+# cleanup
+
+dotnet_diagnostic.IDE0001.severity = warning
+dotnet_diagnostic.IDE0004.severity = warning
+dotnet_diagnostic.IDE0005.severity = warning

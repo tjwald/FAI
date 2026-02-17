@@ -9,7 +9,7 @@ public static class BuilderExtensions
         services.AddOptionsWithValidateOnStart<TConfiguration>()
             .BindConfiguration(section)
             .ValidateDataAnnotations();
-        services.AddSingleton<TConfiguration>(sp => sp.GetRequiredService<IOptions<TConfiguration>>().Value);
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<TConfiguration>>().Value);
 
         return services;
     }

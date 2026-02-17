@@ -1,7 +1,6 @@
 using FAI.Core.Abstractions;
 using FAI.Core.Pipelines;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 
 namespace FAI.Core.Tests.PipelineTests;
 

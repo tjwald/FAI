@@ -1,5 +1,6 @@
 # FAI - Fast AI on A Budget
 
+[![Build Status](https://github.com/tjwald/FAI/actions/workflows/pr-check.yml/badge.svg)](https://github.com/tjwald/FAI/actions/workflows/publish-nuget.yml)
 [![Build Status](https://github.com/tjwald/FAI/actions/workflows/publish-nuget.yml/badge.svg)](https://github.com/tjwald/FAI/actions/workflows/publish-nuget.yml)
 [![NuGet](https://img.shields.io/nuget/v/FAI.Core.svg)](https://www.nuget.org/packages/FAI.Core)
 [![License](https://img.shields.io/github/license/tjwald/FAI)](https://github.com/tjwald/FAI/blob/develop/LICENSE)

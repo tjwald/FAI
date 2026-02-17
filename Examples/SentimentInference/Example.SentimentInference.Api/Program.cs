@@ -1,5 +1,4 @@
 using Example.SentimentInference.Model;
-using FAI.Core;
 using FAI.Core.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;

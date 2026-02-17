@@ -13,7 +13,7 @@ public class LogicalMockModelExecutor : IModelExecutor<long, float>
     public Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
     {
         var data = _outputs[_callCount % _outputs.Length];
-        var output = Tensor.Create<float>(data, [(nint)data.Length]);
+        var output = Tensor.Create(data, [data.Length]);
         _callCount++;
         return Task.FromResult(new[] { output });
     }
@@ -31,7 +31,7 @@ public class LogicalMockModelExecutor : IModelExecutor<long, float>
             row.AsSpan().CopyTo(batchOutput.AsSpan(i * outputSize));
         }
 
-        var batchTensor = Tensor.Create<float>(batchOutput, [(nint)batchSize, (nint)outputSize]);
+        var batchTensor = Tensor.Create(batchOutput, [batchSize, outputSize]);
         postProcess(batchTensor, 0); // Assuming model has 1 output tensor
 
         return Task.CompletedTask;

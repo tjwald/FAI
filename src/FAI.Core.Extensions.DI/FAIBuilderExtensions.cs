@@ -13,7 +13,7 @@ public static class FaiBuilderExtensions
         {
             var pipelineBuilder = new PipelineBuilder<TInput, TOutput>(services);
 
-            services.AddSingleton<IPipeline<TInput, TOutput>>(sp => pipelineBuilder.Build(sp));
+            services.AddSingleton(sp => pipelineBuilder.Build(sp));
 
             return pipelineBuilder;
         }
@@ -25,7 +25,7 @@ public static class FaiBuilderExtensions
         {
             var partitionBuilder = new PartitionBatchExecutorBuilder<TInput, TOutput>(builder.ServiceCollection);
             configure(partitionBuilder);
-            return builder.Use<PartitionPipelineBatchExecutor<TInput, TOutput>>(
+            return builder.Use(
                 (next, sp) => new PartitionPipelineBatchExecutor<TInput, TOutput>(partitionBuilder.BuildSchedular(sp), partitionBuilder.BuildSlicer(sp), next));
         }
     }

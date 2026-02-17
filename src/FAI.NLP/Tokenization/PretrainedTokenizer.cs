@@ -40,7 +40,7 @@ public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<l
 
 /// <summary>
 /// Represents a pretrained tokenizer used for tokenizing text inputs and managing token-related transformations.
-/// Wraps a <see cref="Microsoft.ML.Tokenizers.Tokenizer"/> and adds batch functionality.
+/// Wraps a <see cref="Tokenizer"/> and adds batch functionality.
 /// </summary>
 public sealed class PretrainedTokenizer
 {
@@ -208,7 +208,7 @@ public sealed class PretrainedTokenizer
         Span<long> tokenizationRowSpan = tokenizationSpan[i].AsSpan();
         Span<long> maskRowSpan = maskSpan[i].AsSpan();
 
-        TensorPrimitives.ConvertChecked<int, long>(tokenizedInput, tokenizationRowSpan);
+        TensorPrimitives.ConvertChecked(tokenizedInput, tokenizationRowSpan);
 
         if (tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
         {

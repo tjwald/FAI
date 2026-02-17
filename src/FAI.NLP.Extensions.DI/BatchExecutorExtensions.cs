@@ -18,7 +18,7 @@ public static class BatchExecutorExtensions
         public PipelineBuilder<TInput, TOutput> UseTokenSorting(TokenCountSortingBatchExecutorOptions? options = null)
         {
             options ??= new();
-            return builder.Use<TokenCountSortingBatchExecutor<TInput, TOutput>>((next, sp)
+            return builder.Use((next, sp)
                 => ActivatorUtilities.CreateInstance<TokenCountSortingBatchExecutor<TInput, TOutput>>(sp, next, options));
         }
 

@@ -1,6 +1,5 @@
 using FAI.Core.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 
 namespace FAI.Extensions.Evaluation.Tests;
 

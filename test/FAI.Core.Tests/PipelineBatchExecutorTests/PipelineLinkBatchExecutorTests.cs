@@ -1,7 +1,6 @@
 using System.Buffers;
 using FAI.Core.Abstractions;
 using FAI.Core.PipelineBatchExecutors;
-using NSubstitute;
 
 namespace FAI.Core.Tests.PipelineBatchExecutorTests;
 
