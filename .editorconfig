@@ -384,12 +384,8 @@ dotnet_naming_style.s_camelcase.capitalization = camel_case
 # Docs
 dotnet_diagnostic.CS1591.severity = suggestion
 
-
 # cleanup
 
 dotnet_diagnostic.IDE0001.severity = warning
 dotnet_diagnostic.IDE0004.severity = warning
 dotnet_diagnostic.IDE0005.severity = warning
-
-dotnet_diagnostic.RCS1029.severity = warning
-dotnet_diagnostic.RCS1080.severity = warning
