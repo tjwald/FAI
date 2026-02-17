@@ -59,7 +59,7 @@ public class TextMultipleChoiceTask : InferenceSteps<TextMultipleChoiceInput, Ba
             var tokenRow = tokenTensorSpan[outputRow].AsSpan();
             var maskRow = maskTensorSpan[outputRow].AsSpan();
 
-            TensorPrimitives.ConvertChecked<int, long>(CollectionsMarshal.AsSpan(tokens), tokenRow);
+            TensorPrimitives.ConvertChecked(CollectionsMarshal.AsSpan(tokens), tokenRow);
 
             maskRow[..tokens.Count].Fill(1);
             outputRow++;

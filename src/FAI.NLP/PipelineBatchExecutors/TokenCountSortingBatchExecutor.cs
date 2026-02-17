@@ -44,8 +44,8 @@ public class TokenCountSortingBatchExecutor<TToken, TOutput> : IPipelineBatchExe
 
         var tokenComparer = new TokenCountComparer<TToken>(_options.Ascending);
 
-        MemoryExtensions.Sort<TToken, int, TokenCountComparer<TToken>>(inputsSorted, inputsSortedIndices, tokenComparer);
+        MemoryExtensions.Sort(inputsSorted, inputsSortedIndices, tokenComparer);
         await _executor.ExecuteBatchPredict(inputsSorted, outputSpan);
-        MemoryExtensions.Sort<int, TOutput>(inputsSortedIndices, outputSpan.Span);
+        MemoryExtensions.Sort(inputsSortedIndices, outputSpan.Span);
     }
 }

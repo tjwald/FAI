@@ -18,7 +18,7 @@ public static class ClassificationTensorUtils
     {
         Span<TScore> probabilities = stackalloc TScore[logits.Length];
         TensorPrimitives.SoftMax(logits, probabilities);
-        int argmax = TensorPrimitives.IndexOfMax<TScore>(probabilities);
+        int argmax = TensorPrimitives.IndexOfMax(probabilities);
         var score = probabilities[argmax];
 
         TScore[]? logitsArray = classificationOptions.StoreLogits ? logits.ToArray() : null;

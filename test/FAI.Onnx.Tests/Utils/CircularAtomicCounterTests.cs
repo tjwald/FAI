@@ -33,7 +33,7 @@ public class CircularAtomicCounterTests
         const int threadCount = 10;
         var counter = new CircularAtomicCounter(maxValue);
         var results = new int[maxValue];
-        var @lock = new System.Threading.Lock();
+        var @lock = new Lock();
 
         // Act
         Parallel.For(0, threadCount, _ =>

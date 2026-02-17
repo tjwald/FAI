@@ -18,7 +18,7 @@ public class PipelineConfigurationIntegrationTests
 
         // Setup dependencies
         var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton<PretrainedTokenizer>(tokenizer);
+        services.AddSingleton(tokenizer);
         services.AddSingleton<IBatchSchedular<TokenizedText, ClassificationResult<bool, float>>, ParallelBatchSchedular<TokenizedText, ClassificationResult<bool, float>>>();
         services.AddSingleton<IBatchSlicer<TokenizedText>, FixedSizeBatchSlicer<TokenizedText>>();
 

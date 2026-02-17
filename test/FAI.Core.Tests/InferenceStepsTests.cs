@@ -1,5 +1,4 @@
 using FAI.Core.Abstractions;
-using NSubstitute;
 
 namespace FAI.Core.Tests;
 
@@ -11,7 +10,7 @@ public class InferenceStepsTests
 
         public override Task<double> RunModel(ReadOnlyMemory<string> input, int preprocesses)
         {
-            return Task.FromResult((double)preprocesses * 2.0);
+            return Task.FromResult(preprocesses * 2.0);
         }
 
         public override void PostProcess(ReadOnlySpan<string> inputs, int preprocesses, double modelOutput, Span<string> outputs)

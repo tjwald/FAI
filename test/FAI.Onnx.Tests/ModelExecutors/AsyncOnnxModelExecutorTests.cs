@@ -1,7 +1,6 @@
 using System.Numerics.Tensors;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.ModelExecutors;
-using Microsoft.ML.OnnxRuntime;
 
 namespace FAI.Onnx.Tests.ModelExecutors;
 
@@ -31,8 +30,8 @@ public class AsyncOnnxModelExecutorTests(OnnxModelFixture fixture) : IClassFixtu
         Assert.Single(results);
         var output = results[0];
         Assert.Equal(2, output.Lengths.Length);
-        Assert.Equal(1L, (long)output.Lengths[0]);
-        Assert.Equal(3L, (long)output.Lengths[1]);
+        Assert.Equal(1L, output.Lengths[0]);
+        Assert.Equal(3L, output.Lengths[1]);
 
         // The minimal model casts long to float
         Assert.Equal(10.0f, output[0, 0]);
@@ -60,7 +59,7 @@ public class AsyncOnnxModelExecutorTests(OnnxModelFixture fixture) : IClassFixtu
         await executor.RunAsync(inputs, (span, index) =>
         {
             called = true;
-            outputShape = [(long)span.Lengths[0], (long)span.Lengths[1]];
+            outputShape = [(span.Lengths[0]), (span.Lengths[1])];
             Assert.Equal(100.0f, span[0, 0]);
             Assert.Equal(200.0f, span[0, 1]);
             Assert.Equal(300.0f, span[0, 2]);

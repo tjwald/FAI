@@ -6,8 +6,6 @@ using FAI.Core.ResultTypes;
 using FAI.NLP.BatchSlicer;
 using FAI.NLP.Configuration;
 using FAI.NLP.Configuration.PipelineBatchExecutors;
-using FAI.NLP.Extensions.DI;
-using FAI.NLP.PipelineBatchExecutors;
 using FAI.NLP.Tokenization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

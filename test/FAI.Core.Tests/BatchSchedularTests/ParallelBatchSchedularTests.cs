@@ -1,7 +1,6 @@
 using FAI.Core.Abstractions;
 using FAI.Core.BatchSchedulers;
 using FAI.Core.Configurations.PipelineBatchExecutors;
-using NSubstitute;
 
 namespace FAI.Core.Tests.BatchSchedularTests;
 
@@ -35,7 +34,7 @@ public class ParallelBatchSchedularTests
 
         int activeTasks = 0;
         int maxSeenActiveTasks = 0;
-        var lockObj = new System.Threading.Lock();
+        var lockObj = new Lock();
 
         executor.ExecuteBatchPredict(Arg.Any<ReadOnlyMemory<int>>(), Arg.Any<Memory<int>>())
             .Returns(async _ =>

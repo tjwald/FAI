@@ -14,7 +14,7 @@ public class MultipleChoiceIntegrationTests
                 .Use<TokenizerBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
 
         var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton<PretrainedTokenizer>(tokenizer);
+        services.AddSingleton(tokenizer);
         services.AddSingleton(new TextMultipleChoiceOptions { MaxChoices = 2 });
 
         // Mock model: always returns [0.9, 0.1] logits

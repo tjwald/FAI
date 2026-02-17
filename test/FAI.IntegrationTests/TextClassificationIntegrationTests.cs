@@ -17,7 +17,7 @@ public class TextClassificationIntegrationTests
                 .Use<TokenizerBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
 
         var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton<PretrainedTokenizer>(tokenizer);
+        services.AddSingleton(tokenizer);
 
         // Mock model: always returns high probability for 'true' (index 1)
         services.AddSingleton<IModelExecutor<long, float>>(new LogicalMockModelExecutor([[0.1f, 0.9f]]));

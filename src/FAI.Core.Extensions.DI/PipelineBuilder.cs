@@ -41,7 +41,7 @@ public class PipelineBuilder<TInput, TOutput>
         return this;
     }
 
-    public PipelineBuilder<TInput, TOutput> UsePipeline<TPipeline>(Func<IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>, IPipeline<TInput, TOutput>> factory) where TPipeline : IPipeline<TInput, TOutput>
+    public PipelineBuilder<TInput, TOutput> UsePipeline(Func<IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>, IPipeline<TInput, TOutput>> factory)
     {
         _pipelineFactory = factory;
         return this;
@@ -49,10 +49,10 @@ public class PipelineBuilder<TInput, TOutput>
 
     public PipelineBuilder<TInput, TOutput> Use<TBatchExecutor>() where TBatchExecutor : IPipelineBatchExecutor<TInput, TOutput>
     {
-        return this.Use<TBatchExecutor>((next, sp) => ActivatorUtilities.CreateInstance<TBatchExecutor>(sp, next));
+        return Use((next, sp) => ActivatorUtilities.CreateInstance<TBatchExecutor>(sp, next));
     }
 
-    public PipelineBuilder<TInput, TOutput> Use<TBatchExecutor>(Func<IPipelineBatchExecutor<TInput, TOutput>, IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>> factory) where TBatchExecutor : IPipelineBatchExecutor<TInput, TOutput>
+    public PipelineBuilder<TInput, TOutput> Use(Func<IPipelineBatchExecutor<TInput, TOutput>, IServiceProvider, IPipelineBatchExecutor<TInput, TOutput>> factory)
     {
         _batchExecutorFactories.Add(factory);
         return this;
