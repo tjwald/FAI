@@ -2,4 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FAI.NLP.Extensions.DI\FAI.NLP.Extensions.DI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="NSubstitute" Version="6.2.0" />
+    <PackageReference Update="xunit.v3" Version="4.0.0" />
+  </ItemGroup>
 </Project>

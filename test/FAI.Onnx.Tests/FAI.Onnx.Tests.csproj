@@ -5,7 +5,9 @@
   </ItemGroup>
 
   <ItemGroup>
-      <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
+      <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
+      <PackageReference Update="NSubstitute" Version="6.2.0" />
+      <PackageReference Update="xunit.v3" Version="4.0.0" />
   </ItemGroup>
 
 </Project>

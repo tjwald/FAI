@@ -5,7 +5,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageReference Update="NSubstitute" Version="6.2.0" />
+    <PackageReference Update="xunit.v3" Version="4.0.0" />
   </ItemGroup>
 
 </Project>
