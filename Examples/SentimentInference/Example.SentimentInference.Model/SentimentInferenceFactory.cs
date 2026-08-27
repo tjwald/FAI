@@ -1,8 +1,14 @@
+using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations;
+using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Extensions.DI;
 using FAI.Core.ResultTypes;
+using FAI.Core.Steps;
+using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
+using FAI.NLP.InferenceTasks.TextClassification;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
@@ -22,8 +28,11 @@ public static class SentimentInferenceFactory
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
                     {
-                        sessionOptions.AppendExecutionProvider_CUDA();
-                        sp.GetRequiredService<ILogger<OnnxModelExecutorOptions>>().LogInformation("Using GPU accelerator");
+                        if (options.UseGpu)
+                        {
+                            sessionOptions.AppendExecutionProvider_CUDA();
+                            sp.GetRequiredService<ILogger<OnnxModelExecutorOptions>>().LogInformation("Using GPU accelerator");
+                        }
 
                         sessionOptions.AppendExecutionProvider_CPU();
                     });
@@ -32,20 +41,45 @@ public static class SentimentInferenceFactory
             );
 
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+            localServices.AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification");
+            localServices.AddConfigurationAndBind<TokenCountOrderingOptions>("SentimentInference:BatchExecutors:TokenCountSorting");
+            localServices.AddConfigurationAndBind<MaxPaddedTokensPartitionerOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
+            localServices.AddConfigurationAndBind<ParallelPartitionSchedulerOptions>("SentimentInference:BatchExecutors:ParallelSchedular");
+            localServices.AddSingleton<IPartitionScheduler>(sp =>
+                new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
+            localServices.AddSingleton(sp =>
+                ModelExecutorFactory.CreateBorrowedModelStep(
+                    options.ModelExecutorType,
+                    sp.GetRequiredService<IModelExecutorOptions>()));
+            localServices.AddSingleton<ClassificationDecodingStep<bool>>();
 
-            localServices.AddPipeline<TokenizedText, ClassificationResult<bool, float>>()
-                .AddModelExecutor(sp =>
-                {
-                    var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
-                    return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
-                })
-                .WithTextClassification(section: "SentimentInference:Classification")
-                .UseTokenSorting(section: "SentimentInference:BatchExecutors:TokenCountSorting")
-                .UsePartitioning(partitionBuilder =>
-                    partitionBuilder
-                        .WithMaxPaddedTokens(section: "SentimentInference:BatchExecutors:MaxPaddedTokens")
-                        .WithParallelSchedular(section: "SentimentInference:BatchExecutors:ParallelSchedular")
-                );
+            localServices
+                .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+                .Then(
+                    pipeline => pipeline
+                        .Then<Tensor<long>[], TextBatchEncodingStep>()
+                        .ThenBorrowed(
+                            sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
+                            sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
+                            (_, input, cancellationToken) =>
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                int batchSize = checked((int)input[0].Lengths[0]);
+                                var output = new ClassificationResult<bool, float>[batchSize];
+                                return ValueTask.FromResult(
+                                    new BatchLease<Memory<ClassificationResult<bool, float>>>(output));
+                            }),
+                    (_, input, cancellationToken) =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var output = new ClassificationResult<bool, float>[input.Length];
+                        return ValueTask.FromResult(new BatchLease<Memory<ClassificationResult<bool, float>>>(output));
+                    },
+                    stage => stage
+                        .UseTokenizingStep()
+                        .UseTokenCountOrderingStep()
+                        .UseMaxPaddedTokensPartitioningStep())
+                .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();
 

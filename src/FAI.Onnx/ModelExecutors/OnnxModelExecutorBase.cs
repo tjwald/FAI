@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics.Tensors;
-using System.Runtime.InteropServices;
 using FAI.Core;
-using FAI.Core.Abstractions;
+using FAI.Core.Steps;
 using FAI.Core.Utilities;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
@@ -14,7 +13,7 @@ namespace FAI.Onnx.ModelExecutors;
 /// Defines a contract for an ONNX model executor.
 /// </summary>
 /// <typeparam name="T">The type of the executor implementing this interface.</typeparam>
-public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T : IOnnxModelExecutor<T>
+public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 {
     /// <summary>
     /// Creates an instance of the ONNX model executor with the specified session, options, and configuration.
@@ -29,7 +28,9 @@ public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T
 /// <summary>
 /// Provides a base implementation for ONNX model executors.
 /// </summary>
-public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
+public abstract class OnnxModelExecutorBase :
+    IAllocatingStep<Tensor<long>[], Tensor<float>[]>,
+    IBorrowedTensorProducer<Tensor<long>[], float>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.
@@ -91,30 +92,89 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
         return result;
     }
 
-    /// <summary>
-    /// Runs the model asynchronously and returns the output as an array of tensors.
-    /// </summary>
-    /// <param name="inputs">The input tensors for the model.</param>
-    /// <returns>A task containing the output tensors.</returns>
-    public async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
+    public ValueTask<BatchLease<Tensor<float>[]>> RentOutputAsync(
+        Tensor<long>[] input,
+        CancellationToken cancellationToken = default)
     {
-        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
-        return ToOutTensors(result);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (input.Length == 0)
+        {
+            throw new ArgumentException("At least one model input tensor is required.", nameof(input));
+        }
+
+        Tensor<float>[] output = new Tensor<float>[Session.OutputNames.Count];
+        for (int outputIndex = 0; outputIndex < output.Length; outputIndex++)
+        {
+            int[] dimensions = Session.OutputMetadata[Session.OutputNames[outputIndex]].Dimensions;
+            var resolvedDimensions = new nint[dimensions.Length];
+            for (int dimensionIndex = 0; dimensionIndex < dimensions.Length; dimensionIndex++)
+            {
+                int dimension = dimensions[dimensionIndex];
+                if (dimension > 0)
+                {
+                    resolvedDimensions[dimensionIndex] = dimension;
+                }
+                else if (dimensionIndex < input[0].Rank)
+                {
+                    resolvedDimensions[dimensionIndex] = input[0].Lengths[dimensionIndex];
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Output '{Session.OutputNames[outputIndex]}' dimension {dimensionIndex} is symbolic and cannot be inferred from the model input.");
+                }
+            }
+
+            output[outputIndex] = Tensor.CreateFromShape<float>(resolvedDimensions);
+        }
+
+        return ValueTask.FromResult(new BatchLease<Tensor<float>[]>(output));
     }
 
-    /// <summary>
-    /// Runs the model asynchronously and processes the output using the provided callback.
-    /// </summary>
-    /// <param name="inputs">The input tensors for the model.</param>
-    /// <param name="postProcess">A callback to process each output tensor span.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task RunAsync(Tensor<long>[] inputs, Action<ReadOnlyTensorSpan<float>, int> postProcess)
+    public async ValueTask ExecuteAsync(
+        Tensor<long>[] input,
+        Tensor<float>[] output,
+        CancellationToken cancellationToken = default)
     {
-        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
-        for (int i = 0; i < result.Count; i++)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (output.Length != Session.OutputNames.Count)
         {
-            postProcess(result[i].GetTensorDataAsTensorSpan<float>(), i);
+            throw new ArgumentException(
+                $"The model produces {Session.OutputNames.Count} outputs, but {output.Length} destinations were supplied.",
+                nameof(output));
         }
+
+        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input);
+        for (int outputIndex = 0; outputIndex < result.Count; outputIndex++)
+        {
+            ReadOnlyTensorSpan<float> outputData = result[outputIndex].GetTensorDataAsTensorSpan<float>();
+            if (!outputData.Lengths.SequenceEqual(output[outputIndex].Lengths))
+            {
+                throw new ArgumentException(
+                    $"Output {outputIndex} has shape [{string.Join(", ", output[outputIndex].Lengths.ToArray())}], " +
+                    $"but the model produced [{string.Join(", ", outputData.Lengths.ToArray())}].",
+                    nameof(output));
+            }
+
+            outputData.CopyTo(output[outputIndex]);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    public async ValueTask ExecuteAsync<TOutput>(
+        Tensor<long>[] input,
+        TOutput output,
+        IBorrowedTensorConsumer<float, TOutput> consumer,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input);
+        for (int outputIndex = 0; outputIndex < result.Count; outputIndex++)
+        {
+            consumer.Consume(result[outputIndex].GetTensorDataAsTensorSpan<float>(), outputIndex, output);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     /// <summary>
@@ -133,40 +193,6 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
         _inputMemoryPool.Add(modelInputs);
 
         return ortValues;
-    }
-
-    private static Tensor<float>[] ToOutTensors(IReadOnlyCollection<OrtValue> result)
-    {
-        var outTensors = new Tensor<float>[result.Count];
-        if (result is List<OrtValue> ortValues)
-        {
-            Span<OrtValue> span = CollectionsMarshal.AsSpan(ortValues);
-            for (int i = 0; i < span.Length; i++)
-            {
-                outTensors[i] = ToOutTensor(span[i]);
-            }
-
-            return outTensors;
-        }
-
-        int index = 0;
-        foreach (OrtValue tensor in result)
-        {
-            outTensors[index] = ToOutTensor(tensor);
-            index++;
-        }
-
-        return outTensors;
-    }
-
-    private static Tensor<float> ToOutTensor(OrtValue tensor)
-    {
-        ReadOnlyTensorSpan<float> x = tensor.GetTensorDataAsTensorSpan<float>();
-
-        Tensor<float> outTensor = Tensor.CreateFromShape<float>(x.Lengths, x.Strides);
-        x.CopyTo(outTensor);
-
-        return outTensor;
     }
 
     private Memory<long>[] GetInputsAsMemory(Tensor<long>[] inputs)

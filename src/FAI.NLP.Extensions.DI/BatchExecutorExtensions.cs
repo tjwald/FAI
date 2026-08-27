@@ -1,11 +1,7 @@
-using FAI.Core.Abstractions;
-using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.Extensions.DI;
-using FAI.Core.ResultTypes;
-using FAI.NLP.BatchSlicer;
-using FAI.NLP.Configuration.PipelineBatchExecutors;
-using FAI.NLP.InferenceTasks.TextClassification;
-using FAI.NLP.PipelineBatchExecutors;
+using FAI.Core.Steps;
+using FAI.NLP.Configuration;
+using FAI.NLP.Steps;
 using FAI.NLP.Tokenization;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,50 +9,43 @@ namespace FAI.NLP.Extensions.DI;
 
 public static class BatchExecutorExtensions
 {
-    extension<TInput, TOutput>(PipelineBuilder<TInput, TOutput> builder) where TInput : ITokenizable
+    extension<TInput, TOutput>(PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> stage)
+        where TInput : ITokenizable
     {
-        public PipelineBuilder<TInput, TOutput> UseTokenSorting(TokenCountSortingBatchExecutorOptions? options = null)
+        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseTokenizingStep()
         {
-            options ??= new();
-            return builder.Use((next, sp)
-                => ActivatorUtilities.CreateInstance<TokenCountSortingBatchExecutor<TInput, TOutput>>(sp, next, options));
+            return stage.Use((serviceProvider, inner) =>
+                new TokenizingStep<TInput, TOutput>(
+                    inner,
+                    serviceProvider.GetRequiredService<PretrainedTokenizer>()));
         }
 
-        public PipelineBuilder<TInput, TOutput> UseTokenSorting(string section)
+        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseTokenCountOrderingStep()
         {
-            builder.AddServices(sp => sp.AddConfigurationAndBind<TokenCountSortingBatchExecutorOptions>(section));
-            return builder.Use<TokenCountSortingBatchExecutor<TInput, TOutput>>();
+            return stage.Use((serviceProvider, inner) =>
+                new OrderingStep<
+                    ReadOnlyMemory<TInput>,
+                    Memory<TOutput>,
+                    ReadOnlyMemoryBatchOperations<TInput>,
+                    MemoryBatchOperations<TOutput>>(
+                        inner,
+                        new TokenCountOrdering<TInput>(
+                            serviceProvider.GetRequiredService<TokenCountOrderingOptions>())));
+        }
+
+        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseMaxPaddedTokensPartitioningStep()
+        {
+            return stage.Use((serviceProvider, inner) =>
+                new PartitioningStep<
+                    ReadOnlyMemory<TInput>,
+                    Memory<TOutput>,
+                    ReadOnlyMemoryBatchOperations<TInput>,
+                    MemoryBatchOperations<TOutput>>(
+                        inner,
+                        new MaxPaddedTokensPartitioner<TInput>(
+                            serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
+                        serviceProvider.GetService<IPartitionScheduler>()));
         }
     }
 
-    extension<TInput, TOutput>(PipelineBuilder<TInput, TOutput> builder) where TInput : ITokenizable
-    {
-        public PipelineBuilder<TInput, TOutput> UseTokenizing()
-        {
-            return builder.Use<TokenizerBatchExecutor<TInput, TOutput>>();
-        }
-    }
-
-    extension<TClassification>(PipelineBuilder<TokenizedText, ClassificationResult<TClassification, float>> builder)
-    {
-        public PipelineBuilder<TokenizedText, ClassificationResult<TClassification, float>> WithTextClassification(string section)
-        {
-            builder.AddServices(serviceCollection => serviceCollection.AddConfigurationAndBind<ClassificationOptions<TClassification>>(section));
-            builder.AddInferenceSteps<TextClassification<TClassification>>();
-            return builder;
-        }
-    }
-
-    extension<TInput, TOutput>(PartitionBatchExecutorBuilder<TInput, TOutput> builder) where TInput : ITokenizable
-    {
-        public PartitionBatchExecutorBuilder<TInput, TOutput> WithMaxPaddedTokens(string section)
-        {
-            builder.AddServices(serviceCollection =>
-            {
-                serviceCollection.AddConfigurationAndBind<MaxPaddedTokensSlicerOptions>(section);
-                serviceCollection.AddSingleton<IBatchSlicer<TInput>, MaxPaddedTokensBatchSlicer<TInput>>();
-            });
-            return builder;
-        }
-    }
 }

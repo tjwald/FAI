@@ -1,49 +1,51 @@
-using FAI.Core.BatchSlicers;
-using FAI.NLP.PipelineBatchExecutors;
-
 namespace FAI.IntegrationTests;
 
 public class PipelineConfigurationIntegrationTests
 {
     [Fact]
-    public async Task ComplexPipeline_WithBackgroundAndPartitioning_ShouldProcessBatches()
+    public async Task FinitePolicies_ProcessPartitionedBatchAndRestoreOrder()
     {
-        // Arrange
         var services = new ServiceCollection();
+        services.AddSingleton(DummyTokenizerFactory.Create());
+        services.AddSingleton(new ClassificationOptions<bool>([false, true]));
+        services.AddSingleton(new TokenCountOrderingOptions(Ascending: true));
+        services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 1, MaxTokenCount: 20));
+        services.AddSingleton<IPartitionScheduler>(
+            new ParallelPartitionScheduler(new ParallelPartitionSchedulerOptions(MaxConcurrency: 2)));
+        services.AddSingleton<IBorrowedTensorProducer<Tensor<long>[], float>>(
+            new LogicalMockModelStep([[0.1f, 0.9f]]));
+        services.AddSingleton<ClassificationDecodingStep<bool>>();
+        services
+            .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+            .Then(
+                pipeline => pipeline
+                    .Then<Tensor<long>[], TextBatchEncodingStep>()
+                    .ThenBorrowed(
+                        sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
+                        sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
+                        (_, input, _) => ValueTask.FromResult(
+                            new BatchLease<Memory<ClassificationResult<bool, float>>>(
+                                new ClassificationResult<bool, float>[input[0].Lengths[0]]))),
+                (_, input, _) => ValueTask.FromResult(
+                    new BatchLease<Memory<ClassificationResult<bool, float>>>(
+                        new ClassificationResult<bool, float>[input.Length])),
+                stage => stage
+                    .UseTokenizingStep()
+                    .UseTokenCountOrderingStep()
+                    .UseMaxPaddedTokensPartitioningStep())
+            .Build();
 
-        services.AddPipeline<TokenizedText, ClassificationResult<bool, float>>()
-            .Use<BackgroundPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
-            .Use<PartitionPipelineBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>()
-            .Use<TokenizerBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        var pipeline = provider.GetRequiredService<
+            IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>>>();
+        ReadOnlyMemory<TokenizedText> input = Enumerable.Range(0, 10)
+            .Select(index => new TokenizedText($"test {index}"))
+            .ToArray();
+        var output = new ClassificationResult<bool, float>[input.Length];
 
-        // Setup dependencies
-        var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton(tokenizer);
-        services.AddSingleton<IBatchSchedular<TokenizedText, ClassificationResult<bool, float>>, ParallelBatchSchedular<TokenizedText, ClassificationResult<bool, float>>>();
-        services.AddSingleton<IBatchSlicer<TokenizedText>, FixedSizeBatchSlicer<TokenizedText>>();
+        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
 
-        // Add options for executors
-        services.AddSingleton(new ParallelBatchSchedularOptions(2));
-        services.AddSingleton(new FixedSizeBatchSlicerOptions(5));
-        services.AddSingleton(new BackgroundPipelineBatchExecutorOptions(2));
-
-        var options = new ClassificationOptions<bool>([false, true]);
-        services.AddSingleton(options);
-
-        // Mock model: always returns high probability for 'true'
-        services.AddSingleton<IModelExecutor<long, float>>(new LogicalMockModelExecutor([[0.1f, 0.9f]]));
-
-        services.AddSingleton<IInferenceSteps<TokenizedText, ClassificationResult<bool, float>>, TextClassification<bool>>();
-
-        var provider = services.BuildServiceProvider();
-        var pipeline = provider.GetRequiredService<IPipeline<TokenizedText, ClassificationResult<bool, float>>>();
-
-        // Act
-        var inputs = Enumerable.Range(0, 10).Select(i => new TokenizedText($"test {i}")).ToArray();
-        var results = await pipeline.BatchPredict(inputs);
-
-        // Assert
-        results.Should().HaveCount(10);
-        results.All(r => r.Choice).Should().BeTrue();
+        output.Should().HaveCount(10);
+        output.Should().OnlyContain(result => result.Choice);
     }
 }

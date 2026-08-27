@@ -1,6 +1,6 @@
 using System.Numerics.Tensors;
-using FAI.Core.Abstractions;
 using FAI.Core.ResultTypes;
+using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tests.Mocks;
@@ -11,43 +11,45 @@ namespace FAI.NLP.Tests.InferenceTasks;
 public class TextMultipleChoiceTaskTests
 {
     [Fact]
-    public async Task TextMultipleChoice_FlatteningAndInference_Works()
+    public async Task TextMultipleChoiceStep_ProcessesBatchIntoCallerOutput()
     {
-        // Arrange
         var tokenizer = DummyTokenizerFactory.Create();
-        var modelExecutor = Substitute.For<IModelExecutor<long, float>>();
-
-        var options = new TextMultipleChoiceOptions
+        var modelStep = new StubMultipleChoiceModelStep();
+        var options = new TextMultipleChoiceOptions(MaxChoices: 4, StoreLogits: true);
+        var step = new TextMultipleChoiceStep(tokenizer, modelStep, options);
+        ReadOnlyMemory<TextMultipleChoiceInput> inputs = new TextMultipleChoiceInput[]
         {
-            MaxChoices = 4,
-            StoreLogits = true
+            new("context", [new("choice 1"), new("choice 2")]),
+            new("context", [new("choice a"), new("choice b")]),
         };
+        var output = new ChoiceResult<TokenizedText>[2];
 
-        var task = new TextMultipleChoiceTask(tokenizer, modelExecutor, options);
+        await step.ExecuteAsync(inputs, output, TestContext.Current.CancellationToken);
 
-        // Input with 2 choices
-        var inputs = new TextMultipleChoiceInput[]
+        Assert.Equal([1, 0], output.Select(result => result.ChoiceIndex));
+        Assert.Equal(["choice 2", "choice a"], output.Select(result => result.Choice.Text));
+        Assert.Equal(2, modelStep.BatchSize);
+    }
+
+    private sealed class StubMultipleChoiceModelStep : IBorrowedTensorProducer<Tensor<long>[], float>
+    {
+        public int BatchSize { get; private set; }
+
+        public ValueTask ExecuteAsync<TOutput>(
+            Tensor<long>[] input,
+            TOutput output,
+            IBorrowedTensorConsumer<float, TOutput> consumer,
+            CancellationToken cancellationToken = default)
         {
-            new("context", [new("choice 1"), new("choice 2")])
-        };
-        var outputs = new ChoiceResult<TokenizedText>[1];
-
-        modelExecutor.RunAsync(Arg.Any<Tensor<long>[]>(), Arg.Any<Action<ReadOnlyTensorSpan<float>, int>>())
-            .Returns(x =>
-            {
-                var callback = x.ArgAt<Action<ReadOnlyTensorSpan<float>, int>>(1);
-                var logits = Tensor.CreateFromShape<float>([1, 2]);
-                logits[0, 0] = -1.0f;
-                logits[0, 1] = 2.0f; // Higher score for second choice
-                callback(logits, 0);
-                return Task.CompletedTask;
-            });
-
-        // Act
-        await task.ProcessBatch(inputs, outputs);
-
-        // Assert
-        Assert.Equal(1, outputs[0].ChoiceIndex);
-        Assert.Equal("choice 2", outputs[0].Choice.Text);
+            BatchSize = checked((int)input[0].Lengths[0]);
+            int choices = checked((int)input[0].Lengths[1]);
+            Tensor<float> logits = Tensor.CreateFromShape<float>([BatchSize, choices]);
+            logits[0, 0] = -1.0f;
+            logits[0, 1] = 2.0f;
+            logits[1, 0] = 3.0f;
+            logits[1, 1] = -2.0f;
+            consumer.Consume(logits.AsReadOnlyTensorSpan(), 0, output);
+            return ValueTask.CompletedTask;
+        }
     }
 }

@@ -96,14 +96,14 @@ with low utilization, then maybe this is not worth the effort to migrate.
 
 These can be mixed and matched to tailor the performance and behaviour of most NLP models.
 
-### Model Executors
-These actually run the model. You can switch from ONNX to another implementation without effecting the other building blocks.
+### Model Steps
+These run the model through the same finite step contract as the rest of the graph. You can switch from ONNX to another implementation without affecting the other building blocks.
 
 You can also see that there are multiple ONNX runners, with a pooled wrapper that can pool multiple instances.
 
 Currently supported:
 
-* FAI.Onnx - implements multiple onnx ModelExecutors. When referencing this package, you need to add the specific Onnx
+* FAI.Onnx - implements multiple ONNX model steps. When referencing this package, you need to add the specific ONNX
   package you want to use (GPU, OpenVino etc.).
 
 ### Tokenizers
@@ -111,20 +111,13 @@ Currently supported:
 A batch tokenizer implementation - `FAI.NLP.Tokenization.PretrainedTokenizer`
 
 ### Pipelines
-I was inspired by [HuggingFace](https://huggingface.co/docs/transformers/en/index), but I added my own little twist - you can now inject a custom `IPipelineBatchExecutor<TInput, TOutput>` that controls how batches are executed.
+Pipelines are compile-time typed chains of finite steps. Each stage receives a complete input value and writes into caller-owned output.
 
-### Pipeline Batch Executors
+### Batch Policies
 
-This abstraction enables you to mix and match different batching and scheduling algorithms to get the most performance
-out of you model and hardware.
+Ordering, partitioning, routing, and scheduling decorators can be mixed and matched to get the most performance out of your model and hardware.
 
-There are multiple examples of these PipelineBatchExecutors:
-* Serial - just runs them in a loop one after the other.
-* Parallel - will do just that - parallelize the batches.
-* TokenCountSorting - this one is tricky, but since different sentences translate to different sizes, and the GPU likes the same size, batching similar sized sentences sometimes helps with performance. However, the user expects the ordering of the batch to stay the same, so we have to sort twice - once by length, and once by original index.
-* TokenBatchSize - group the sentences up to a token threshold instead of sentence count.
-* Max Padding - make sure you don't waste a lot of compute on padding tokens.
-  And more.
+Current policies include serial or bounded-parallel partition scheduling, token-count ordering with output restoration, max-padded-token partitioning, and route-based dispatch.
 
 ---
 

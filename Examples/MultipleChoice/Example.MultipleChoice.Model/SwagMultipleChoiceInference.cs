@@ -1,5 +1,6 @@
 using FAI.Core.Abstractions;
 using FAI.Core.ResultTypes;
+using FAI.Core.Steps;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tokenization;
 
@@ -9,17 +10,18 @@ public record struct SwagInput(string Context, string Text, string[] Endings);
 
 public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<TokenizedText>>
 {
-    private readonly IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> _pipeline;
+    private readonly IStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> _pipeline;
 
-    public SwagMultipleChoiceInference(IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> pipeline)
+    public SwagMultipleChoiceInference(
+        IStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> pipeline)
     {
         _pipeline = pipeline;
     }
 
     public async Task<ChoiceResult<TokenizedText>> Predict(SwagInput input)
     {
-        var pipelineInput = MapSwagInputToPipelineInput(input);
-        return await _pipeline.Predict(pipelineInput);
+        ChoiceResult<TokenizedText>[] output = await BatchPredict(new[] { input });
+        return output[0];
     }
 
     public async Task<ChoiceResult<TokenizedText>[]> BatchPredict(ReadOnlyMemory<SwagInput> input)
@@ -38,7 +40,7 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
             pipelineInput[i] = MapSwagInputToPipelineInput(inputSpan[i]);
         }
 
-        await _pipeline.BatchPredict(pipelineInput, output);
+        await _pipeline.ExecuteAsync(pipelineInput, output);
     }
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)

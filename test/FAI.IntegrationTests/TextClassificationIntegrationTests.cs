@@ -1,5 +1,3 @@
-using FAI.NLP.PipelineBatchExecutors;
-
 namespace FAI.IntegrationTests;
 
 public class TextClassificationIntegrationTests
@@ -7,32 +5,38 @@ public class TextClassificationIntegrationTests
     [Fact]
     public async Task FullPipeline_ShouldClassifyText()
     {
-        // Arrange
         var services = new ServiceCollection();
+        services.AddSingleton(new ClassificationOptions<bool>([false, true]));
+        services.AddSingleton(DummyTokenizerFactory.Create());
+        services.AddSingleton<IBorrowedTensorProducer<Tensor<long>[], float>>(
+            new LogicalMockModelStep([[0.1f, 0.9f]]));
+        services.AddSingleton<ClassificationDecodingStep<bool>>();
+        services
+            .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+            .Then(
+                pipeline => pipeline
+                    .Then<Tensor<long>[], TextBatchEncodingStep>()
+                    .ThenBorrowed(
+                        sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
+                        sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
+                        (_, input, _) => ValueTask.FromResult(
+                            new BatchLease<Memory<ClassificationResult<bool, float>>>(
+                                new ClassificationResult<bool, float>[input[0].Lengths[0]]))),
+                (_, input, _) => ValueTask.FromResult(
+                    new BatchLease<Memory<ClassificationResult<bool, float>>>(
+                        new ClassificationResult<bool, float>[input.Length])),
+                stage => stage.UseTokenizingStep())
+            .Build();
 
-        var options = new ClassificationOptions<bool>([false, true]);
-        services.AddSingleton(options);
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        var pipeline = provider.GetRequiredService<
+            IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>>>();
+        ReadOnlyMemory<TokenizedText> input = new TokenizedText[] { new("hello") };
+        var output = new ClassificationResult<bool, float>[1];
 
-        services.AddPipeline<TokenizedText, ClassificationResult<bool, float>>()
-                .Use<TokenizerBatchExecutor<TokenizedText, ClassificationResult<bool, float>>>();
+        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
 
-        var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton(tokenizer);
-
-        // Mock model: always returns high probability for 'true' (index 1)
-        services.AddSingleton<IModelExecutor<long, float>>(new LogicalMockModelExecutor([[0.1f, 0.9f]]));
-
-        services.AddSingleton<IInferenceSteps<TokenizedText, ClassificationResult<bool, float>>, TextClassification<bool>>();
-
-        var provider = services.BuildServiceProvider();
-        var pipeline = provider.GetRequiredService<IPipeline<TokenizedText, ClassificationResult<bool, float>>>();
-
-        // Act
-        var input = new TokenizedText("hello");
-        var results = await pipeline.BatchPredict(new[] { input });
-
-        // Assert
-        results.Should().HaveCount(1);
-        results[0].Choice.Should().BeTrue();
+        output.Should().HaveCount(1);
+        output[0].Choice.Should().BeTrue();
     }
 }

@@ -1,8 +1,9 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
-using FAI.Core.Configurations.PipelineBatchExecutors;
 using FAI.Core.Extensions.DI;
 using FAI.Core.ResultTypes;
+using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
@@ -17,43 +18,45 @@ public static class SwagMultipleChoiceInferenceFactory
 {
     public static IServiceCollection AddDefaultSwagInference(this IServiceCollection services, SwagMultipleChoiceInferenceOptions options)
     {
-        services
-            .AddConfigurationAndBind<TextMultipleChoiceOptions>("SwagInference:MultipleChoice")
-            .AddConfigurationAndBind<StreamedPipelineExecutorOptions>("SwagInference:BatchExecutors:Streamed");
+        return services.AddLocalServices(localServices =>
+        {
+            localServices.AddConfigurationAndBind<TextMultipleChoiceOptions>("SwagInference:MultipleChoice");
+            localServices.AddConfigurationAndBind<MaxPaddedTokensPartitionerOptions>("SwagInference:BatchExecutors:MaxPaddedTokens");
+            localServices.AddConfigurationAndBind<ParallelPartitionSchedulerOptions>("SwagInference:BatchExecutors:Parallel");
+            localServices.AddSingleton<IPartitionScheduler>(sp =>
+                new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
 
-        services.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
-            .ConfigureOnnxOptions(onnxOptions =>
-            {
-                onnxOptions.ConfigureSessionOptions(sessionOptions =>
+            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
+                .ConfigureOnnxOptions(onnxOptions =>
                 {
-                    sessionOptions.AppendExecutionProvider_CUDA();
-                    Console.WriteLine("Using GPU accelerator");
+                    onnxOptions.ConfigureSessionOptions(sessionOptions =>
+                    {
+                        if (options.UseGpu)
+                        {
+                            sessionOptions.AppendExecutionProvider_CUDA();
+                            Console.WriteLine("Using GPU accelerator");
+                        }
 
-                    sessionOptions.AppendExecutionProvider_CPU();
-                });
-                onnxOptions.ModelDir = options.ModelDir;
-            })
-        );
+                        sessionOptions.AppendExecutionProvider_CPU();
+                    });
+                    onnxOptions.ModelDir = options.ModelDir;
+                })
+            );
+            localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+            localServices.AddSingleton(sp =>
+                ModelExecutorFactory.CreateBorrowedModelStep(
+                    options.ModelExecutorType,
+                    sp.GetRequiredService<IModelExecutorOptions>()));
 
-        services.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
-        services
-            .AddSingleton<IInferenceSteps<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>, TextMultipleChoiceTask>();
+            localServices
+                .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
+                .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>(stage => stage
+                    .UseTokenizingStep()
+                    .UseMaxPaddedTokensPartitioningStep())
+                .Build();
 
-        services.AddPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>()
-            .AddModelExecutor(sp =>
-            {
-                var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
-                return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
-            })
-            .UseTokenizing()
-            .UsePartitioning(partitionBuilder =>
-            {
-                partitionBuilder.WithMaxPaddedTokens(section: "SwagInference:BatchExecutors:MaxPaddedTokens")
-                    .WithParallelSchedular("SwagInference:BatchExecutors:Parallel"); // TODO
-            });
-
-        services.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();
-
-        return services;
+            localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();
+            localServices.CopyToGlobal<IInference<SwagInput, ChoiceResult<TokenizedText>>>();
+        });
     }
 }
