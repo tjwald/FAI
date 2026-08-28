@@ -10,6 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="..\FAI.Core\FAI.Core.csproj"/>
         <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+        <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.400" />
     </ItemGroup>
 
 </Project>

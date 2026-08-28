@@ -15,6 +15,7 @@
 
     <ItemGroup>
         <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+        <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.400" />
     </ItemGroup>
 
 </Project>
