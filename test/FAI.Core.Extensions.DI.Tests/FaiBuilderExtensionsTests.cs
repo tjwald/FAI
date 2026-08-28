@@ -1,5 +1,4 @@
 using FAI.Core.Abstractions;
-using FAI.Core.Extensions.DI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Extensions.DI.Tests;
