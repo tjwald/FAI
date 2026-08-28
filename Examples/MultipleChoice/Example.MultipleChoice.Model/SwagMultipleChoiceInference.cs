@@ -40,7 +40,8 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
             pipelineInput[i] = MapSwagInputToPipelineInput(inputSpan[i]);
         }
 
-        await _pipeline.ExecuteAsync(pipelineInput, output);
+        Memory<ChoiceResult<TokenizedText>> results = await _pipeline.ExecuteAsync(pipelineInput);
+        results.CopyTo(output);
     }
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)

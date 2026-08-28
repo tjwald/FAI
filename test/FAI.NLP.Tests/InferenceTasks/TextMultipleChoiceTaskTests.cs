@@ -31,14 +31,12 @@ public class TextMultipleChoiceTaskTests
         Assert.Equal(2, modelStep.BatchSize);
     }
 
-    private sealed class StubMultipleChoiceModelStep : IBorrowedTensorProducer<Tensor<long>[], float>
+    private sealed class StubMultipleChoiceModelStep : IStep<Tensor<long>[], TensorOutputs<float>>
     {
         public int BatchSize { get; private set; }
 
-        public ValueTask ExecuteAsync<TOutput>(
+        public ValueTask<TensorOutputs<float>> ExecuteAsync(
             Tensor<long>[] input,
-            TOutput output,
-            IBorrowedTensorConsumer<float, TOutput> consumer,
             CancellationToken cancellationToken = default)
         {
             BatchSize = checked((int)input[0].Lengths[0]);
@@ -48,8 +46,19 @@ public class TextMultipleChoiceTaskTests
             logits[0, 1] = 2.0f;
             logits[1, 0] = 3.0f;
             logits[1, 1] = -2.0f;
-            consumer.Consume(logits.AsReadOnlyTensorSpan(), 0, output);
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult<TensorOutputs<float>>(new TestTensorOutputs(logits));
+        }
+    }
+
+    private sealed class TestTensorOutputs(Tensor<float> output) : TensorOutputs<float>
+    {
+        public override int Count => 1;
+
+        public override ReadOnlyTensorSpan<float> GetOutput(int index)
+            => index == 0 ? output.AsReadOnlyTensorSpan() : throw new ArgumentOutOfRangeException(nameof(index));
+
+        public override void Dispose()
+        {
         }
     }
 }

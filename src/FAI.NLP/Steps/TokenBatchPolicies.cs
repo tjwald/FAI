@@ -5,33 +5,27 @@ using FAI.NLP.Tokenization;
 namespace FAI.NLP.Steps;
 
 public sealed class TokenizingStep<TInput, TOutput> :
-    IAllocatingStep<ReadOnlyMemory<TInput>, Memory<TOutput>>
+    IStep<ReadOnlyMemory<TInput>, Memory<TOutput>>
     where TInput : ITokenizable
 {
-    private readonly IAllocatingStep<ReadOnlyMemory<TInput>, Memory<TOutput>> _inner;
+    private readonly IStep<ReadOnlyMemory<TInput>, Memory<TOutput>> _inner;
     private readonly PretrainedTokenizer _tokenizer;
 
     public TokenizingStep(
-        IAllocatingStep<ReadOnlyMemory<TInput>, Memory<TOutput>> inner,
+        IStep<ReadOnlyMemory<TInput>, Memory<TOutput>> inner,
         PretrainedTokenizer tokenizer)
     {
         _inner = inner;
         _tokenizer = tokenizer;
     }
 
-    public ValueTask<BatchLease<Memory<TOutput>>> RentOutputAsync(
+    public async ValueTask<Memory<TOutput>> ExecuteAsync(
         ReadOnlyMemory<TInput> input,
-        CancellationToken cancellationToken = default)
-        => _inner.RentOutputAsync(input, cancellationToken);
-
-    public async ValueTask ExecuteAsync(
-        ReadOnlyMemory<TInput> input,
-        Memory<TOutput> output,
         CancellationToken cancellationToken = default)
     {
         var parallelOptions = new ParallelOptions { CancellationToken = cancellationToken };
         Parallel.ForEach(input.ToArray(), parallelOptions, item => item.Tokenize(_tokenizer));
-        await _inner.ExecuteAsync(input, output, cancellationToken);
+        return await _inner.ExecuteAsync(input, cancellationToken);
     }
 }
 

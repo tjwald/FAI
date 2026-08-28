@@ -1,7 +1,8 @@
-using System.Numerics;
 using FAI.Core.Steps;
 
 namespace FAI.Core.Extensions.DI;
+
+public delegate bool TryAllocatePipelineOutput<in TInput, TOutput>(TInput input, out TOutput output);
 
 public sealed class PipelineBuilder<TInput>
 {
@@ -14,14 +15,14 @@ public sealed class PipelineBuilder<TInput>
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput, TStep>(
         Action<PipelineStageBuilder<TInput, TOutput>>? configure = null)
-        where TStep : class, IAllocatingStep<TInput, TOutput>
+        where TStep : class, IStep<TInput, TOutput>
     {
         _services.AddSingleton<TStep>();
         return Then(serviceProvider => serviceProvider.GetRequiredService<TStep>(), configure);
     }
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(
-        Func<IServiceProvider, IAllocatingStep<TInput, TOutput>> stepFactory,
+        Func<IServiceProvider, IStep<TInput, TOutput>> stepFactory,
         Action<PipelineStageBuilder<TInput, TOutput>>? configure = null)
     {
         var stage = new PipelineStageBuilder<TInput, TOutput>();
@@ -29,33 +30,30 @@ public sealed class PipelineBuilder<TInput>
 
         return new ComposedPipelineBuilder<TInput, TOutput>(
             _services,
-            serviceProvider => new StepChain<TInput, TOutput>(
+            serviceProvider => StepChain.Create(
                 stage.Build(serviceProvider, stepFactory(serviceProvider))));
     }
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(
         Func<PipelineBuilder<TInput>, ComposedPipelineBuilder<TInput, TOutput>> buildPipeline,
-        Func<IServiceProvider, TInput, CancellationToken, ValueTask<BatchLease<TOutput>>> rentOutput,
         Action<PipelineStageBuilder<TInput, TOutput>>? configure = null)
     {
         ComposedPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
         return Then(
-            serviceProvider => new NestedPipelineStep<TInput, TOutput>(pipeline.BuildChain(serviceProvider), serviceProvider, rentOutput),
+            serviceProvider => pipeline.BuildChain(serviceProvider),
             configure);
     }
 
-    public ComposedPipelineBuilder<TInput, TOutput> ThenBorrowed<TElement, TOutput>(
-        Func<IServiceProvider, IBorrowedTensorProducer<TInput, TElement>> producerFactory,
-        Func<IServiceProvider, IBorrowedTensorConsumer<TElement, TOutput>> consumerFactory,
-        Func<IServiceProvider, TInput, CancellationToken, ValueTask<BatchLease<TOutput>>> rentOutput,
+    public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(
+        Func<PipelineBuilder<TInput>, ComposedPipelineBuilder<TInput, TOutput>> buildPipeline,
+        TryAllocatePipelineOutput<TInput, TOutput> tryAllocateOutput,
         Action<PipelineStageBuilder<TInput, TOutput>>? configure = null)
-        where TElement : unmanaged, INumber<TElement>
     {
+        ComposedPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
         return Then(
-            serviceProvider => new BorrowedTensorDecodingStep<TInput, TElement, TOutput>(
-                producerFactory(serviceProvider),
-                consumerFactory(serviceProvider),
-                (input, cancellationToken) => rentOutput(serviceProvider, input, cancellationToken)),
+            serviceProvider => new PreallocatingPipelineStep<TInput, TOutput>(
+                pipeline.BuildChain(serviceProvider),
+                tryAllocateOutput),
             configure);
     }
 }
@@ -75,14 +73,14 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
 
     public ComposedPipelineBuilder<TStart, TNext> Then<TNext, TStep>(
         Action<PipelineStageBuilder<TCurrent, TNext>>? configure = null)
-        where TStep : class, IAllocatingStep<TCurrent, TNext>
+        where TStep : class, IStep<TCurrent, TNext>
     {
         _services.AddSingleton<TStep>();
         return Then(serviceProvider => serviceProvider.GetRequiredService<TStep>(), configure);
     }
 
     public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(
-        Func<IServiceProvider, IAllocatingStep<TCurrent, TNext>> stepFactory,
+        Func<IServiceProvider, IStep<TCurrent, TNext>> stepFactory,
         Action<PipelineStageBuilder<TCurrent, TNext>>? configure = null)
     {
         var stage = new PipelineStageBuilder<TCurrent, TNext>();
@@ -97,27 +95,24 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
 
     public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(
         Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline,
-        Func<IServiceProvider, TCurrent, CancellationToken, ValueTask<BatchLease<TNext>>> rentOutput,
         Action<PipelineStageBuilder<TCurrent, TNext>>? configure = null)
     {
         ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
         return Then(
-            serviceProvider => new NestedPipelineStep<TCurrent, TNext>(pipeline.BuildChain(serviceProvider), serviceProvider, rentOutput),
+            serviceProvider => pipeline.BuildChain(serviceProvider),
             configure);
     }
 
-    public ComposedPipelineBuilder<TStart, TNext> ThenBorrowed<TElement, TNext>(
-        Func<IServiceProvider, IBorrowedTensorProducer<TCurrent, TElement>> producerFactory,
-        Func<IServiceProvider, IBorrowedTensorConsumer<TElement, TNext>> consumerFactory,
-        Func<IServiceProvider, TCurrent, CancellationToken, ValueTask<BatchLease<TNext>>> rentOutput,
+    public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(
+        Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline,
+        TryAllocatePipelineOutput<TCurrent, TNext> tryAllocateOutput,
         Action<PipelineStageBuilder<TCurrent, TNext>>? configure = null)
-        where TElement : unmanaged, INumber<TElement>
     {
+        ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
         return Then(
-            serviceProvider => new BorrowedTensorDecodingStep<TCurrent, TElement, TNext>(
-                producerFactory(serviceProvider),
-                consumerFactory(serviceProvider),
-                (input, cancellationToken) => rentOutput(serviceProvider, input, cancellationToken)),
+            serviceProvider => new PreallocatingPipelineStep<TCurrent, TNext>(
+                pipeline.BuildChain(serviceProvider),
+                tryAllocateOutput),
             configure);
     }
 
@@ -138,74 +133,84 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
     internal IStepChain<TStart, TCurrent> BuildChain(IServiceProvider serviceProvider) => _build(serviceProvider);
 }
 
-internal sealed class NestedPipelineStep<TInput, TOutput> : IAllocatingStep<TInput, TOutput>
+internal sealed class PreallocatingPipelineStep<TInput, TOutput> : IPreallocatingStep<TInput, TOutput>
 {
-    private readonly IStep<TInput, TOutput> _pipeline;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly Func<IServiceProvider, TInput, CancellationToken, ValueTask<BatchLease<TOutput>>> _rentOutput;
+    private readonly IStepChain<TInput, TOutput> _pipeline;
+    private readonly TryAllocatePipelineOutput<TInput, TOutput> _tryAllocateOutput;
 
-    public NestedPipelineStep(
-        IStep<TInput, TOutput> pipeline,
-        IServiceProvider serviceProvider,
-        Func<IServiceProvider, TInput, CancellationToken, ValueTask<BatchLease<TOutput>>> rentOutput)
+    public PreallocatingPipelineStep(
+        IStepChain<TInput, TOutput> pipeline,
+        TryAllocatePipelineOutput<TInput, TOutput> tryAllocateOutput)
     {
+        if (!pipeline.CanWriteOutput)
+        {
+            throw new InvalidOperationException("A preallocating nested pipeline requires a destination-writing final stage.");
+        }
+
         _pipeline = pipeline;
-        _serviceProvider = serviceProvider;
-        _rentOutput = rentOutput;
+        _tryAllocateOutput = tryAllocateOutput;
     }
 
-    public ValueTask<BatchLease<TOutput>> RentOutputAsync(
-        TInput input,
-        CancellationToken cancellationToken = default)
-        => _rentOutput(_serviceProvider, input, cancellationToken);
+    public bool TryAllocateOutput(TInput input, out TOutput output)
+        => _tryAllocateOutput(input, out output);
 
-    public ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
-        => _pipeline.ExecuteAsync(input, output, cancellationToken);
+    public ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
+        => _pipeline.ExecuteAsync(input, cancellationToken);
+
+    public ValueTask ExecuteAsync(
+        TInput input,
+        TOutput output,
+        CancellationToken cancellationToken = default)
+        => _pipeline.ExecuteIntoAsync(input, output, cancellationToken);
 }
 
 public sealed class PipelineStageBuilder<TInput, TOutput>
 {
-    private readonly List<Func<IServiceProvider, IAllocatingStep<TInput, TOutput>, IAllocatingStep<TInput, TOutput>>> _decorators = [];
+    private readonly List<Func<IServiceProvider, IStep<TInput, TOutput>, IStep<TInput, TOutput>>> _decorators = [];
 
     public PipelineStageBuilder<TInput, TOutput> Use<TDecorator>()
-        where TDecorator : class, IAllocatingStep<TInput, TOutput>
+        where TDecorator : class, IStep<TInput, TOutput>
     {
         return Use((serviceProvider, inner) => ActivatorUtilities.CreateInstance<TDecorator>(serviceProvider, inner));
     }
 
     public PipelineStageBuilder<TInput, TOutput> Use(
-        Func<IServiceProvider, IAllocatingStep<TInput, TOutput>, IAllocatingStep<TInput, TOutput>> factory)
+        Func<IServiceProvider, IStep<TInput, TOutput>, IStep<TInput, TOutput>> factory)
     {
         _decorators.Add(factory);
         return this;
     }
 
-    public PipelineStageBuilder<TInput, TOutput> UseBatchPartitioning<TInputBatch, TOutputBatch>()
-        where TInputBatch : IReadOnlyIndexedBatch<TInput, TInputBatch>
-        where TOutputBatch : IWritableIndexedBatch<TOutput, TOutputBatch>
+    public PipelineStageBuilder<TInput, TOutput> UseBatchPartitioning(
+        IReadOnlyIndexedBatch<TInput> inputBatch,
+        IWritableIndexedBatch<TOutput> outputBatch)
     {
         return Use((serviceProvider, inner) =>
-            new PartitioningStep<TInput, TOutput, TInputBatch, TOutputBatch>(
+            new PartitioningStep<TInput, TOutput>(
                 inner,
                 serviceProvider.GetRequiredService<IBatchPartitioner<TInput>>(),
+                inputBatch,
+                outputBatch,
                 serviceProvider.GetService<IPartitionScheduler>()));
     }
 
-    public PipelineStageBuilder<TInput, TOutput> UseOrdering<TInputBatch, TOutputBatch>()
-        where TInputBatch : IReadOnlyIndexedBatch<TInput, TInputBatch>
-        where TOutputBatch : IWritableIndexedBatch<TOutput, TOutputBatch>
+    public PipelineStageBuilder<TInput, TOutput> UseOrdering(
+        IReadOnlyIndexedBatch<TInput> inputBatch,
+        IWritableIndexedBatch<TOutput> outputBatch)
     {
         return Use((serviceProvider, inner) =>
-            new OrderingStep<TInput, TOutput, TInputBatch, TOutputBatch>(
+            new OrderingStep<TInput, TOutput>(
                 inner,
-                serviceProvider.GetRequiredService<IIndexOrdering<TInput>>()));
+                serviceProvider.GetRequiredService<IIndexOrdering<TInput>>(),
+                inputBatch,
+                outputBatch));
     }
 
-    internal IAllocatingStep<TInput, TOutput> Build(
+    internal IStep<TInput, TOutput> Build(
         IServiceProvider serviceProvider,
-        IAllocatingStep<TInput, TOutput> step)
+        IStep<TInput, TOutput> step)
     {
-        IAllocatingStep<TInput, TOutput> current = step;
+        IStep<TInput, TOutput> current = step;
         for (int i = _decorators.Count - 1; i >= 0; i--)
         {
             current = _decorators[i](serviceProvider, current);

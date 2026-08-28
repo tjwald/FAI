@@ -41,12 +41,11 @@ public sealed class SentimentInference : IInference<string, bool>
             textInputs[index] = input.Span[index];
         }
 
-        var classificationResults = new ClassificationResult<bool, float>[input.Length];
-        await _pipeline.ExecuteAsync(textInputs, classificationResults);
+        Memory<ClassificationResult<bool, float>> classificationResults = await _pipeline.ExecuteAsync(textInputs);
 
         for (int index = 0; index < classificationResults.Length; index++)
         {
-            output.Span[index] = classificationResults[index].Choice;
+            output.Span[index] = classificationResults.Span[index].Choice;
         }
     }
 }

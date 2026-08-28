@@ -34,32 +34,25 @@ public class TokenBatchPolicyTests
         var inner = new TokenCountStep();
         var step = new TokenizingStep<TokenizedText, int>(inner, tokenizer);
         ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[] { new("hello"), new("hello world") };
-        var output = new int[2];
-
-        await step.ExecuteAsync(inputs, output, TestContext.Current.CancellationToken);
+        Memory<int> output = await step.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
 
         Assert.All(inputs.ToArray(), input => Assert.NotNull(input.Tokens));
-        Assert.Equal(inputs.ToArray().Select(input => input.TokenCount), output);
+        Assert.Equal(inputs.ToArray().Select(input => input.TokenCount), output.ToArray());
     }
 
-    private sealed class TokenCountStep : IAllocatingStep<ReadOnlyMemory<TokenizedText>, Memory<int>>
+    private sealed class TokenCountStep : IStep<ReadOnlyMemory<TokenizedText>, Memory<int>>
     {
-        public ValueTask<BatchLease<Memory<int>>> RentOutputAsync(
+        public ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<TokenizedText> input,
-            CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<Memory<int>>(new int[input.Length]));
-
-        public ValueTask ExecuteAsync(
-            ReadOnlyMemory<TokenizedText> input,
-            Memory<int> output,
             CancellationToken cancellationToken = default)
         {
+            var output = new int[input.Length];
             for (int index = 0; index < input.Length; index++)
             {
-                output.Span[index] = input.Span[index].TokenCount;
+                output[index] = input.Span[index].TokenCount;
             }
 
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult<Memory<int>>(output);
         }
     }
 }

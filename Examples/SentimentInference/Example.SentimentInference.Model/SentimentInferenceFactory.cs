@@ -48,7 +48,7 @@ public static class SentimentInferenceFactory
             localServices.AddSingleton<IPartitionScheduler>(sp =>
                 new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
             localServices.AddSingleton(sp =>
-                ModelExecutorFactory.CreateBorrowedModelStep(
+                ModelExecutorFactory.CreateModelStep(
                     options.ModelExecutorType,
                     sp.GetRequiredService<IModelExecutorOptions>()));
             localServices.AddSingleton<ClassificationDecodingStep<bool>>();
@@ -58,22 +58,13 @@ public static class SentimentInferenceFactory
                 .Then(
                     pipeline => pipeline
                         .Then<Tensor<long>[], TextBatchEncodingStep>()
-                        .ThenBorrowed(
-                            sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
-                            sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
-                            (_, input, cancellationToken) =>
-                            {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                int batchSize = checked((int)input[0].Lengths[0]);
-                                var output = new ClassificationResult<bool, float>[batchSize];
-                                return ValueTask.FromResult(
-                                    new BatchLease<Memory<ClassificationResult<bool, float>>>(output));
-                            }),
-                    (_, input, cancellationToken) =>
+                        .Then(sp =>
+                            sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
+                        .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
+                    (input, out output) =>
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var output = new ClassificationResult<bool, float>[input.Length];
-                        return ValueTask.FromResult(new BatchLease<Memory<ClassificationResult<bool, float>>>(output));
+                        output = new ClassificationResult<bool, float>[input.Length];
+                        return true;
                     },
                     stage => stage
                         .UseTokenizingStep()

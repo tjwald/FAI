@@ -10,70 +10,226 @@ public interface IIndexOrdering<in TBatch>
     int[] CreateOrder(TBatch batch);
 }
 
-public sealed class PartitioningStep<TInput, TOutput, TInputBatch, TOutputBatch>
-    : IAllocatingStep<TInput, TOutput>
-    where TInputBatch : IReadOnlyIndexedBatch<TInput, TInputBatch>
-    where TOutputBatch : IWritableIndexedBatch<TOutput, TOutputBatch>
+public sealed class PartitioningStep<TInput, TOutput>
+    : IPreallocatingStep<TInput, TOutput>
 {
-    private readonly IAllocatingStep<TInput, TOutput> _inner;
+    private readonly IStep<TInput, TOutput> _inner;
+    private readonly IPreallocatingStep<TInput, TOutput>? _preallocatingInner;
     private readonly IBatchPartitioner<TInput> _partitioner;
     private readonly IPartitionScheduler _scheduler;
+    private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
+    private readonly IWritableIndexedBatch<TOutput> _outputBatch;
 
     public PartitioningStep(
-        IAllocatingStep<TInput, TOutput> inner,
+        IStep<TInput, TOutput> inner,
         IBatchPartitioner<TInput> partitioner,
+        IReadOnlyIndexedBatch<TInput> inputBatch,
+        IWritableIndexedBatch<TOutput> outputBatch,
         IPartitionScheduler? scheduler = null)
     {
         _inner = inner;
+        _preallocatingInner = inner as IPreallocatingStep<TInput, TOutput>;
         _partitioner = partitioner;
+        _inputBatch = inputBatch;
+        _outputBatch = outputBatch;
         _scheduler = scheduler ?? new SerialPartitionScheduler();
     }
 
-    public ValueTask<BatchLease<TOutput>> RentOutputAsync(TInput input, CancellationToken cancellationToken = default)
-        => _inner.RentOutputAsync(input, cancellationToken);
-
-    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+    public bool TryAllocateOutput(TInput input, out TOutput output)
     {
-        int inputCount = TInputBatch.Count(input);
-        int outputCount = TOutputBatch.Count(output);
-        if (inputCount != outputCount)
+        if (_preallocatingInner is not null && _preallocatingInner.TryAllocateOutput(input, out TOutput? allocated))
         {
-            throw new ArgumentException($"Input count {inputCount} does not match output count {outputCount}.", nameof(output));
+            output = allocated;
+            return true;
+        }
+
+        output = default!;
+        return false;
+    }
+
+    public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
+    {
+        if (TryAllocateOutput(input, out TOutput? output))
+        {
+            try
+            {
+                await ExecuteAsync(input, output, cancellationToken);
+                return output;
+            }
+            catch
+            {
+                await StepOutputDisposer.DisposeAsync(output);
+                throw;
+            }
+        }
+
+        Range[] ranges = _partitioner.Partition(input).ToArray();
+        if (ranges.Length == 0)
+        {
+            throw new InvalidOperationException("Partitioning an empty batch requires preallocation support.");
+        }
+
+        var partitionOutputs = new TOutput[ranges.Length];
+        Dictionary<Range, int> rangeIndices = ranges
+            .Select((range, index) => (range, index))
+            .ToDictionary(item => item.range, item => item.index);
+        try
+        {
+            await _scheduler.ExecuteAsync(
+                ranges,
+                async (range, token) =>
+                {
+                    int index = rangeIndices[range];
+                    partitionOutputs[index] = await _inner.ExecuteAsync(
+                        _inputBatch.Slice(input, range),
+                        token);
+                },
+                cancellationToken);
+
+            TOutput aggregate = _outputBatch.AllocateLike(partitionOutputs[0], _inputBatch.Count(input));
+            try
+            {
+                for (int i = 0; i < ranges.Length; i++)
+                {
+                    ScatterRange(partitionOutputs[i], aggregate, ranges[i]);
+                }
+
+                return aggregate;
+            }
+            catch
+            {
+                await StepOutputDisposer.DisposeAsync(aggregate);
+                throw;
+            }
+        }
+        finally
+        {
+            foreach (TOutput partitionOutput in partitionOutputs)
+            {
+                if (partitionOutput is not null)
+                {
+                    await StepOutputDisposer.DisposeAsync(partitionOutput);
+                }
+            }
+        }
+    }
+
+    public async ValueTask ExecuteAsync(
+        TInput input,
+        TOutput output,
+        CancellationToken cancellationToken = default)
+    {
+        int inputCount = _inputBatch.Count(input);
+        if (inputCount != _outputBatch.Count(output))
+        {
+            throw new ArgumentException("Input and output batch counts must match.", nameof(output));
         }
 
         await _scheduler.ExecuteAsync(
             _partitioner.Partition(input),
-            (range, token) => _inner.ExecuteAsync(
-                TInputBatch.Slice(input, range),
-                TOutputBatch.Slice(output, range),
-                token),
+            async (range, token) =>
+            {
+                TInput partitionInput = _inputBatch.Slice(input, range);
+                if (_preallocatingInner is not null)
+                {
+                    await _preallocatingInner.ExecuteAsync(
+                        partitionInput,
+                        _outputBatch.Slice(output, range),
+                        token);
+                    return;
+                }
+
+                TOutput partitionOutput = await _inner.ExecuteAsync(partitionInput, token);
+                try
+                {
+                    ScatterRange(partitionOutput, output, range);
+                }
+                finally
+                {
+                    await StepOutputDisposer.DisposeAsync(partitionOutput);
+                }
+            },
             cancellationToken);
     }
-}
 
-public sealed class OrderingStep<TInput, TOutput, TInputBatch, TOutputBatch>
-    : IAllocatingStep<TInput, TOutput>
-    where TInputBatch : IReadOnlyIndexedBatch<TInput, TInputBatch>
-    where TOutputBatch : IWritableIndexedBatch<TOutput, TOutputBatch>
-{
-    private readonly IAllocatingStep<TInput, TOutput> _inner;
-    private readonly IIndexOrdering<TInput> _ordering;
-
-    public OrderingStep(IAllocatingStep<TInput, TOutput> inner, IIndexOrdering<TInput> ordering)
+    private void ScatterRange(TOutput source, TOutput destination, Range range)
     {
-        _inner = inner;
-        _ordering = ordering;
+        (int offset, int length) = range.GetOffsetAndLength(_outputBatch.Count(destination));
+        int[] destinationIndices = Enumerable.Range(offset, length).ToArray();
+        _outputBatch.Scatter(source, destination, destinationIndices);
     }
 
-    public ValueTask<BatchLease<TOutput>> RentOutputAsync(TInput input, CancellationToken cancellationToken = default)
-        => _inner.RentOutputAsync(input, cancellationToken);
+}
 
-    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+public sealed class OrderingStep<TInput, TOutput>
+    : IPreallocatingStep<TInput, TOutput>
+{
+    private readonly IStep<TInput, TOutput> _inner;
+    private readonly IPreallocatingStep<TInput, TOutput>? _preallocatingInner;
+    private readonly IIndexOrdering<TInput> _ordering;
+    private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
+    private readonly IWritableIndexedBatch<TOutput> _outputBatch;
+
+    public OrderingStep(
+        IStep<TInput, TOutput> inner,
+        IIndexOrdering<TInput> ordering,
+        IReadOnlyIndexedBatch<TInput> inputBatch,
+        IWritableIndexedBatch<TOutput> outputBatch)
+    {
+        _inner = inner;
+        _preallocatingInner = inner as IPreallocatingStep<TInput, TOutput>;
+        _ordering = ordering;
+        _inputBatch = inputBatch;
+        _outputBatch = outputBatch;
+    }
+
+    public bool TryAllocateOutput(TInput input, out TOutput output)
+    {
+        if (_preallocatingInner is not null && _preallocatingInner.TryAllocateOutput(input, out TOutput? allocated))
+        {
+            output = allocated;
+            return true;
+        }
+
+        output = default!;
+        return false;
+    }
+
+    public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
     {
         int[] sortedToOriginal = _ordering.CreateOrder(input);
+        using BatchLease<TInput> sortedInput = _inputBatch.Gather(input, sortedToOriginal);
+        TOutput output = await _inner.ExecuteAsync(sortedInput.Value, cancellationToken);
+        _outputBatch.PermuteInPlace(output, sortedToOriginal);
+        return output;
+    }
 
-        using BatchLease<TInput> sortedInput = TInputBatch.Gather(input, sortedToOriginal);
-        await _inner.ExecuteAsync(sortedInput.Value, output, cancellationToken);
-        TOutputBatch.PermuteInPlace(output, sortedToOriginal);
+    public async ValueTask ExecuteAsync(
+        TInput input,
+        TOutput output,
+        CancellationToken cancellationToken = default)
+    {
+        int[] sortedToOriginal = _ordering.CreateOrder(input);
+        using BatchLease<TInput> sortedInput = _inputBatch.Gather(input, sortedToOriginal);
+
+        if (_preallocatingInner is not null)
+        {
+            await _preallocatingInner.ExecuteAsync(sortedInput.Value, output, cancellationToken);
+        }
+        else
+        {
+            TOutput sortedOutput = await _inner.ExecuteAsync(sortedInput.Value, cancellationToken);
+            try
+            {
+                int[] identity = Enumerable.Range(0, _outputBatch.Count(sortedOutput)).ToArray();
+                _outputBatch.Scatter(sortedOutput, output, identity);
+            }
+            finally
+            {
+                await StepOutputDisposer.DisposeAsync(sortedOutput);
+            }
+        }
+
+        _outputBatch.PermuteInPlace(output, sortedToOriginal);
     }
 }

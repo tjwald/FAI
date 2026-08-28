@@ -9,31 +9,37 @@ using FAI.NLP.Tokenization;
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
 public sealed class TextMultipleChoiceStep :
-    IAllocatingStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+    IPreallocatingStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
 {
     private readonly PretrainedTokenizer _tokenizer;
-    private readonly IBorrowedTensorProducer<Tensor<long>[], float> _modelStep;
+    private readonly IStep<Tensor<long>[], TensorOutputs<float>> _modelStep;
     private readonly TextMultipleChoiceOptions _options;
-    private readonly ModelOutputConsumer _modelOutputConsumer;
 
     public TextMultipleChoiceStep(
         PretrainedTokenizer tokenizer,
-        IBorrowedTensorProducer<Tensor<long>[], float> modelStep,
+        IStep<Tensor<long>[], TensorOutputs<float>> modelStep,
         TextMultipleChoiceOptions options)
     {
         _tokenizer = tokenizer;
         _modelStep = modelStep;
         _options = options;
-        _modelOutputConsumer = new ModelOutputConsumer(this);
     }
 
-    public ValueTask<BatchLease<Memory<ChoiceResult<TokenizedText>>>> RentOutputAsync(
+    public bool TryAllocateOutput(
+        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        out Memory<ChoiceResult<TokenizedText>> output)
+    {
+        output = new ChoiceResult<TokenizedText>[input.Length];
+        return true;
+    }
+
+    public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
         ReadOnlyMemory<TextMultipleChoiceInput> input,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var output = new ChoiceResult<TokenizedText>[input.Length];
-        return ValueTask.FromResult(new BatchLease<Memory<ChoiceResult<TokenizedText>>>(output));
+        _ = TryAllocateOutput(input, out Memory<ChoiceResult<TokenizedText>> output);
+        await ExecuteAsync(input, output, cancellationToken);
+        return output;
     }
 
     public async ValueTask ExecuteAsync(
@@ -54,11 +60,8 @@ public sealed class TextMultipleChoiceStep :
         cancellationToken.ThrowIfCancellationRequested();
         BatchTokenizedResult tokenized = Preprocess(input.Span);
         Tensor<long>[] modelInput = tokenized.ToArray();
-        await _modelStep.ExecuteAsync(
-            modelInput,
-            new DecodeState(input, output),
-            _modelOutputConsumer,
-            cancellationToken);
+        using TensorOutputs<float> modelOutput = await _modelStep.ExecuteAsync(modelInput, cancellationToken);
+        Decode(input, modelOutput.GetOutput(0), output);
     }
 
     private BatchTokenizedResult Preprocess(ReadOnlySpan<TextMultipleChoiceInput> input)
@@ -118,36 +121,26 @@ public sealed class TextMultipleChoiceStep :
             storedLogits);
     }
 
-    private readonly record struct DecodeState(
-        ReadOnlyMemory<TextMultipleChoiceInput> Input,
-        Memory<ChoiceResult<TokenizedText>> Output);
-
-    private sealed class ModelOutputConsumer(TextMultipleChoiceStep owner) :
-        IBorrowedTensorConsumer<float, DecodeState>
+    private void Decode(
+        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        ReadOnlyTensorSpan<float> tensor,
+        Memory<ChoiceResult<TokenizedText>> output)
     {
-        public void Consume(ReadOnlyTensorSpan<float> tensor, int outputIndex, DecodeState state)
+        int rowCount = checked((int)tensor.Lengths[0]);
+        if (rowCount != input.Length)
         {
-            if (outputIndex != 0)
-            {
-                return;
-            }
+            throw new InvalidOperationException(
+                $"The model produced {rowCount} result rows for an input batch of {input.Length}.");
+        }
 
-            int rowCount = checked((int)tensor.Lengths[0]);
-            if (rowCount != state.Input.Length)
-            {
-                throw new InvalidOperationException(
-                    $"The model produced {rowCount} result rows for an input batch of {state.Input.Length}.");
-            }
-
-            int rowIndex = 0;
-            foreach (ReadOnlyTensorSpan<float> row in tensor.GetDimensionSpan(0))
-            {
-                int choiceCount = state.Input.Span[rowIndex].Choices.Length;
-                state.Output.Span[rowIndex] = owner.GetMultipleChoiceResult(
-                    state.Input.Span[rowIndex],
-                    row.AsSpan()[..choiceCount]);
-                rowIndex++;
-            }
+        int rowIndex = 0;
+        foreach (ReadOnlyTensorSpan<float> row in tensor.GetDimensionSpan(0))
+        {
+            int choiceCount = input.Span[rowIndex].Choices.Length;
+            output.Span[rowIndex] = GetMultipleChoiceResult(
+                input.Span[rowIndex],
+                row.AsSpan()[..choiceCount]);
+            rowIndex++;
         }
     }
 }

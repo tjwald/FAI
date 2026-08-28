@@ -1,10 +1,27 @@
 # Finite pipelines
 
-Finite pipelines are composed from steps that transform one complete input value into a caller-provided output value.
+Finite pipelines compose steps that transform one complete value into another.
 
 ```csharp
-public interface IStep<TInput, TOutput>
+public interface IStep<in TInput, TOutput>
 {
+    ValueTask<TOutput> ExecuteAsync(
+        TInput input,
+        CancellationToken cancellationToken = default);
+}
+```
+
+`TInput` and `TOutput` may each represent a complete batch, tensor bundle, or runtime-owned model result. A returned value belongs to the caller. During composition, the chain owns intermediate values and disposes an `IAsyncDisposable` or `IDisposable` intermediate only after the complete downstream asynchronous operation finishes.
+
+## Conditional preallocation
+
+Preallocation is an optional capability, not the base execution contract.
+
+```csharp
+public interface IPreallocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
+{
+    bool TryAllocateOutput(TInput input, out TOutput output);
+
     ValueTask ExecuteAsync(
         TInput input,
         TOutput output,
@@ -12,67 +29,28 @@ public interface IStep<TInput, TOutput>
 }
 ```
 
-`TInput` and `TOutput` represent complete batches. A step can therefore use `ReadOnlyMemory<T>`, `Memory<T>`, `Tensor<T>`, or a model-specific tensor bundle without requiring one output object per input item.
+Interface presence means a step understands destination execution. `TryAllocateOutput` determines whether metadata is sufficient for a particular input. It returns storage only and must not perform inference, tokenization, I/O, probing, or substantive work that execution would repeat. It must not encode hidden execution state into the destination.
 
-## Output allocation
-
-Steps that can produce intermediate values implement `IAllocatingStep<TInput, TOutput>`. The producing step owns its output shape and allocator selection, preventing a pipeline builder from pairing it with an incompatible output factory.
-
-```csharp
-public interface IAllocatingStep<TInput, TOutput> : IStep<TInput, TOutput>
-{
-    ValueTask<BatchLease<TOutput>> RentOutputAsync(
-        TInput input,
-        CancellationToken cancellationToken = default);
-
-        ValueTask<BatchLease<TOutput>> ExecuteAsync(
-        TInput input,
-        CancellationToken cancellationToken = default);
-}
-```
-
-    The direct `IStep.ExecuteAsync` path does not allocate an output. Pipeline composition uses the atomic allocating overload for intermediate links, allowing a step to prepare its input-dependent state once. `RentOutputAsync` remains available when a caller must separate allocation from execution. The final output is always supplied by the caller. The allocating overload returns a lease that the caller must dispose.
+A supplied compatible destination remains valid for `ExecuteAsync(input, output)` even when `TryAllocateOutput(input, out _)` returns `false`. Invalid metadata and allocation failures throw; `false` means only that this invocation cannot be preallocated from available metadata.
 
 ## Composition
 
-`AddPipeline<TInput>()` starts a typed pipeline. Every `Then<TOutput, TStep>()` changes the builder's current type, so incompatible stages fail at compile time.
-
-```csharp
-services
-    .AddPipeline<ReadOnlyMemory<string>>()
-    .Then<TokenBatch, TokenizeStep>()
-    .Then<Tensor<float>, EmbeddingStep>(stage => stage
-        .Use<TokenCountOrderingStep>()
-        .UseBatchPartitioning<TokenBatchOperations, TensorBatchOperations<float>>())
-    .Then<Tensor<float>, NormalizeStep>()
-    .Build("embeddings");
-```
-
-This registers one keyed `IStep<ReadOnlyMemory<string>, Tensor<float>>`. `Then` does not register output factories: every `TStep` must implement `IAllocatingStep` and provide its own intermediate allocation.
-
-The builder compiles stages into a continuation-based chain. This allows each step to rent its output only after its immediate input exists. Intermediate leases are disposed immediately after the consuming stage completes.
-
-`Use` wraps only the stage passed to that `Then` call. Policies are applied in declaration order from outermost to innermost. A step implementation does not call the next step; only pipeline chains and policy decorators hold and invoke an inner step.
-
-## Nested pipelines
-
-The pipeline-building `Then` overload turns another typed pipeline into one stage of the current pipeline. Decorators on that stage wrap the complete inner chain rather than one of its individual steps.
+`AddPipeline<TInput>()` starts a typed pipeline. Each `Then<TOutput, TStep>()` changes the current type, so incompatible stages fail at compile time.
 
 ```csharp
 services
     .AddPipeline<ReadOnlyMemory<TokenizedText>>()
-    .Then<Memory<ClassificationResult<bool, float>>>(
+    .Then(
         pipeline => pipeline
             .Then<Tensor<long>[], TextBatchEncodingStep>()
-            .ThenBorrowed<float, Memory<ClassificationResult<bool, float>>>(
-                services => services.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
-                services => services.GetRequiredService<ClassificationDecodingStep<bool>>(),
-                (_, input, _) => ValueTask.FromResult(
-                    new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                        new ClassificationResult<bool, float>[input[0].Lengths[0]]))),
-        (_, input, _) => ValueTask.FromResult(
-            new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                new ClassificationResult<bool, float>[input.Length])),
+            .Then<TensorOutputs<float>>(services =>
+                services.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
+            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
+        (ReadOnlyMemory<TokenizedText> input, out Memory<ClassificationResult<bool, float>> output) =>
+        {
+            output = new ClassificationResult<bool, float>[input.Length];
+            return true;
+        },
         stage => stage
             .UseTokenizingStep()
             .UseTokenCountOrderingStep()
@@ -80,32 +58,59 @@ services
     .Build();
 ```
 
-The nested stage requires an explicit endpoint allocator. Its final step normally allocates from its immediate input, but that input does not exist until the earlier nested steps have executed. The endpoint allocator instead describes how the enclosing pipeline allocates output directly from the enclosing input without executing the nested pipeline twice.
+Nested `Then` is an ordinary typed stage and needs no allocator for normal return-value execution. A type-changing nested pipeline may optionally provide a synchronous endpoint allocator when its final stage supports destination execution but cannot derive final storage directly from the nested pipeline's starting input. The allocator follows the same storage-only Try contract and lets enclosing partition decorators preallocate one complete output.
 
-For classification, the effective execution order is tokenization, token-count ordering, token-budget partitioning through the configured scheduler, tensor encoding, model execution, and logits decoding. Output order is restored only after the complete nested pipeline has finished.
+`Use` wraps only the configured stage, and decorators are declared from outermost to innermost.
 
-## Indexed batch policies
+For classification, execution order is tokenization, token-count ordering, token-budget partitioning, scheduled encoding, model execution, decoding, and restoration of original order.
 
-Ordering, partitioning, and routing require first-axis batch semantics. These semantics use static abstract traits rather than injected operation services:
+## Batch capabilities
 
-- `ReadOnlyMemoryBatchOperations<T>` gathers and slices memory inputs.
-- `MemoryBatchOperations<T>` rents, slices, scatters, and permutes memory outputs.
-- `TensorBatchOperations<T>` performs the same operations over axis zero of `Tensor<T>`.
+Batch structure belongs to operations traits rather than `TInput` or `TOutput`. This supports external values such as arrays, `Memory<T>`, and `Tensor<T>` without requiring those types to implement FAI interfaces.
 
-Contiguous tensor slices are shared views of the source tensor. Partitioning can therefore write directly into the corresponding region of the caller's output. Non-contiguous ordering and routing require gathered temporary storage unless the underlying model accepts indexed inputs.
+The relevant operations are independent capabilities:
 
-`PartitioningStep` forwards matching input and output views to its inner step. `OrderingStep` gathers inputs in the selected order, invokes its inner step, and restores caller output order. `RoutingStep` gathers each route, invokes its selected target, and scatters results to the original row positions.
+- Cardinality
+- Contiguous slicing
+- Indexed gathering
+- Aggregate allocation
+- Scattering
+- Permutation
 
-Domain packages should expose concise extensions over these generic policies. For example, NLP can provide token-budget partitioning and token-count ordering without introducing another execution abstraction.
+Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing requires indexed gathering and output scattering; contiguous slicing alone cannot represent non-contiguous routes.
 
-## Borrowed model output
+## Partition preallocation
 
-Runtime-owned tensors should be decoded while the runtime allocation is alive. `IBorrowedTensorProducer<TInput, TElement>` invokes an `IBorrowedTensorConsumer<TElement, TOutput>` synchronously for each output tensor. The consumer receives a `ReadOnlyTensorSpan<TElement>` and must not retain it after `Consume` returns.
+Partitioning selects its strategy from three capabilities:
 
-`ThenBorrowed` composes a producer and consumer into a normal owned-output pipeline stage. ONNX keeps each `OrtValue` alive through the consumer call, so decoding does not allocate or copy a managed logits tensor. Domain packages depend only on the Core borrowed contracts and never on ONNX types.
+1. The input operations support contiguous slicing.
+2. The output operations support matching destination slices.
+3. The inner step implements `IPreallocatingStep<TInput, TOutput>` and can allocate for the full input.
 
-Use `ModelExecutorFactory.CreateBorrowedModelStep` for normal model-and-decode pipelines. `CreateMaterializingModelStep` is the explicit adapter for consumers that require owned `Tensor<float>[]` output.
+When all are available, partitioning calls `TryAllocateOutput` once with the complete input, slices the input and destination by matching ranges, and schedules writes into disjoint output slices. It never allocates once per partition.
 
-## Ownership
+If preallocation returns `false`, partitioning executes each partition through the ordinary return-value path, allocates an aggregate shaped from an actual partition result, and scatters each result into place.
 
-Inputs and caller-provided outputs must remain valid until `ExecuteAsync` completes. A `BatchLease<T>` owns only the value returned by an allocating execution or `RentOutputAsync`; disposing it returns pooled resources. Tensor views returned by `TensorBatchOperations<T>.Slice` share their source storage and do not own it. Borrowed tensor spans are valid only during their synchronous consumer call.
+Structural capabilities are selected when generic decorators are configured and the inner step interface is cached when DI constructs the pipeline. Runtime checks cover per-input preallocation eligibility, cardinality, shape compatibility, ranges, cancellation, and disposal.
+
+## Runtime-owned model outputs
+
+`TensorOutputs<T>` is a Core-owned disposable output value. ONNX implements it with live `OrtValue` instances and returns it from a normal model step:
+
+```csharp
+IStep<Tensor<long>[], TensorOutputs<float>>
+```
+
+A decoder obtains `ReadOnlyTensorSpan<T>` views synchronously from the live scope. The scope can remain alive across awaits, while C# prevents a ref-struct span from crossing an await. The composed chain disposes the scope after decoding finishes, including failure and cancellation paths.
+
+Normal classification therefore performs no managed logits materialization. A consumer that needs owned logits must copy them explicitly while the scope is alive.
+
+## Capability examples
+
+- Tokenization is return-value-only because dimensions depend on tokenization work.
+- Text encoding is return-value-only when shape discovery would repeat encoding work.
+- Static-shape model backends may implement preallocation only when they can bind supplied storage directly.
+- Dynamic-output models remain return-value-only for inputs whose output shape is not metadata-predictable.
+- Classification, multiple-choice, and image decoders can preallocate result memory from output cardinality and write directly into slices.
+
+Tensor and memory slices share source storage and do not own it. Gathered pooled inputs are local decorator implementation details and must be disposed before the decorator returns.

@@ -3,37 +3,35 @@ using System.Runtime.CompilerServices;
 
 namespace FAI.Core.Steps;
 
-public interface IReadOnlyIndexedBatch<TBatch, TSelf>
-    where TSelf : IReadOnlyIndexedBatch<TBatch, TSelf>
+public interface IReadOnlyIndexedBatch<TBatch>
 {
-    static abstract int Count(TBatch batch);
+    int Count(TBatch batch);
 
-    static abstract TBatch Slice(TBatch batch, Range range);
+    TBatch Slice(TBatch batch, Range range);
 
-    static abstract BatchLease<TBatch> Gather(TBatch source, ReadOnlySpan<int> indices);
+    BatchLease<TBatch> Gather(TBatch source, ReadOnlySpan<int> indices);
 }
 
-public interface IWritableIndexedBatch<TBatch, TSelf>
-    where TSelf : IWritableIndexedBatch<TBatch, TSelf>
+public interface IWritableIndexedBatch<TBatch>
 {
-    static abstract int Count(TBatch batch);
+    int Count(TBatch batch);
 
-    static abstract TBatch Slice(TBatch batch, Range range);
+    TBatch Slice(TBatch batch, Range range);
 
-    static abstract BatchLease<TBatch> RentLike(TBatch template, int count);
+    TBatch AllocateLike(TBatch template, int count);
 
-    static abstract void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
+    void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
 
-    static abstract void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
+    void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
 }
 
-public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>, ReadOnlyMemoryBatchOperations<T>>
+public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>
 {
-    public static int Count(ReadOnlyMemory<T> batch) => batch.Length;
+    public int Count(ReadOnlyMemory<T> batch) => batch.Length;
 
-    public static ReadOnlyMemory<T> Slice(ReadOnlyMemory<T> batch, Range range) => batch[range];
+    public ReadOnlyMemory<T> Slice(ReadOnlyMemory<T> batch, Range range) => batch[range];
 
-    public static BatchLease<ReadOnlyMemory<T>> Gather(ReadOnlyMemory<T> source, ReadOnlySpan<int> indices)
+    public BatchLease<ReadOnlyMemory<T>> Gather(ReadOnlyMemory<T> source, ReadOnlySpan<int> indices)
     {
         T[] buffer = ArrayPool<T>.Shared.Rent(indices.Length);
         ReadOnlySpan<T> sourceSpan = source.Span;
@@ -48,21 +46,15 @@ public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<Rea
     }
 }
 
-public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>, MemoryBatchOperations<T>>
+public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
 {
-    public static int Count(Memory<T> batch) => batch.Length;
+    public int Count(Memory<T> batch) => batch.Length;
 
-    public static Memory<T> Slice(Memory<T> batch, Range range) => batch[range];
+    public Memory<T> Slice(Memory<T> batch, Range range) => batch[range];
 
-    public static BatchLease<Memory<T>> RentLike(Memory<T> template, int count)
-    {
-        T[] buffer = ArrayPool<T>.Shared.Rent(count);
-        return new BatchLease<Memory<T>>(
-            buffer.AsMemory(0, count),
-            _ => ArrayPool<T>.Shared.Return(buffer, RuntimeHelpers.IsReferenceOrContainsReferences<T>()));
-    }
+    public Memory<T> AllocateLike(Memory<T> template, int count) => new T[count];
 
-    public static void Scatter(Memory<T> source, Memory<T> destination, ReadOnlySpan<int> destinationIndices)
+    public void Scatter(Memory<T> source, Memory<T> destination, ReadOnlySpan<int> destinationIndices)
     {
         ReadOnlySpan<T> sourceSpan = source.Span;
         Span<T> destinationSpan = destination.Span;
@@ -72,7 +64,7 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>, 
         }
     }
 
-    public static void PermuteInPlace(Memory<T> batch, Span<int> sourceToDestinationIndices)
+    public void PermuteInPlace(Memory<T> batch, Span<int> sourceToDestinationIndices)
     {
         T[] copy = ArrayPool<T>.Shared.Rent(batch.Length);
         try

@@ -1,4 +1,5 @@
 using System.Numerics.Tensors;
+using FAI.Core;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Steps;
 using FAI.Onnx.Configuration;
@@ -12,30 +13,30 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
     private readonly string _modelPath = fixture.ModelPath;
 
     [Fact]
-    public async Task CreateMaterializingModelStep_PooledOptions_ExecutesRealInference()
+    public async Task CreateModelStep_PooledOptions_ExecutesRealInference()
     {
         var onnxOptions = CreateOnnxOptions();
         var options = new PooledExecutorOptions<OnnxModelExecutorOptions>(onnxOptions, 2);
-        IAllocatingStep<Tensor<long>[], Tensor<float>[]> step =
-            ModelExecutorFactory.CreateMaterializingModelStep(ModelExecutorType.Async, options);
+        IStep<Tensor<long>[], TensorOutputs<float>> step =
+            ModelExecutorFactory.CreateModelStep(ModelExecutorType.Async, options);
 
         await AssertFiniteStepOutput(step);
     }
 
     [Fact]
-    public async Task CreateMaterializingModelStep_MultiDeviceOptions_ExecutesRealInference()
+    public async Task CreateModelStep_MultiDeviceOptions_ExecutesRealInference()
     {
         var options = new MultiDeviceExecutorOptions()
             .AddOptions(ConfigureModelPath)
             .AddOptions(ConfigureModelPath);
-        IAllocatingStep<Tensor<long>[], Tensor<float>[]> step =
-            ModelExecutorFactory.CreateMaterializingModelStep(ModelExecutorType.Simple, options);
+        IStep<Tensor<long>[], TensorOutputs<float>> step =
+            ModelExecutorFactory.CreateModelStep(ModelExecutorType.Simple, options);
 
         await AssertFiniteStepOutput(step);
     }
 
     [Fact]
-    public void CreateMaterializingModelStep_ShouldReturnSimpleStep_WhenOnnxOptionsProvided()
+    public void CreateModelStep_ShouldReturnSimpleStep_WhenOnnxOptionsProvided()
     {
         // Arrange
         var options = new OnnxModelExecutorOptions().ConfigureOnnxOptions(opt =>
@@ -45,21 +46,21 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
         });
 
         // Act
-        var step = ModelExecutorFactory.CreateMaterializingModelStep(ModelExecutorType.Simple, options);
+        var step = ModelExecutorFactory.CreateModelStep(ModelExecutorType.Simple, options);
 
         // Assert
         Assert.IsType<OnnxModelExecutor>(step);
     }
 
     [Fact]
-    public void CreateMaterializingModelStep_ShouldThrow_WhenUnknownExecutorType()
+    public void CreateModelStep_ShouldThrow_WhenUnknownExecutorType()
     {
         // Arrange
         var options = new OnnxModelExecutorOptions();
         var unknownType = (ModelExecutorType)999;
 
         // Act & Assert
-        Assert.Throws<NotImplementedException>(() => ModelExecutorFactory.CreateMaterializingModelStep(unknownType, options));
+        Assert.Throws<NotImplementedException>(() => ModelExecutorFactory.CreateModelStep(unknownType, options));
     }
 
     private OnnxModelExecutorOptions CreateOnnxOptions()
@@ -79,15 +80,10 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
     }
 
     private static async Task AssertFiniteStepOutput(
-        IAllocatingStep<Tensor<long>[], Tensor<float>[]> step)
+        IStep<Tensor<long>[], TensorOutputs<float>> step)
     {
         Tensor<long>[] input = [Tensor.Create([11L, 22L, 33L], [1, 3])];
-        using BatchLease<Tensor<float>[]> output =
-            await step.RentOutputAsync(input, TestContext.Current.CancellationToken);
-
-        await step.ExecuteAsync(input, output.Value, TestContext.Current.CancellationToken);
-
-        Tensor<float> result = output.Value[0];
-        Assert.Equal([11.0f, 22.0f, 33.0f], [result[0, 0], result[0, 1], result[0, 2]]);
+        using TensorOutputs<float> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Assert.Equal([11.0f, 22.0f, 33.0f], output.GetOutput(0).AsSpan().ToArray());
     }
 }

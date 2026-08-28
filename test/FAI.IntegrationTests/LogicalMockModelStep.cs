@@ -1,41 +1,12 @@
 namespace FAI.IntegrationTests;
 
 public sealed class LogicalMockModelStep(float[][] outputs) :
-    IAllocatingStep<Tensor<long>[], Tensor<float>[]>,
-    IBorrowedTensorProducer<Tensor<long>[], float>
+    IStep<Tensor<long>[], TensorOutputs<float>>
 {
     private int _callCount;
 
-    public ValueTask<BatchLease<Tensor<float>[]>> RentOutputAsync(
+    public ValueTask<TensorOutputs<float>> ExecuteAsync(
         Tensor<long>[] input,
-        CancellationToken cancellationToken = default)
-    {
-        int batchSize = checked((int)input[0].Lengths[0]);
-        Tensor<float>[] output = [Tensor.CreateFromShape<float>([batchSize, outputs[0].Length])];
-        return ValueTask.FromResult(new BatchLease<Tensor<float>[]>(output));
-    }
-
-    public ValueTask ExecuteAsync(
-        Tensor<long>[] input,
-        Tensor<float>[] output,
-        CancellationToken cancellationToken = default)
-    {
-        for (int rowIndex = 0; rowIndex < output[0].Lengths[0]; rowIndex++)
-        {
-            float[] row = outputs[_callCount++ % outputs.Length];
-            for (int columnIndex = 0; columnIndex < row.Length; columnIndex++)
-            {
-                output[0][rowIndex, columnIndex] = row[columnIndex];
-            }
-        }
-
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask ExecuteAsync<TOutput>(
-        Tensor<long>[] input,
-        TOutput output,
-        IBorrowedTensorConsumer<float, TOutput> consumer,
         CancellationToken cancellationToken = default)
     {
         int batchSize = checked((int)input[0].Lengths[0]);
@@ -49,7 +20,18 @@ public sealed class LogicalMockModelStep(float[][] outputs) :
             }
         }
 
-        consumer.Consume(logits.AsReadOnlyTensorSpan(), 0, output);
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult<TensorOutputs<float>>(new LogicalTensorOutputs(logits));
+    }
+
+    private sealed class LogicalTensorOutputs(Tensor<float> output) : TensorOutputs<float>
+    {
+        public override int Count => 1;
+
+        public override ReadOnlyTensorSpan<float> GetOutput(int index)
+            => index == 0 ? output.AsReadOnlyTensorSpan() : throw new ArgumentOutOfRangeException(nameof(index));
+
+        public override void Dispose()
+        {
+        }
     }
 }

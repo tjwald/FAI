@@ -11,20 +11,33 @@ namespace FAI.NLP.Tests.InferenceTasks;
 public class TextClassificationStepsTests
 {
     [Fact]
-    public async Task ClassificationSteps_ComposeIntoCallerOutput()
+    public async Task ClassificationSteps_ComposeWithTensorOutputScope()
     {
         var tokenizer = DummyTokenizerFactory.Create();
         var options = new ClassificationOptions<string>(["Negative", "Positive"]);
         var encodingStep = new TextBatchEncodingStep(tokenizer);
         var decodingStep = new ClassificationDecodingStep<string>(options);
         ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[] { new("hello"), new("world") };
-        var results = new ClassificationResult<string, float>[2];
-
-        using BatchLease<Tensor<long>[]> encoded = await encodingStep.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        Tensor<long>[] encoded = await encodingStep.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         Tensor<float> logits = Tensor.Create([0.1f, 0.9f, 0.8f, 0.2f], [2, 2]);
-        decodingStep.Consume(logits.AsReadOnlyTensorSpan(), 0, results);
+        using var outputs = new TestTensorOutputs(logits);
+        Memory<ClassificationResult<string, float>> results =
+            await decodingStep.ExecuteAsync(outputs, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["Positive", "Negative"], results.Select(result => result.Choice));
-        Assert.All(results, result => Assert.True(result.Score > 0.5f));
+        Assert.Equal(2, encoded.Length);
+        Assert.Equal(["Positive", "Negative"], results.ToArray().Select(result => result.Choice));
+        Assert.All(results.ToArray(), result => Assert.True(result.Score > 0.5f));
+    }
+
+    private sealed class TestTensorOutputs(Tensor<float> output) : TensorOutputs<float>
+    {
+        public override int Count => 1;
+
+        public override ReadOnlyTensorSpan<float> GetOutput(int index)
+            => index == 0 ? output.AsReadOnlyTensorSpan() : throw new ArgumentOutOfRangeException(nameof(index));
+
+        public override void Dispose()
+        {
+        }
     }
 }

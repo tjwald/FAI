@@ -8,7 +8,7 @@ public class TextClassificationIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(new ClassificationOptions<bool>([false, true]));
         services.AddSingleton(DummyTokenizerFactory.Create());
-        services.AddSingleton<IBorrowedTensorProducer<Tensor<long>[], float>>(
+        services.AddSingleton<IStep<Tensor<long>[], TensorOutputs<float>>>(
             new LogicalMockModelStep([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecodingStep<bool>>();
         services
@@ -16,15 +16,9 @@ public class TextClassificationIntegrationTests
             .Then(
                 pipeline => pipeline
                     .Then<Tensor<long>[], TextBatchEncodingStep>()
-                    .ThenBorrowed(
-                        sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
-                        sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
-                        (_, input, _) => ValueTask.FromResult(
-                            new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                                new ClassificationResult<bool, float>[input[0].Lengths[0]]))),
-                (_, input, _) => ValueTask.FromResult(
-                    new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                        new ClassificationResult<bool, float>[input.Length])),
+                    .Then(sp =>
+                        sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
+                    .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
                 stage => stage.UseTokenizingStep())
             .Build();
 
@@ -32,11 +26,10 @@ public class TextClassificationIntegrationTests
         var pipeline = provider.GetRequiredService<
             IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>>>();
         ReadOnlyMemory<TokenizedText> input = new TokenizedText[] { new("hello") };
-        var output = new ClassificationResult<bool, float>[1];
+        Memory<ClassificationResult<bool, float>> output =
+            await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
-
-        output.Should().HaveCount(1);
-        output[0].Choice.Should().BeTrue();
+        output.ToArray().Should().HaveCount(1);
+        output.Span[0].Choice.Should().BeTrue();
     }
 }

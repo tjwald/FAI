@@ -6,10 +6,9 @@ namespace FAI.Core.Extensions.DI.Tests;
 public sealed class StepPipelineBuilderTests
 {
     [Fact]
-    public async Task AddPipeline_ComposesTypedStagesAndReturnsIntermediateLeases()
+    public async Task AddPipeline_ComposesTypedStages()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<LeaseTracker>();
 
         services
             .AddPipeline<int[]>()
@@ -20,12 +19,10 @@ public sealed class StepPipelineBuilderTests
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IStep<int[], int[]> pipeline = serviceProvider.GetRequiredKeyedService<IStep<int[], int[]>>("lengths");
-        var output = new int[3];
 
-        await pipeline.ExecuteAsync([3, 42, 100], output, TestContext.Current.CancellationToken);
+        int[] output = await pipeline.ExecuteAsync([3, 42, 100], TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3], output);
-        Assert.Equal(2, serviceProvider.GetRequiredService<LeaseTracker>().Returned);
     }
 
     [Fact]
@@ -33,7 +30,6 @@ public sealed class StepPipelineBuilderTests
     {
         var services = new ServiceCollection();
         var calls = new List<string>();
-        services.AddSingleton<LeaseTracker>();
 
         services
             .AddPipeline<int[]>()
@@ -44,16 +40,15 @@ public sealed class StepPipelineBuilderTests
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IStep<int[], long[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], long[]>>();
-        var output = new long[1];
 
-        await pipeline.ExecuteAsync([7], output, TestContext.Current.CancellationToken);
+        long[] output = await pipeline.ExecuteAsync([7], TestContext.Current.CancellationToken);
 
         Assert.Equal(["outer", "inner"], calls);
         Assert.Equal([7L], output);
     }
 
     [Fact]
-    public async Task UsePartitioning_WrapsOnlyConfiguredStage()
+    public async Task UsePartitioning_PreallocatesFullOutputOnceAndWritesSlices()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IBatchPartitioner<ReadOnlyMemory<int>>>(new FixedMemoryPartitioner(2));
@@ -61,27 +56,31 @@ public sealed class StepPipelineBuilderTests
         services
             .AddPipeline<ReadOnlyMemory<int>>()
             .Then<Memory<long>, PartitionedLongStep>(stage => stage
-                .UseBatchPartitioning<ReadOnlyMemoryBatchOperations<int>, MemoryBatchOperations<long>>())
+                .UseBatchPartitioning(
+                    new ReadOnlyMemoryBatchOperations<int>(),
+                    new MemoryBatchOperations<long>()))
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IStep<ReadOnlyMemory<int>, Memory<long>> pipeline =
             serviceProvider.GetRequiredService<IStep<ReadOnlyMemory<int>, Memory<long>>>();
-        var output = new long[5];
 
-        int[] input = [1, 2, 3, 4, 5];
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        Memory<long> output = await pipeline.ExecuteAsync(
+            new[] { 1, 2, 3, 4, 5 },
+            TestContext.Current.CancellationToken);
+        PartitionedLongStep inner = serviceProvider.GetRequiredService<PartitionedLongStep>();
 
-        Assert.Equal([1L, 2L, 3L, 4L, 5L], output);
-        Assert.Equal([2, 2, 1], serviceProvider.GetRequiredService<PartitionedLongStep>().BatchSizes);
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], output.ToArray());
+        Assert.Equal([1, 2, 2], inner.BatchSizes.Order());
+        Assert.Equal(1, inner.AllocationCount);
+        Assert.Equal(5, inner.AllocatedLengths.Single());
     }
 
     [Fact]
-    public async Task Then_NestsDecoratedTypedPipelineInsideExistingPipeline()
+    public async Task Then_NestsDecoratedTypedPipelineWithoutEndpointAllocator()
     {
         var services = new ServiceCollection();
         var calls = new List<string>();
-        services.AddSingleton<LeaseTracker>();
 
         services
             .AddPipeline<int[]>()
@@ -90,74 +89,118 @@ public sealed class StepPipelineBuilderTests
                 nested => nested
                     .Then<string[], ToStringStep>()
                     .Then<int[], StringLengthStep>(),
-                (_, input, _) => ValueTask.FromResult(new BatchLease<int[]>(new int[input.Length])),
                 stage => stage.Use((_, inner) => new TrackingStep<long[], int[]>("nested", calls, inner)))
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IStep<int[], int[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], int[]>>();
-        var output = new int[3];
 
-        await pipeline.ExecuteAsync([3, 42, 100], output, TestContext.Current.CancellationToken);
+        int[] output = await pipeline.ExecuteAsync([3, 42, 100], TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3], output);
         Assert.Equal(["nested"], calls);
-        Assert.Equal(2, serviceProvider.GetRequiredService<LeaseTracker>().Returned);
     }
 
     [Fact]
-    public async Task Then_NestedPipelineWithoutDecoratorInfersOverloadWithoutCasts()
+    public async Task Then_NestedPipelineInfersOverloadWithoutCasts()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<LeaseTracker>();
+
+        services
+            .AddPipeline<int[]>()
+            .Then(nested => nested
+                .Then<long[], ToLongStep>()
+                .Then<string[], ToStringStep>())
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IStep<int[], string[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], string[]>>();
+
+        string[] output = await pipeline.ExecuteAsync([7, 42], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["7", "42"], output);
+    }
+
+    [Fact]
+    public async Task Then_EndpointAllocatorWritesThroughTypeChangingNestedPipeline()
+    {
+        var services = new ServiceCollection();
 
         services
             .AddPipeline<int[]>()
             .Then(
                 nested => nested
                     .Then<long[], ToLongStep>()
-                    .Then<string[], ToStringStep>(),
-                (_, input, _) => ValueTask.FromResult(new BatchLease<string[]>(new string[input.Length])))
+                    .Then<string[], PreallocatingToStringStep>(),
+                (input, out output) =>
+                {
+                    output = new string[input.Length];
+                    return true;
+                })
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IStep<int[], string[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], string[]>>();
-        var output = new string[2];
+        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingStep<int[], string[]>>(pipeline);
 
-        await pipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
+        Assert.True(preallocatingPipeline.TryAllocateOutput([7, 42], out string[]? output));
+        await preallocatingPipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
 
         Assert.Equal(["7", "42"], output);
     }
 
-    private sealed class LeaseTracker
+    [Fact]
+    public async Task Pipeline_DisposesIntermediateAfterDownstreamCompletes()
     {
-        public int Returned { get; private set; }
+        var services = new ServiceCollection();
 
-        public void Return() => Returned++;
+        services
+            .AddPipeline<int>()
+            .Then<DisposableValue, DisposableValueStep>()
+            .Then<int, ReadDisposableValueStep>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IStep<int, int> pipeline = serviceProvider.GetRequiredService<IStep<int, int>>();
+        DisposableValueStep first = serviceProvider.GetRequiredService<DisposableValueStep>();
+
+        int output = await pipeline.ExecuteAsync(42, TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, output);
+        Assert.True(first.Output!.IsDisposed);
     }
 
-    private sealed class ToLongStep(LeaseTracker tracker) : IAllocatingStep<int[], long[]>
+    private sealed class ToLongStep : IStep<int[], long[]>
     {
-        public ValueTask<BatchLease<long[]>> RentOutputAsync(int[] input, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<long[]>(new long[input.Length], _ => tracker.Return()));
+        public ValueTask<long[]> ExecuteAsync(int[] input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Select(value => (long)value).ToArray());
+    }
 
-        public ValueTask ExecuteAsync(int[] input, long[] output, CancellationToken cancellationToken = default)
+    private sealed class ToStringStep : IStep<long[], string[]>
+    {
+        public ValueTask<string[]> ExecuteAsync(long[] input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Select(value => value.ToString()).ToArray());
+    }
+
+    private sealed class PreallocatingToStringStep : IPreallocatingStep<long[], string[]>
+    {
+        public bool TryAllocateOutput(long[] input, out string[] output)
         {
-            for (int i = 0; i < input.Length; i++)
-            {
-                output[i] = input[i];
-            }
-
-            return ValueTask.CompletedTask;
+            output = new string[input.Length];
+            return true;
         }
-    }
 
-    private sealed class ToStringStep(LeaseTracker tracker) : IAllocatingStep<long[], string[]>
-    {
-        public ValueTask<BatchLease<string[]>> RentOutputAsync(long[] input, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<string[]>(new string[input.Length], _ => tracker.Return()));
+        public async ValueTask<string[]> ExecuteAsync(long[] input, CancellationToken cancellationToken = default)
+        {
+            _ = TryAllocateOutput(input, out string[] output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
+        }
 
-        public ValueTask ExecuteAsync(long[] input, string[] output, CancellationToken cancellationToken = default)
+        public ValueTask ExecuteAsync(
+            long[] input,
+            string[] output,
+            CancellationToken cancellationToken = default)
         {
             for (int i = 0; i < input.Length; i++)
             {
@@ -168,47 +211,53 @@ public sealed class StepPipelineBuilderTests
         }
     }
 
-    private sealed class StringLengthStep : IAllocatingStep<string[], int[]>
+    private sealed class StringLengthStep : IStep<string[], int[]>
     {
-        public ValueTask<BatchLease<int[]>> RentOutputAsync(string[] input, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<int[]>(new int[input.Length]));
-
-        public ValueTask ExecuteAsync(string[] input, int[] output, CancellationToken cancellationToken = default)
-        {
-            for (int i = 0; i < input.Length; i++)
-            {
-                output[i] = input[i].Length;
-            }
-
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask<int[]> ExecuteAsync(string[] input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Select(value => value.Length).ToArray());
     }
 
     private sealed class TrackingStep<TInput, TOutput>(
         string name,
         List<string> calls,
-        IAllocatingStep<TInput, TOutput> inner) : IAllocatingStep<TInput, TOutput>
+        IStep<TInput, TOutput> inner) : IStep<TInput, TOutput>
     {
-        public ValueTask<BatchLease<TOutput>> RentOutputAsync(TInput input, CancellationToken cancellationToken = default)
-            => inner.RentOutputAsync(input, cancellationToken);
-
-        public ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+        public ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
         {
             calls.Add(name);
-            return inner.ExecuteAsync(input, output, cancellationToken);
+            return inner.ExecuteAsync(input, cancellationToken);
         }
     }
 
-    private sealed class PartitionedLongStep : IAllocatingStep<ReadOnlyMemory<int>, Memory<long>>
+    private sealed class PartitionedLongStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<long>>
     {
+        private readonly Lock _lock = new();
+
         public List<int> BatchSizes { get; } = [];
 
-        public ValueTask<BatchLease<Memory<long>>> RentOutputAsync(
+        public List<int> AllocatedLengths { get; } = [];
+
+        public int AllocationCount { get; private set; }
+
+        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<long> output)
+        {
+            lock (_lock)
+            {
+                AllocationCount++;
+                AllocatedLengths.Add(input.Length);
+            }
+
+            output = new long[input.Length];
+            return true;
+        }
+
+        public async ValueTask<Memory<long>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
-            var output = new long[input.Length];
-            return ValueTask.FromResult(new BatchLease<Memory<long>>(output));
+            _ = TryAllocateOutput(input, out Memory<long> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
         }
 
         public ValueTask ExecuteAsync(
@@ -216,7 +265,11 @@ public sealed class StepPipelineBuilderTests
             Memory<long> output,
             CancellationToken cancellationToken = default)
         {
-            BatchSizes.Add(input.Length);
+            lock (_lock)
+            {
+                BatchSizes.Add(input.Length);
+            }
+
             for (int i = 0; i < input.Length; i++)
             {
                 output.Span[i] = input.Span[i];
@@ -234,6 +287,38 @@ public sealed class StepPipelineBuilderTests
             {
                 yield return start..Math.Min(start + size, batch.Length);
             }
+        }
+    }
+
+    private sealed class DisposableValue(int value) : IDisposable
+    {
+        public int Value { get; } = value;
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose() => IsDisposed = true;
+    }
+
+    private sealed class DisposableValueStep : IStep<int, DisposableValue>
+    {
+        public DisposableValue? Output { get; private set; }
+
+        public ValueTask<DisposableValue> ExecuteAsync(int input, CancellationToken cancellationToken = default)
+        {
+            Output = new DisposableValue(input);
+            return ValueTask.FromResult(Output);
+        }
+    }
+
+    private sealed class ReadDisposableValueStep : IStep<DisposableValue, int>
+    {
+        public async ValueTask<int> ExecuteAsync(
+            DisposableValue input,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            Assert.False(input.IsDisposed);
+            return input.Value;
         }
     }
 }

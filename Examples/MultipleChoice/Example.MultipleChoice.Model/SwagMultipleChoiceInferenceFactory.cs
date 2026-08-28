@@ -21,6 +21,7 @@ public static class SwagMultipleChoiceInferenceFactory
         return services.AddLocalServices(localServices =>
         {
             localServices.AddConfigurationAndBind<TextMultipleChoiceOptions>("SwagInference:MultipleChoice");
+            localServices.AddConfigurationAndBind<TokenCountOrderingOptions>("SwagInference:BatchExecutors:TokenCountSorting");
             localServices.AddConfigurationAndBind<MaxPaddedTokensPartitionerOptions>("SwagInference:BatchExecutors:MaxPaddedTokens");
             localServices.AddConfigurationAndBind<ParallelPartitionSchedulerOptions>("SwagInference:BatchExecutors:Parallel");
             localServices.AddSingleton<IPartitionScheduler>(sp =>
@@ -44,7 +45,7 @@ public static class SwagMultipleChoiceInferenceFactory
             );
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddSingleton(sp =>
-                ModelExecutorFactory.CreateBorrowedModelStep(
+                ModelExecutorFactory.CreateModelStep(
                     options.ModelExecutorType,
                     sp.GetRequiredService<IModelExecutorOptions>()));
 
@@ -52,6 +53,7 @@ public static class SwagMultipleChoiceInferenceFactory
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
                 .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>(stage => stage
                     .UseTokenizingStep()
+                    .UseTokenCountOrderingStep()
                     .UseMaxPaddedTokensPartitioningStep())
                 .Build();
 

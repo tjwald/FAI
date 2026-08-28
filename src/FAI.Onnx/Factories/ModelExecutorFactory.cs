@@ -13,12 +13,7 @@ namespace FAI.Onnx.Factories;
 /// </summary>
 public static class ModelExecutorFactory
 {
-    public static IBorrowedTensorProducer<Tensor<long>[], float> CreateBorrowedModelStep(
-        ModelExecutorType executorType,
-        IModelExecutorOptions modelExecutorOptions)
-        => (IBorrowedTensorProducer<Tensor<long>[], float>)CreateMaterializingModelStep(executorType, modelExecutorOptions);
-
-    public static IAllocatingStep<Tensor<long>[], Tensor<float>[]> CreateMaterializingModelStep(
+    public static IStep<Tensor<long>[], TensorOutputs<float>> CreateModelStep(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {

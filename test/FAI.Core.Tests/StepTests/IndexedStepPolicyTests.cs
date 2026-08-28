@@ -10,16 +10,14 @@ public sealed class IndexedStepPolicyTests
     public async Task PartitioningStep_WritesTensorSlicesIntoCallerOutput()
     {
         var inner = new TensorCopyStep();
-        var step = new PartitioningStep<
-            Tensor<float>,
-            Tensor<float>,
-            TensorBatchOperations<float>,
-            TensorBatchOperations<float>>(inner, new FixedTensorPartitioner(2));
+        var step = new PartitioningStep<Tensor<float>, Tensor<float>>(
+            inner,
+            new FixedTensorPartitioner(2),
+            new TensorBatchOperations<float>(),
+            new TensorBatchOperations<float>());
 
         Tensor<float> input = CreateTensor([4, 2], [1, 2, 3, 4, 5, 6, 7, 8]);
-        Tensor<float> output = Tensor.CreateFromShape<float>([4, 2]);
-
-        await step.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        Tensor<float> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], output.AsReadOnlyTensorSpan().AsSpan().ToArray());
         Assert.Equal([2, 2], inner.BatchSizes);
@@ -29,40 +27,53 @@ public sealed class IndexedStepPolicyTests
     public async Task PartitioningStep_UsesBoundedParallelScheduler()
     {
         var inner = new DelayedMemoryStep();
-        var step = new PartitioningStep<
-            ReadOnlyMemory<int>,
-            Memory<int>,
-            ReadOnlyMemoryBatchOperations<int>,
-            MemoryBatchOperations<int>>(
+        var step = new PartitioningStep<ReadOnlyMemory<int>, Memory<int>>(
                 inner,
                 new FixedMemoryPartitioner(1),
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>(),
                 new ParallelPartitionScheduler(new ParallelPartitionSchedulerOptions(MaxConcurrency: 2)));
         int[] input = [1, 2, 3, 4];
-        var output = new int[input.Length];
+        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        await step.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
-
-        Assert.Equal(input, output);
+        Assert.Equal(input, output.ToArray());
         Assert.Equal(2, inner.MaximumConcurrency);
+    }
+
+    [Fact]
+    public async Task PartitioningStep_FallsBackWhenPreallocationIsUnavailableForInput()
+    {
+        var inner = new ConditionalMemoryStep();
+        var step = new PartitioningStep<ReadOnlyMemory<int>, Memory<int>>(
+            inner,
+            new FixedMemoryPartitioner(2),
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4, 5];
+
+        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        Assert.Equal(input, output.ToArray());
+        Assert.Equal(1, inner.PreallocationAttempts);
+        Assert.Equal([2, 2, 1], inner.ExecutedBatchSizes);
+        Assert.Equal(0, inner.DestinationExecutions);
     }
 
     [Fact]
     public async Task OrderingStep_RestoresOriginalMemoryOrder()
     {
         var inner = new MemoryIdentityStep();
-        var step = new OrderingStep<
-            ReadOnlyMemory<int>,
-            Memory<int>,
-            ReadOnlyMemoryBatchOperations<int>,
-            MemoryBatchOperations<int>>(inner, new DescendingOrdering());
+        var step = new OrderingStep<ReadOnlyMemory<int>, Memory<int>>(
+            inner,
+            new DescendingOrdering(),
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
 
         int[] values = [10, 30, 20];
-        var output = new int[values.Length];
-
-        await step.ExecuteAsync(values, output, TestContext.Current.CancellationToken);
+        Memory<int> output = await step.ExecuteAsync(values, TestContext.Current.CancellationToken);
 
         Assert.Equal([30, 20, 10], inner.ObservedInput);
-        Assert.Equal(values, output);
+        Assert.Equal(values, output.ToArray());
     }
 
     [Fact]
@@ -70,7 +81,7 @@ public sealed class IndexedStepPolicyTests
     {
         Tensor<float> tensor = CreateTensor([3, 2], [1, 2, 3, 4, 5, 6]);
 
-        Tensor<float> middleRow = TensorBatchOperations<float>.Slice(tensor, 1..2);
+        Tensor<float> middleRow = new TensorBatchOperations<float>().Slice(tensor, 1..2);
         middleRow[0, 0] = 99;
 
         Assert.Equal(99, tensor[1, 0]);
@@ -79,38 +90,63 @@ public sealed class IndexedStepPolicyTests
     [Fact]
     public async Task RoutingStep_GathersTargetsAndScattersToOriginalOrder()
     {
-        var routing = new ParityRoutingStrategy(new MultiplyStep(10), new MultiplyStep(100));
-        var step = new RoutingStep<
-            ReadOnlyMemory<int>,
-            Memory<int>,
-            ReadOnlyMemoryBatchOperations<int>,
-            MemoryBatchOperations<int>>(routing);
+        var even = new MultiplyStep(10);
+        var odd = new MultiplyStep(100);
+        var routing = new ParityRoutingStrategy(even, odd);
+        var step = new RoutingStep<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4];
-        var output = new int[input.Length];
+        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        await step.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        Assert.Equal([100, 20, 300, 40], output.ToArray());
+        Assert.Equal(1, even.AllocationCount);
+        Assert.Equal(0, odd.AllocationCount);
+        Assert.Equal([2], even.DestinationBatchSizes);
+        Assert.Equal([2], odd.DestinationBatchSizes);
+    }
 
-        Assert.Equal([100, 20, 300, 40], output);
+    [Fact]
+    public async Task RoutingStep_FallsBackToScatteringReturnedOutputs()
+    {
+        var routing = new ParityRoutingStrategy(new ReturningMultiplyStep(10), new ReturningMultiplyStep(100));
+        var step = new RoutingStep<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+
+        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        Assert.Equal([100, 20, 300, 40], output.ToArray());
     }
 
     private static Tensor<float> CreateTensor(ReadOnlySpan<nint> lengths, float[] values)
         => Tensor.Create(values, lengths);
 
-    private sealed class TensorCopyStep : IAllocatingStep<Tensor<float>, Tensor<float>>
+    private sealed class TensorCopyStep : IPreallocatingStep<Tensor<float>, Tensor<float>>
     {
         public List<int> BatchSizes { get; } = [];
 
-        public ValueTask<BatchLease<Tensor<float>>> RentOutputAsync(
+        public bool TryAllocateOutput(Tensor<float> input, out Tensor<float> output)
+        {
+            output = Tensor.CreateFromShape<float>(input.Lengths);
+            return true;
+        }
+
+        public async ValueTask<Tensor<float>> ExecuteAsync(
             Tensor<float> input,
             CancellationToken cancellationToken = default)
         {
-            Tensor<float> output = Tensor.CreateFromShape<float>(input.Lengths);
-            return ValueTask.FromResult(new BatchLease<Tensor<float>>(output));
+            _ = TryAllocateOutput(input, out Tensor<float> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
         }
 
         public ValueTask ExecuteAsync(Tensor<float> input, Tensor<float> output, CancellationToken cancellationToken = default)
         {
-            BatchSizes.Add(TensorBatchOperations<float>.Count(input));
+            BatchSizes.Add(new TensorBatchOperations<float>().Count(input));
             input.AsReadOnlyTensorSpan().CopyTo(output.AsTensorSpan());
             return ValueTask.CompletedTask;
         }
@@ -120,7 +156,7 @@ public sealed class IndexedStepPolicyTests
     {
         public IEnumerable<Range> Partition(Tensor<float> batch)
         {
-            int count = TensorBatchOperations<float>.Count(batch);
+            int count = new TensorBatchOperations<float>().Count(batch);
             for (int start = 0; start < count; start += size)
             {
                 yield return start..Math.Min(start + size, count);
@@ -128,16 +164,23 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class MemoryIdentityStep : IAllocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MemoryIdentityStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
     {
         public int[] ObservedInput { get; private set; } = [];
 
-        public ValueTask<BatchLease<Memory<int>>> RentOutputAsync(
+        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
+        {
+            output = new int[input.Length];
+            return true;
+        }
+
+        public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
-            var output = new int[input.Length];
-            return ValueTask.FromResult(new BatchLease<Memory<int>>(output));
+            _ = TryAllocateOutput(input, out Memory<int> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
         }
 
         public ValueTask ExecuteAsync(
@@ -151,17 +194,27 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class DelayedMemoryStep : IAllocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class DelayedMemoryStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
     {
         private int _concurrency;
         private int _maximumConcurrency;
 
         public int MaximumConcurrency => _maximumConcurrency;
 
-        public ValueTask<BatchLease<Memory<int>>> RentOutputAsync(
+        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
+        {
+            output = new int[input.Length];
+            return true;
+        }
+
+        public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<Memory<int>>(new int[input.Length]));
+        {
+            _ = TryAllocateOutput(input, out Memory<int> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
+        }
 
         public async ValueTask ExecuteAsync(
             ReadOnlyMemory<int> input,
@@ -179,6 +232,40 @@ public sealed class IndexedStepPolicyTests
             {
                 Interlocked.Decrement(ref _concurrency);
             }
+        }
+    }
+
+    private sealed class ConditionalMemoryStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    {
+        public int PreallocationAttempts { get; private set; }
+
+        public int DestinationExecutions { get; private set; }
+
+        public List<int> ExecutedBatchSizes { get; } = [];
+
+        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
+        {
+            PreallocationAttempts++;
+            output = default;
+            return false;
+        }
+
+        public ValueTask<Memory<int>> ExecuteAsync(
+            ReadOnlyMemory<int> input,
+            CancellationToken cancellationToken = default)
+        {
+            ExecutedBatchSizes.Add(input.Length);
+            return ValueTask.FromResult<Memory<int>>(input.ToArray());
+        }
+
+        public ValueTask ExecuteAsync(
+            ReadOnlyMemory<int> input,
+            Memory<int> output,
+            CancellationToken cancellationToken = default)
+        {
+            DestinationExecutions++;
+            input.CopyTo(output);
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -216,14 +303,26 @@ public sealed class IndexedStepPolicyTests
             => Enumerable.Range(0, batch.Length).OrderByDescending(index => batch.Span[index]).ToArray();
     }
 
-    private sealed class MultiplyStep(int multiplier) : IAllocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MultiplyStep(int multiplier) : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
     {
-        public ValueTask<BatchLease<Memory<int>>> RentOutputAsync(
+        public int AllocationCount { get; private set; }
+
+        public List<int> DestinationBatchSizes { get; } = [];
+
+        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
+        {
+            AllocationCount++;
+            output = new int[input.Length];
+            return true;
+        }
+
+        public ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
             var output = new int[input.Length];
-            return ValueTask.FromResult(new BatchLease<Memory<int>>(output));
+            Execute(input, output);
+            return ValueTask.FromResult<Memory<int>>(output);
         }
 
         public ValueTask ExecuteAsync(
@@ -231,18 +330,39 @@ public sealed class IndexedStepPolicyTests
             Memory<int> output,
             CancellationToken cancellationToken = default)
         {
+            DestinationBatchSizes.Add(output.Length);
+            Execute(input, output);
+            return ValueTask.CompletedTask;
+        }
+
+        private void Execute(ReadOnlyMemory<int> input, Memory<int> output)
+        {
             for (int i = 0; i < input.Length; i++)
             {
                 output.Span[i] = input.Span[i] * multiplier;
             }
+        }
+    }
 
-            return ValueTask.CompletedTask;
+    private sealed class ReturningMultiplyStep(int multiplier) : IStep<ReadOnlyMemory<int>, Memory<int>>
+    {
+        public ValueTask<Memory<int>> ExecuteAsync(
+            ReadOnlyMemory<int> input,
+            CancellationToken cancellationToken = default)
+        {
+            var output = new int[input.Length];
+            for (int i = 0; i < input.Length; i++)
+            {
+                output[i] = input.Span[i] * multiplier;
+            }
+
+            return ValueTask.FromResult<Memory<int>>(output);
         }
     }
 
     private sealed class ParityRoutingStrategy(
-        IAllocatingStep<ReadOnlyMemory<int>, Memory<int>> even,
-        IAllocatingStep<ReadOnlyMemory<int>, Memory<int>> odd)
+        IStep<ReadOnlyMemory<int>, Memory<int>> even,
+        IStep<ReadOnlyMemory<int>, Memory<int>> odd)
         : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
     {
         public IReadOnlyList<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)

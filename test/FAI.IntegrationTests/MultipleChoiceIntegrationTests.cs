@@ -8,7 +8,7 @@ public class MultipleChoiceIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(DummyTokenizerFactory.Create());
         services.AddSingleton(new TextMultipleChoiceOptions(MaxChoices: 2));
-        services.AddSingleton<IBorrowedTensorProducer<Tensor<long>[], float>>(
+        services.AddSingleton<IStep<Tensor<long>[], TensorOutputs<float>>>(
             new LogicalMockModelStep([[0.9f, 0.1f]]));
         services
             .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
@@ -22,11 +22,10 @@ public class MultipleChoiceIntegrationTests
         {
             new("Question", [new("choice 1"), new("choice 2")]),
         };
-        var output = new ChoiceResult<TokenizedText>[1];
+        Memory<ChoiceResult<TokenizedText>> output =
+            await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
-
-        output.Should().HaveCount(1);
-        output[0].ChoiceIndex.Should().Be(0);
+        output.ToArray().Should().HaveCount(1);
+        output.Span[0].ChoiceIndex.Should().Be(0);
     }
 }

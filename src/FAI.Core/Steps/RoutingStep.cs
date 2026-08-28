@@ -1,7 +1,7 @@
 namespace FAI.Core.Steps;
 
 public sealed record BatchRoute<TInput, TOutput>(
-    IAllocatingStep<TInput, TOutput> Target,
+    IStep<TInput, TOutput> Target,
     int[] InputIndices);
 
 public interface IBatchRoutingStrategy<TInput, TOutput>
@@ -9,85 +9,123 @@ public interface IBatchRoutingStrategy<TInput, TOutput>
     IReadOnlyList<BatchRoute<TInput, TOutput>> Route(TInput input);
 }
 
-public sealed class RoutingStep<TInput, TOutput, TInputBatch, TOutputBatch>
-    : IAllocatingStep<TInput, TOutput>
-    where TInputBatch : IReadOnlyIndexedBatch<TInput, TInputBatch>
-    where TOutputBatch : IWritableIndexedBatch<TOutput, TOutputBatch>
+public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TOutput>
 {
     private readonly IBatchRoutingStrategy<TInput, TOutput> _routingStrategy;
+    private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
+    private readonly IWritableIndexedBatch<TOutput> _outputBatch;
 
-    public RoutingStep(IBatchRoutingStrategy<TInput, TOutput> routingStrategy)
+    public RoutingStep(
+        IBatchRoutingStrategy<TInput, TOutput> routingStrategy,
+        IReadOnlyIndexedBatch<TInput> inputBatch,
+        IWritableIndexedBatch<TOutput> outputBatch)
     {
         _routingStrategy = routingStrategy;
+        _inputBatch = inputBatch;
+        _outputBatch = outputBatch;
     }
 
-    public async ValueTask<BatchLease<TOutput>> RentOutputAsync(
-        TInput input,
-        CancellationToken cancellationToken = default)
+    public bool TryAllocateOutput(TInput input, out TOutput output)
     {
         IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
-        BatchRoute<TInput, TOutput> firstRoute = routes[0];
-        using BatchLease<TInput> routeInput = TInputBatch.Gather(input, firstRoute.InputIndices);
-        using BatchLease<TOutput> routeOutput = await firstRoute.Target.RentOutputAsync(routeInput.Value, cancellationToken);
-        return TOutputBatch.RentLike(routeOutput.Value, TInputBatch.Count(input));
+        if (routes.All(route => route.Target is IPreallocatingStep<TInput, TOutput>) &&
+            ((IPreallocatingStep<TInput, TOutput>)routes[0].Target).TryAllocateOutput(input, out TOutput? allocated))
+        {
+            output = allocated;
+            return true;
+        }
+
+        output = default!;
+        return false;
     }
 
-    public async ValueTask<BatchLease<TOutput>> ExecuteAsync(
-        TInput input,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
     {
+        if (TryAllocateOutput(input, out TOutput? output))
+        {
+            try
+            {
+                await ExecuteAsync(input, output, cancellationToken);
+                return output;
+            }
+            catch
+            {
+                await StepOutputDisposer.DisposeAsync(output);
+                throw;
+            }
+        }
+
         IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
-        BatchRoute<TInput, TOutput> firstRoute = routes[0];
-        using BatchLease<TInput> routeInput = TInputBatch.Gather(input, firstRoute.InputIndices);
-        using BatchLease<TOutput> routeOutput = await firstRoute.Target.RentOutputAsync(routeInput.Value, cancellationToken);
-        BatchLease<TOutput> output = TOutputBatch.RentLike(routeOutput.Value, TInputBatch.Count(input));
+        var routeOutputs = new TOutput[routes.Count];
         try
         {
-            await ExecuteRoutesAsync(input, output.Value, routes, cancellationToken);
-            return output;
+            for (int i = 0; i < routes.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                BatchRoute<TInput, TOutput> route = routes[i];
+                using BatchLease<TInput> routeInput = _inputBatch.Gather(input, route.InputIndices);
+                routeOutputs[i] = await route.Target.ExecuteAsync(routeInput.Value, cancellationToken);
+            }
+
+            output = _outputBatch.AllocateLike(routeOutputs[0], _inputBatch.Count(input));
+            try
+            {
+                for (int i = 0; i < routes.Count; i++)
+                {
+                    _outputBatch.Scatter(routeOutputs[i], output, routes[i].InputIndices);
+                }
+
+                return output;
+            }
+            catch
+            {
+                await StepOutputDisposer.DisposeAsync(output);
+                throw;
+            }
         }
-        catch
+        finally
         {
-            output.Dispose();
-            throw;
+            foreach (TOutput routeOutput in routeOutputs)
+            {
+                if (routeOutput is not null)
+                {
+                    await StepOutputDisposer.DisposeAsync(routeOutput);
+                }
+            }
         }
     }
 
-    public async ValueTask ExecuteAsync(
-        TInput input,
-        TOutput output,
-        CancellationToken cancellationToken = default)
+    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
-        await ExecuteRoutesAsync(input, output, routes, cancellationToken);
-    }
-
-    private static async ValueTask ExecuteRoutesAsync(
-        TInput input,
-        TOutput output,
-        IReadOnlyList<BatchRoute<TInput, TOutput>> routes,
-        CancellationToken cancellationToken)
-    {
-        if (TOutputBatch.Count(output) != TInputBatch.Count(input))
+        if (_inputBatch.Count(input) != _outputBatch.Count(output))
         {
             throw new ArgumentException("Input and output batch counts must match.", nameof(output));
         }
 
+        var sourceToDestination = new int[_inputBatch.Count(input)];
+        int offset = 0;
         foreach (BatchRoute<TInput, TOutput> route in routes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using BatchLease<TInput> routeInput = TInputBatch.Gather(input, route.InputIndices);
-            using BatchLease<TOutput> routeOutput = TOutputBatch.RentLike(output, route.InputIndices.Length);
-            await route.Target.ExecuteAsync(routeInput.Value, routeOutput.Value, cancellationToken);
-            TOutputBatch.Scatter(routeOutput.Value, output, route.InputIndices);
+            var target = (IPreallocatingStep<TInput, TOutput>)route.Target;
+            using BatchLease<TInput> routeInput = _inputBatch.Gather(input, route.InputIndices);
+            await target.ExecuteAsync(
+                routeInput.Value,
+                _outputBatch.Slice(output, offset..(offset + route.InputIndices.Length)),
+                cancellationToken);
+            route.InputIndices.CopyTo(sourceToDestination, offset);
+            offset += route.InputIndices.Length;
         }
+
+        _outputBatch.PermuteInPlace(output, sourceToDestination);
     }
 
     private IReadOnlyList<BatchRoute<TInput, TOutput>> GetValidatedRoutes(TInput input)
     {
         IReadOnlyList<BatchRoute<TInput, TOutput>> routes = _routingStrategy.Route(input);
-        int count = TInputBatch.Count(input);
-        if (count == 0)
+        int count = _inputBatch.Count(input);
+        if (count == 0 || routes.Count == 0)
         {
             throw new InvalidOperationException("Routing an empty batch requires an explicit output allocator.");
         }

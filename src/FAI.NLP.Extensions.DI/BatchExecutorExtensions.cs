@@ -25,12 +25,12 @@ public static class BatchExecutorExtensions
             return stage.Use((serviceProvider, inner) =>
                 new OrderingStep<
                     ReadOnlyMemory<TInput>,
-                    Memory<TOutput>,
-                    ReadOnlyMemoryBatchOperations<TInput>,
-                    MemoryBatchOperations<TOutput>>(
+                    Memory<TOutput>>(
                         inner,
                         new TokenCountOrdering<TInput>(
-                            serviceProvider.GetRequiredService<TokenCountOrderingOptions>())));
+                            serviceProvider.GetRequiredService<TokenCountOrderingOptions>()),
+                        new ReadOnlyMemoryBatchOperations<TInput>(),
+                        new MemoryBatchOperations<TOutput>()));
         }
 
         public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseMaxPaddedTokensPartitioningStep()
@@ -38,12 +38,12 @@ public static class BatchExecutorExtensions
             return stage.Use((serviceProvider, inner) =>
                 new PartitioningStep<
                     ReadOnlyMemory<TInput>,
-                    Memory<TOutput>,
-                    ReadOnlyMemoryBatchOperations<TInput>,
-                    MemoryBatchOperations<TOutput>>(
+                    Memory<TOutput>>(
                         inner,
                         new MaxPaddedTokensPartitioner<TInput>(
                             serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
+                        new ReadOnlyMemoryBatchOperations<TInput>(),
+                        new MemoryBatchOperations<TOutput>(),
                         serviceProvider.GetService<IPartitionScheduler>()));
         }
     }

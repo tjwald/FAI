@@ -4,7 +4,7 @@ This file provides guidance to agents when working in Architect mode within this
 
 ## Architectural Principles (Non-Obvious)
 - **Extreme Performance**: The core goal is 7X-14X speedup over standard Python stacks. Every design decision must prioritize throughput and latency.
-- **Step Abstraction**: The library centers on finite `IStep<TInput, TOutput>` and `IAllocatingStep<TInput, TOutput>` contracts. Each step transforms one complete value and writes into caller-owned output.
+- **Step Abstraction**: The library centers on return-value `IStep<TInput, TOutput>`. Conditional synchronous preallocation and destination writing use `IPreallocatingStep<TInput, TOutput>`.
 - **Batching Strategy**: Performance comes from composable ordering, partitioning, routing, and scheduling policies over indexed batch traits. Domain packages should add policies rather than parallel execution abstractions.
 - **Hardware Agnostic**: Inference logic should be decoupled from the framework (ONNX, PyTorch, etc.) and hardware (CPU, GPU, OpenVino).
 

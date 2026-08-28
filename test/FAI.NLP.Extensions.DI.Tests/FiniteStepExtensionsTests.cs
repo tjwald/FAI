@@ -16,9 +16,7 @@ public class FiniteStepExtensionsTests
         ServiceProvider provider = BuildProvider(stage => stage.UseTokenizingStep());
         var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(4), new(2) };
-        var output = new int[input.Length];
-
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        _ = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.All(input.ToArray(), item => Assert.True(item.WasTokenized));
     }
@@ -30,12 +28,10 @@ public class FiniteStepExtensionsTests
         var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         var inner = provider.GetRequiredService<RecordingStep>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(10), new(2), new(5) };
-        var output = new int[input.Length];
-
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([2, 5, 10], inner.ObservedTokenCounts);
-        Assert.Equal([10, 2, 5], output);
+        Assert.Equal([10, 2, 5], output.ToArray());
     }
 
     [Fact]
@@ -45,12 +41,29 @@ public class FiniteStepExtensionsTests
         var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         var inner = provider.GetRequiredService<RecordingStep>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(4), new(4), new(4) };
-        var output = new int[input.Length];
-
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([2, 1], inner.BatchSizes);
-        Assert.Equal([4, 4, 4], output);
+        Assert.Equal([4, 4, 4], output.ToArray());
+    }
+
+    [Fact]
+    public async Task TokenizeOrderAndPartition_ExecutesSortedPartitionsAndRestoresOutputOrder()
+    {
+        ServiceProvider provider = BuildProvider(stage => stage
+            .UseTokenizingStep()
+            .UseTokenCountOrderingStep()
+            .UseMaxPaddedTokensPartitioningStep());
+        var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
+        var inner = provider.GetRequiredService<RecordingStep>();
+        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(9), new(2), new(4), new(3) };
+
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        Assert.All(input.ToArray(), item => Assert.True(item.WasTokenized));
+        Assert.Equal([2, 3, 4, 9], inner.ObservedTokenCounts);
+        Assert.Equal([2, 1, 1], inner.BatchSizes);
+        Assert.Equal([9, 2, 4, 3], output.ToArray());
     }
 
     private static ServiceProvider BuildProvider(
@@ -80,15 +93,25 @@ public class FiniteStepExtensionsTests
         }
     }
 
-    public sealed class RecordingStep : IAllocatingStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>
+    public sealed class RecordingStep : IPreallocatingStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>
     {
         public List<int> ObservedTokenCounts { get; } = [];
         public List<int> BatchSizes { get; } = [];
 
-        public ValueTask<BatchLease<Memory<int>>> RentOutputAsync(
+        public bool TryAllocateOutput(ReadOnlyMemory<TestTokenizable> input, out Memory<int> output)
+        {
+            output = new int[input.Length];
+            return true;
+        }
+
+        public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<TestTokenizable> input,
             CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(new BatchLease<Memory<int>>(new int[input.Length]));
+        {
+            _ = TryAllocateOutput(input, out Memory<int> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
+        }
 
         public ValueTask ExecuteAsync(
             ReadOnlyMemory<TestTokenizable> input,

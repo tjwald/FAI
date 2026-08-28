@@ -11,33 +11,39 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace FAI.Vision.InferenceTasks.ImageClassification;
 
 public sealed class ImageClassificationStep<TPixel, TClassification, TFloat> :
-    IAllocatingStep<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
+    IPreallocatingStep<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
     where TPixel : unmanaged, IPixel<TPixel>
     where TFloat : unmanaged, IFloatingPointIeee754<TFloat>
 {
     private readonly IImageProcessor<TPixel, TFloat> _imageProcessor;
-    private readonly IBorrowedTensorProducer<Tensor<TFloat>[], TFloat> _modelStep;
+    private readonly IStep<Tensor<TFloat>[], TensorOutputs<TFloat>> _modelStep;
     private readonly ClassificationOptions<TClassification> _options;
-    private readonly ModelOutputConsumer _modelOutputConsumer;
 
     public ImageClassificationStep(
         IImageProcessor<TPixel, TFloat> imageProcessor,
-        IBorrowedTensorProducer<Tensor<TFloat>[], TFloat> modelStep,
+        IStep<Tensor<TFloat>[], TensorOutputs<TFloat>> modelStep,
         ClassificationOptions<TClassification> options)
     {
         _imageProcessor = imageProcessor;
         _modelStep = modelStep;
         _options = options;
-        _modelOutputConsumer = new ModelOutputConsumer(this);
     }
 
-    public ValueTask<BatchLease<Memory<ClassificationResult<TClassification, TFloat>>>> RentOutputAsync(
+    public bool TryAllocateOutput(
+        ReadOnlyMemory<Image<TPixel>> input,
+        out Memory<ClassificationResult<TClassification, TFloat>> output)
+    {
+        output = new ClassificationResult<TClassification, TFloat>[input.Length];
+        return true;
+    }
+
+    public async ValueTask<Memory<ClassificationResult<TClassification, TFloat>>> ExecuteAsync(
         ReadOnlyMemory<Image<TPixel>> input,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var output = new ClassificationResult<TClassification, TFloat>[input.Length];
-        return ValueTask.FromResult(new BatchLease<Memory<ClassificationResult<TClassification, TFloat>>>(output));
+        _ = TryAllocateOutput(input, out Memory<ClassificationResult<TClassification, TFloat>> output);
+        await ExecuteAsync(input, output, cancellationToken);
+        return output;
     }
 
     public async ValueTask ExecuteAsync(
@@ -56,35 +62,20 @@ public sealed class ImageClassificationStep<TPixel, TClassification, TFloat> :
         }
 
         Tensor<TFloat>[] modelInput = _imageProcessor.Preprocess(input.Span);
-        await _modelStep.ExecuteAsync(modelInput, output, _modelOutputConsumer, cancellationToken);
-    }
-
-    private sealed class ModelOutputConsumer(ImageClassificationStep<TPixel, TClassification, TFloat> owner) :
-        IBorrowedTensorConsumer<TFloat, Memory<ClassificationResult<TClassification, TFloat>>>
-    {
-        public void Consume(
-            ReadOnlyTensorSpan<TFloat> tensor,
-            int outputIndex,
-            Memory<ClassificationResult<TClassification, TFloat>> output)
+        using TensorOutputs<TFloat> modelOutput = await _modelStep.ExecuteAsync(modelInput, cancellationToken);
+        ReadOnlyTensorSpan<TFloat> tensor = modelOutput.GetOutput(0);
+        int rowCount = checked((int)tensor.Lengths[0]);
+        if (rowCount != output.Length)
         {
-            if (outputIndex != 0)
-            {
-                return;
-            }
+            throw new InvalidOperationException(
+                $"The model produced {rowCount} result rows for an input batch of {output.Length}.");
+        }
 
-            int rowCount = checked((int)tensor.Lengths[0]);
-            if (rowCount != output.Length)
-            {
-                throw new InvalidOperationException(
-                    $"The model produced {rowCount} result rows for an input batch of {output.Length}.");
-            }
-
-            int rowIndex = 0;
-            foreach (ReadOnlyTensorSpan<TFloat> row in tensor.GetDimensionSpan(0))
-            {
-                output.Span[rowIndex] = owner._options.GetClassificationResult(row.AsSpan());
-                rowIndex++;
-            }
+        int rowIndex = 0;
+        foreach (ReadOnlyTensorSpan<TFloat> row in tensor.GetDimensionSpan(0))
+        {
+            output.Span[rowIndex] = _options.GetClassificationResult(row.AsSpan());
+            rowIndex++;
         }
     }
 }

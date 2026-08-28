@@ -12,7 +12,7 @@ public class PipelineConfigurationIntegrationTests
         services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 1, MaxTokenCount: 20));
         services.AddSingleton<IPartitionScheduler>(
             new ParallelPartitionScheduler(new ParallelPartitionSchedulerOptions(MaxConcurrency: 2)));
-        services.AddSingleton<IBorrowedTensorProducer<Tensor<long>[], float>>(
+        services.AddSingleton<IStep<Tensor<long>[], TensorOutputs<float>>>(
             new LogicalMockModelStep([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecodingStep<bool>>();
         services
@@ -20,15 +20,9 @@ public class PipelineConfigurationIntegrationTests
             .Then(
                 pipeline => pipeline
                     .Then<Tensor<long>[], TextBatchEncodingStep>()
-                    .ThenBorrowed(
-                        sp => sp.GetRequiredService<IBorrowedTensorProducer<Tensor<long>[], float>>(),
-                        sp => sp.GetRequiredService<ClassificationDecodingStep<bool>>(),
-                        (_, input, _) => ValueTask.FromResult(
-                            new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                                new ClassificationResult<bool, float>[input[0].Lengths[0]]))),
-                (_, input, _) => ValueTask.FromResult(
-                    new BatchLease<Memory<ClassificationResult<bool, float>>>(
-                        new ClassificationResult<bool, float>[input.Length])),
+                    .Then(sp =>
+                        sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
+                    .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
                 stage => stage
                     .UseTokenizingStep()
                     .UseTokenCountOrderingStep()
@@ -41,11 +35,10 @@ public class PipelineConfigurationIntegrationTests
         ReadOnlyMemory<TokenizedText> input = Enumerable.Range(0, 10)
             .Select(index => new TokenizedText($"test {index}"))
             .ToArray();
-        var output = new ClassificationResult<bool, float>[input.Length];
+        Memory<ClassificationResult<bool, float>> output =
+            await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        await pipeline.ExecuteAsync(input, output, TestContext.Current.CancellationToken);
-
-        output.Should().HaveCount(10);
-        output.Should().OnlyContain(result => result.Choice);
+        output.ToArray().Should().HaveCount(10);
+        output.ToArray().Should().OnlyContain(result => result.Choice);
     }
 }

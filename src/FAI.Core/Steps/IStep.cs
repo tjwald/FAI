@@ -1,28 +1,19 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace FAI.Core.Steps;
 
-public interface IStep<in TInput, in TOutput>
+public interface IStep<in TInput, TOutput>
 {
-    ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default);
+    ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default);
 }
 
-public interface IAllocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
+public interface IPreallocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
 {
-    ValueTask<BatchLease<TOutput>> RentOutputAsync(TInput input, CancellationToken cancellationToken = default);
+    bool TryAllocateOutput(TInput input, [MaybeNullWhen(false)] out TOutput output);
 
-    async ValueTask<BatchLease<TOutput>> ExecuteAsync(
+    ValueTask ExecuteAsync(
         TInput input,
+        TOutput output,
         CancellationToken cancellationToken = default)
-    {
-        BatchLease<TOutput> output = await RentOutputAsync(input, cancellationToken);
-        try
-        {
-            await ExecuteAsync(input, output.Value, cancellationToken);
-            return output;
-        }
-        catch
-        {
-            output.Dispose();
-            throw;
-        }
-    }
+        ;
 }

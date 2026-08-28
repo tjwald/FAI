@@ -29,7 +29,7 @@ internal sealed class TokenizerWrapper
     }
 }
 
-public sealed class TextBatchEncodingStep : IAllocatingStep<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
+public sealed class TextBatchEncodingStep : IStep<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
@@ -38,41 +38,17 @@ public sealed class TextBatchEncodingStep : IAllocatingStep<ReadOnlyMemory<Token
         _tokenizer = tokenizer;
     }
 
-    public ValueTask<BatchLease<Tensor<long>[]>> RentOutputAsync(
+    public ValueTask<Tensor<long>[]> ExecuteAsync(
         ReadOnlyMemory<TokenizedText> input,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(new BatchLease<Tensor<long>[]>(new Tensor<long>[2]));
-    }
-
-    public ValueTask<BatchLease<Tensor<long>[]>> ExecuteAsync(
-        ReadOnlyMemory<TokenizedText> input,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(new BatchLease<Tensor<long>[]>(Encode(input)));
-    }
-
-    public ValueTask ExecuteAsync(
-        ReadOnlyMemory<TokenizedText> input,
-        Tensor<long>[] output,
-        CancellationToken cancellationToken = default)
-    {
-        if (output.Length != 2)
-        {
-            throw new ArgumentException("Text encoding requires token and attention-mask destinations.", nameof(output));
-        }
-
         if (input.IsEmpty)
         {
             throw new ArgumentException("Cannot encode an empty text batch.", nameof(input));
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        Tensor<long>[] encoded = Encode(input);
-        encoded.CopyTo(output, 0);
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult(Encode(input));
     }
 
     private Tensor<long>[] Encode(ReadOnlyMemory<TokenizedText> input)
@@ -83,7 +59,7 @@ public sealed class TextBatchEncodingStep : IAllocatingStep<ReadOnlyMemory<Token
 }
 
 public sealed class ClassificationDecodingStep<TClassification> :
-    IBorrowedTensorConsumer<float, Memory<ClassificationResult<TClassification, float>>>
+    IPreallocatingStep<TensorOutputs<float>, Memory<ClassificationResult<TClassification, float>>>
 {
     private readonly ClassificationOptions<TClassification> _options;
 
@@ -92,16 +68,41 @@ public sealed class ClassificationDecodingStep<TClassification> :
         _options = options;
     }
 
-    public void Consume(
-        ReadOnlyTensorSpan<float> tensor,
-        int outputIndex,
-        Memory<ClassificationResult<TClassification, float>> output)
+    public bool TryAllocateOutput(
+        TensorOutputs<float> input,
+        out Memory<ClassificationResult<TClassification, float>> output)
     {
-        if (outputIndex != 0)
+        if (input.Count == 0)
         {
-            return;
+            output = default;
+            return false;
         }
 
+        int rowCount = checked((int)input.GetOutput(0).Lengths[0]);
+        output = new ClassificationResult<TClassification, float>[rowCount];
+        return true;
+    }
+
+    public async ValueTask<Memory<ClassificationResult<TClassification, float>>> ExecuteAsync(
+        TensorOutputs<float> input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryAllocateOutput(input, out Memory<ClassificationResult<TClassification, float>> output))
+        {
+            throw new InvalidOperationException("Classification requires at least one model output.");
+        }
+
+        await ExecuteAsync(input, output, cancellationToken);
+        return output;
+    }
+
+    public ValueTask ExecuteAsync(
+        TensorOutputs<float> input,
+        Memory<ClassificationResult<TClassification, float>> output,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ReadOnlyTensorSpan<float> tensor = input.GetOutput(0);
         int rowCount = checked((int)tensor.Lengths[0]);
         if (rowCount != output.Length)
         {
@@ -117,5 +118,7 @@ public sealed class ClassificationDecodingStep<TClassification> :
             outputSpan[rowIndex] = _options.GetClassificationResult(row.AsSpan());
             rowIndex++;
         }
+
+        return ValueTask.CompletedTask;
     }
 }
