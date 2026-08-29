@@ -12,14 +12,6 @@ public static class BatchExecutorExtensions
     extension<TInput, TOutput>(PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> stage)
         where TInput : ITokenizable
     {
-        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseTokenizingStep()
-        {
-            return stage.Use((serviceProvider, inner) =>
-                new TokenizingStep<TInput, TOutput>(
-                    inner,
-                    serviceProvider.GetRequiredService<PretrainedTokenizer>()));
-        }
-
         public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseTokenCountOrderingStep()
         {
             return stage.Use((serviceProvider, inner) =>

@@ -1,4 +1,3 @@
-using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Steps;
 using FAI.NLP.Tests.Mocks;
@@ -13,7 +12,6 @@ public class TokenBatchPolicyTests
         public int TokenCount { get; set; } = tokenCount;
         public int MaxTokenLength => TokenCount;
         public int SentenceCount => 1;
-        public void Tokenize(PretrainedTokenizer tokenizer) { }
     }
 
     [Fact]
@@ -28,31 +26,15 @@ public class TokenBatchPolicyTests
     }
 
     [Fact]
-    public async Task TokenizingStep_TokenizesBeforeExecutingInnerStep()
+    public async Task TextTokenizationStep_ReturnsImmutableTokenizedBatch()
     {
         var tokenizer = DummyTokenizerFactory.Create();
-        var inner = new TokenCountStep();
-        var step = new TokenizingStep<TokenizedText, int>(inner, tokenizer);
-        ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[] { new("hello"), new("hello world") };
-        Memory<int> output = await step.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        var step = new TextTokenizationStep(tokenizer);
+        ReadOnlyMemory<string> inputs = new string[] { "hello", "hello world" };
 
-        Assert.All(inputs.ToArray(), input => Assert.NotNull(input.Tokens));
-        Assert.Equal(inputs.ToArray().Select(input => input.TokenCount), output.ToArray());
-    }
+        ReadOnlyMemory<TokenizedText> output = await step.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
 
-    private sealed class TokenCountStep : IStep<ReadOnlyMemory<TokenizedText>, Memory<int>>
-    {
-        public ValueTask<Memory<int>> ExecuteAsync(
-            ReadOnlyMemory<TokenizedText> input,
-            CancellationToken cancellationToken = default)
-        {
-            var output = new int[input.Length];
-            for (int index = 0; index < input.Length; index++)
-            {
-                output[index] = input.Span[index].TokenCount;
-            }
-
-            return ValueTask.FromResult<Memory<int>>(output);
-        }
+        Assert.Equal(inputs.ToArray(), output.ToArray().Select(item => item.Text));
+        Assert.All(output.ToArray(), item => Assert.True(item.TokenCount > 0));
     }
 }

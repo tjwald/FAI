@@ -3,6 +3,7 @@ using FAI.Core.ResultTypes;
 using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
+using FAI.NLP.Steps;
 using FAI.NLP.Tests.Mocks;
 using FAI.NLP.Tokenization;
 
@@ -16,15 +17,18 @@ public class TextMultipleChoiceTaskTests
         var tokenizer = DummyTokenizerFactory.Create();
         var modelStep = new StubMultipleChoiceModelStep();
         var options = new TextMultipleChoiceOptions(MaxChoices: 4, StoreLogits: true);
-        var step = new TextMultipleChoiceStep(tokenizer, modelStep, options);
+        var tokenizationStep = new TextMultipleChoiceTokenizationStep(tokenizer);
+        var step = new TextMultipleChoiceStep(modelStep, options);
         ReadOnlyMemory<TextMultipleChoiceInput> inputs = new TextMultipleChoiceInput[]
         {
             new("context", [new("choice 1"), new("choice 2")]),
             new("context", [new("choice a"), new("choice b")]),
         };
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> tokenizedInputs =
+            await tokenizationStep.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         var output = new ChoiceResult<TokenizedText>[2];
 
-        await step.ExecuteAsync(inputs, output, TestContext.Current.CancellationToken);
+        await step.ExecuteAsync(tokenizedInputs, output, TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 0], output.Select(result => result.ChoiceIndex));
         Assert.Equal(["choice 2", "choice a"], output.Select(result => result.Choice.Text));

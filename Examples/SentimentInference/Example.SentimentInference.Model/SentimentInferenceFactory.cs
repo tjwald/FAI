@@ -9,6 +9,7 @@ using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextClassification;
+using FAI.NLP.Steps;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
@@ -54,22 +55,22 @@ public static class SentimentInferenceFactory
             localServices.AddSingleton<ClassificationDecodingStep<bool>>();
 
             localServices
-                .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+                .AddPipeline<ReadOnlyMemory<string>>()
+                .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
                 .Then(
                     pipeline => pipeline
-                        .Then<Tensor<long>[], TextBatchEncodingStep>()
+                        .Then<Tensor<long>[], TextTensorizingStep>()
                         .Then(sp =>
                             sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-                        .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
-                    (input, out output) =>
-                    {
-                        output = new ClassificationResult<bool, float>[input.Length];
-                        return true;
-                    },
-                    stage => stage
-                        .UseTokenizingStep()
-                        .UseTokenCountOrderingStep()
-                        .UseMaxPaddedTokensPartitioningStep())
+                        .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
+                        .WithOutputAllocation((input, out output) =>
+                        {
+                            output = new ClassificationResult<bool, float>[input.Length];
+                            return true;
+                        })
+                        .WithPolicies(stage => stage
+                            .UseTokenCountOrderingStep()
+                            .UseMaxPaddedTokensPartitioningStep()))
                 .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();

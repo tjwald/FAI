@@ -15,9 +15,13 @@ public class TextClassificationStepsTests
     {
         var tokenizer = DummyTokenizerFactory.Create();
         var options = new ClassificationOptions<string>(["Negative", "Positive"]);
-        var encodingStep = new TextBatchEncodingStep(tokenizer);
+        var encodingStep = new TextTensorizingStep(tokenizer);
         var decodingStep = new ClassificationDecodingStep<string>(options);
-        ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[] { new("hello"), new("world") };
+        ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[]
+        {
+            new("hello", tokenizer.Tokenize("hello").ToArray()),
+            new("world", tokenizer.Tokenize("world").ToArray()),
+        };
         Tensor<long>[] encoded = await encodingStep.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         Tensor<float> logits = Tensor.Create([0.1f, 0.9f, 0.8f, 0.2f], [2, 2]);
         using var outputs = new TestTensorOutputs(logits);

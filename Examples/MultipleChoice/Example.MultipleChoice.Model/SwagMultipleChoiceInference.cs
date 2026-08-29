@@ -46,7 +46,7 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)
     {
-        var choices = new TokenizedText[input.Endings.Length];
+        var choices = new string[input.Endings.Length];
         for (int i = 0; i < choices.Length; i++)
         {
             choices[i] = input.Text + " " + input.Endings[i];

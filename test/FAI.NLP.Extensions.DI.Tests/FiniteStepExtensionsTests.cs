@@ -11,17 +11,6 @@ namespace FAI.NLP.Extensions.DI.Tests;
 public class FiniteStepExtensionsTests
 {
     [Fact]
-    public async Task UseTokenizingStep_TokenizesBeforeExecutingInnerStep()
-    {
-        ServiceProvider provider = BuildProvider(stage => stage.UseTokenizingStep());
-        var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
-        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(4), new(2) };
-        _ = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
-
-        Assert.All(input.ToArray(), item => Assert.True(item.WasTokenized));
-    }
-
-    [Fact]
     public async Task UseTokenCountOrderingStep_RestoresCallerOutputOrder()
     {
         ServiceProvider provider = BuildProvider(stage => stage.UseTokenCountOrderingStep());
@@ -48,10 +37,9 @@ public class FiniteStepExtensionsTests
     }
 
     [Fact]
-    public async Task TokenizeOrderAndPartition_ExecutesSortedPartitionsAndRestoresOutputOrder()
+    public async Task OrderAndPartition_ExecutesSortedPartitionsAndRestoresOutputOrder()
     {
         ServiceProvider provider = BuildProvider(stage => stage
-            .UseTokenizingStep()
             .UseTokenCountOrderingStep()
             .UseMaxPaddedTokensPartitioningStep());
         var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
@@ -60,7 +48,6 @@ public class FiniteStepExtensionsTests
 
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        Assert.All(input.ToArray(), item => Assert.True(item.WasTokenized));
         Assert.Equal([2, 3, 4, 9], inner.ObservedTokenCounts);
         Assert.Equal([2, 1, 1], inner.BatchSizes);
         Assert.Equal([9, 2, 4, 3], output.ToArray());
@@ -85,12 +72,6 @@ public class FiniteStepExtensionsTests
         public int TokenCount { get; } = tokenCount;
         public int MaxTokenLength => TokenCount;
         public int SentenceCount => 1;
-        public bool WasTokenized { get; private set; }
-
-        public void Tokenize(PretrainedTokenizer tokenizer)
-        {
-            WasTokenized = true;
-        }
     }
 
     public sealed class RecordingStep : IPreallocatingStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>

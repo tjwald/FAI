@@ -1,31 +1,64 @@
 using FAI.Core.Steps;
 using FAI.NLP.Configuration;
+using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.Steps;
 
-public sealed class TokenizingStep<TInput, TOutput> :
-    IStep<ReadOnlyMemory<TInput>, Memory<TOutput>>
-    where TInput : ITokenizable
+public sealed class TextTokenizationStep :
+    IStep<ReadOnlyMemory<string>, ReadOnlyMemory<TokenizedText>>
 {
-    private readonly IStep<ReadOnlyMemory<TInput>, Memory<TOutput>> _inner;
     private readonly PretrainedTokenizer _tokenizer;
 
-    public TokenizingStep(
-        IStep<ReadOnlyMemory<TInput>, Memory<TOutput>> inner,
-        PretrainedTokenizer tokenizer)
+    public TextTokenizationStep(PretrainedTokenizer tokenizer)
     {
-        _inner = inner;
         _tokenizer = tokenizer;
     }
 
-    public async ValueTask<Memory<TOutput>> ExecuteAsync(
-        ReadOnlyMemory<TInput> input,
+    public ValueTask<ReadOnlyMemory<TokenizedText>> ExecuteAsync(
+        ReadOnlyMemory<string> input,
         CancellationToken cancellationToken = default)
     {
-        var parallelOptions = new ParallelOptions { CancellationToken = cancellationToken };
-        Parallel.ForEach(input.ToArray(), parallelOptions, item => item.Tokenize(_tokenizer));
-        return await _inner.ExecuteAsync(input, cancellationToken);
+        var output = new TokenizedText[input.Length];
+        Parallel.For(0, input.Length, new ParallelOptions { CancellationToken = cancellationToken }, index =>
+        {
+            string text = input.Span[index];
+            output[index] = new TokenizedText(text, _tokenizer.Tokenize(text).ToArray());
+        });
+        return ValueTask.FromResult<ReadOnlyMemory<TokenizedText>>(output);
+    }
+}
+
+public sealed class TextMultipleChoiceTokenizationStep :
+    IStep<ReadOnlyMemory<TextMultipleChoiceInput>, ReadOnlyMemory<TokenizedTextMultipleChoiceInput>>
+{
+    private readonly PretrainedTokenizer _tokenizer;
+
+    public TextMultipleChoiceTokenizationStep(PretrainedTokenizer tokenizer)
+    {
+        _tokenizer = tokenizer;
+    }
+
+    public ValueTask<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>> ExecuteAsync(
+        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        CancellationToken cancellationToken = default)
+    {
+        var output = new TokenizedTextMultipleChoiceInput[input.Length];
+        Parallel.For(0, input.Length, new ParallelOptions { CancellationToken = cancellationToken }, inputIndex =>
+        {
+            TextMultipleChoiceInput item = input.Span[inputIndex];
+            var choices = new TokenizedText[item.Choices.Length];
+            for (int choiceIndex = 0; choiceIndex < choices.Length; choiceIndex++)
+            {
+                string choice = item.Choices[choiceIndex];
+                choices[choiceIndex] = new TokenizedText(
+                    choice,
+                    _tokenizer.Tokenize(item.Context, choice).ToArray());
+            }
+
+            output[inputIndex] = new TokenizedTextMultipleChoiceInput(item.Context, choices);
+        });
+        return ValueTask.FromResult<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>>(output);
     }
 }
 

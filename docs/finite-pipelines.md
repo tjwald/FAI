@@ -39,30 +39,30 @@ A supplied compatible destination remains valid for `ExecuteAsync(input, output)
 
 ```csharp
 services
-    .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+    .AddPipeline<ReadOnlyMemory<string>>()
+    .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
     .Then(
         pipeline => pipeline
-            .Then<Tensor<long>[], TextBatchEncodingStep>()
+            .Then<Tensor<long>[], TextTensorizingStep>()
             .Then<TensorOutputs<float>>(services =>
                 services.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
-        (ReadOnlyMemory<TokenizedText> input, out Memory<ClassificationResult<bool, float>> output) =>
-        {
-            output = new ClassificationResult<bool, float>[input.Length];
-            return true;
-        },
-        stage => stage
-            .UseTokenizingStep()
-            .UseTokenCountOrderingStep()
-            .UseMaxPaddedTokensPartitioningStep())
+            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
+            .WithOutputAllocation((input, out output) =>
+            {
+                output = new ClassificationResult<bool, float>[input.Length];
+                return true;
+            })
+            .WithPolicies(stage => stage
+                .UseTokenCountOrderingStep()
+                .UseMaxPaddedTokensPartitioningStep()))
     .Build();
 ```
 
-Nested `Then` is an ordinary typed stage and needs no allocator for normal return-value execution. A type-changing nested pipeline may optionally provide a synchronous endpoint allocator when its final stage supports destination execution but cannot derive final storage directly from the nested pipeline's starting input. The allocator follows the same storage-only Try contract and lets enclosing partition decorators preallocate one complete output.
+Nested `Then` is an ordinary typed stage and needs no allocator for normal return-value execution. A type-changing nested pipeline may optionally declare a synchronous endpoint allocator with `WithOutputAllocation` when its final stage supports destination execution but cannot derive final storage directly from the nested pipeline's starting input. `WithPolicies` applies ordering, partitioning, routing, or other whole-stage decorators to that composed pipeline. Keeping allocation and policies inside the nested definition makes their scope explicit. The allocator follows the same storage-only Try contract and lets partition decorators preallocate one complete output.
 
 `Use` wraps only the configured stage, and decorators are declared from outermost to innermost.
 
-For classification, execution order is tokenization, token-count ordering, token-budget partitioning, scheduled encoding, model execution, decoding, and restoration of original order.
+For classification, execution order is raw text tokenization, token-count ordering, token-budget partitioning, scheduled tensorization, model execution, decoding, and restoration of original order. `TextTokenizationStep` changes raw strings into immutable `TokenizedText` values. `TextTensorizingStep` only pads those token sequences and creates model input tensors; it never tokenizes or mutates text.
 
 ## Batch capabilities
 
@@ -77,7 +77,7 @@ The relevant operations are independent capabilities:
 - Scattering
 - Permutation
 
-Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing requires indexed gathering and output scattering; contiguous slicing alone cannot represent non-contiguous routes.
+Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing gathers non-contiguous inputs; its preallocated path writes route results into contiguous output slices and performs one final permutation, while its fallback scatters returned route outputs.
 
 ## Partition preallocation
 
@@ -107,8 +107,8 @@ Normal classification therefore performs no managed logits materialization. A co
 
 ## Capability examples
 
-- Tokenization is return-value-only because dimensions depend on tokenization work.
-- Text encoding is return-value-only when shape discovery would repeat encoding work.
+- Tokenization is an explicit type-changing, return-value-only step because dimensions depend on tokenization work.
+- Text tensorization is return-value-only when shape discovery would repeat tensor construction work.
 - Static-shape model backends may implement preallocation only when they can bind supplied storage directly.
 - Dynamic-output models remain return-value-only for inputs whose output shape is not metadata-predictable.
 - Classification, multiple-choice, and image decoders can preallocate result memory from output cardinality and write directly into slices.

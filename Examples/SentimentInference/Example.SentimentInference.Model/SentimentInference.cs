@@ -1,16 +1,15 @@
 using FAI.Core.Abstractions;
 using FAI.Core.ResultTypes;
 using FAI.Core.Steps;
-using FAI.NLP.Tokenization;
 
 namespace Example.SentimentInference.Model;
 
 public sealed class SentimentInference : IInference<string, bool>
 {
-    private readonly IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>> _pipeline;
+    private readonly IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> _pipeline;
 
     public SentimentInference(
-        IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>> pipeline)
+        IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> pipeline)
     {
         _pipeline = pipeline;
     }
@@ -35,13 +34,7 @@ public sealed class SentimentInference : IInference<string, bool>
             throw new ArgumentException("Input and output batch sizes must match.", nameof(output));
         }
 
-        var textInputs = new TokenizedText[input.Length];
-        for (int index = 0; index < input.Length; index++)
-        {
-            textInputs[index] = input.Span[index];
-        }
-
-        Memory<ClassificationResult<bool, float>> classificationResults = await _pipeline.ExecuteAsync(textInputs);
+        Memory<ClassificationResult<bool, float>> classificationResults = await _pipeline.ExecuteAsync(input);
 
         for (int index = 0; index < classificationResults.Length; index++)
         {

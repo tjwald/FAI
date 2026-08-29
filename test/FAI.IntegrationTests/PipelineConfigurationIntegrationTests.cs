@@ -1,3 +1,5 @@
+using FAI.NLP.Steps;
+
 namespace FAI.IntegrationTests;
 
 public class PipelineConfigurationIntegrationTests
@@ -16,24 +18,29 @@ public class PipelineConfigurationIntegrationTests
             new LogicalMockModelStep([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecodingStep<bool>>();
         services
-            .AddPipeline<ReadOnlyMemory<TokenizedText>>()
+            .AddPipeline<ReadOnlyMemory<string>>()
+            .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
             .Then(
                 pipeline => pipeline
-                    .Then<Tensor<long>[], TextBatchEncodingStep>()
+                    .Then<Tensor<long>[], TextTensorizingStep>()
                     .Then(sp =>
                         sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-                    .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>(),
-                stage => stage
-                    .UseTokenizingStep()
-                    .UseTokenCountOrderingStep()
-                    .UseMaxPaddedTokensPartitioningStep())
+                    .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
+                    .WithOutputAllocation((input, out output) =>
+                    {
+                        output = new ClassificationResult<bool, float>[input.Length];
+                        return true;
+                    })
+                    .WithPolicies(stage => stage
+                        .UseTokenCountOrderingStep()
+                        .UseMaxPaddedTokensPartitioningStep()))
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<
-            IStep<ReadOnlyMemory<TokenizedText>, Memory<ClassificationResult<bool, float>>>>();
-        ReadOnlyMemory<TokenizedText> input = Enumerable.Range(0, 10)
-            .Select(index => new TokenizedText($"test {index}"))
+            IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>>>();
+        ReadOnlyMemory<string> input = Enumerable.Range(0, 10)
+            .Select(index => $"test {index}")
             .ToArray();
         Memory<ClassificationResult<bool, float>> output =
             await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);

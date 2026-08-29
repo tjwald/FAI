@@ -128,15 +128,14 @@ public sealed class StepPipelineBuilderTests
 
         services
             .AddPipeline<int[]>()
-            .Then(
-                nested => nested
+            .Then(nested => nested
                     .Then<long[], ToLongStep>()
-                    .Then<string[], PreallocatingToStringStep>(),
-                (input, out output) =>
-                {
-                    output = new string[input.Length];
-                    return true;
-                })
+                    .Then<string[], PreallocatingToStringStep>()
+                    .WithOutputAllocation((input, out output) =>
+                    {
+                        output = new string[input.Length];
+                        return true;
+                    }))
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();

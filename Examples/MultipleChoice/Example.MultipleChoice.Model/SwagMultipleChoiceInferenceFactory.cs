@@ -7,6 +7,7 @@ using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
+using FAI.NLP.Steps;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
@@ -51,10 +52,12 @@ public static class SwagMultipleChoiceInferenceFactory
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
-                .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>(stage => stage
-                    .UseTokenizingStep()
-                    .UseTokenCountOrderingStep()
-                    .UseMaxPaddedTokensPartitioningStep())
+                .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenizationStep>()
+                .Then(pipeline => pipeline
+                    .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>()
+                    .WithPolicies(stage => stage
+                        .UseTokenCountOrderingStep()
+                        .UseMaxPaddedTokensPartitioningStep()))
                 .Build();
 
             localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();

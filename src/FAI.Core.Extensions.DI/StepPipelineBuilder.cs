@@ -44,18 +44,6 @@ public sealed class PipelineBuilder<TInput>
             configure);
     }
 
-    public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(
-        Func<PipelineBuilder<TInput>, ComposedPipelineBuilder<TInput, TOutput>> buildPipeline,
-        TryAllocatePipelineOutput<TInput, TOutput> tryAllocateOutput,
-        Action<PipelineStageBuilder<TInput, TOutput>>? configure = null)
-    {
-        ComposedPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
-        return Then(
-            serviceProvider => new PreallocatingPipelineStep<TInput, TOutput>(
-                pipeline.BuildChain(serviceProvider),
-                tryAllocateOutput),
-            configure);
-    }
 }
 
 public sealed class ComposedPipelineBuilder<TStart, TCurrent>
@@ -103,17 +91,26 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
             configure);
     }
 
-    public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(
-        Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline,
-        TryAllocatePipelineOutput<TCurrent, TNext> tryAllocateOutput,
-        Action<PipelineStageBuilder<TCurrent, TNext>>? configure = null)
+    public ComposedPipelineBuilder<TStart, TCurrent> WithOutputAllocation(
+        TryAllocatePipelineOutput<TStart, TCurrent> tryAllocateOutput)
     {
-        ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
-        return Then(
-            serviceProvider => new PreallocatingPipelineStep<TCurrent, TNext>(
-                pipeline.BuildChain(serviceProvider),
-                tryAllocateOutput),
-            configure);
+        return new ComposedPipelineBuilder<TStart, TCurrent>(
+            _services,
+            serviceProvider => StepChain.Create(
+                new PreallocatingPipelineStep<TStart, TCurrent>(
+                    _build(serviceProvider),
+                    tryAllocateOutput)));
+    }
+
+    public ComposedPipelineBuilder<TStart, TCurrent> WithPolicies(
+        Action<PipelineStageBuilder<TStart, TCurrent>> configure)
+    {
+        var stage = new PipelineStageBuilder<TStart, TCurrent>();
+        configure(stage);
+        return new ComposedPipelineBuilder<TStart, TCurrent>(
+            _services,
+            serviceProvider => StepChain.Create(
+                stage.Build(serviceProvider, _build(serviceProvider))));
     }
 
     public IServiceCollection Build(string? key = null)

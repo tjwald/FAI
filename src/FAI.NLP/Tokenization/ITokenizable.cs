@@ -1,7 +1,7 @@
 namespace FAI.NLP.Tokenization;
 
 /// <summary>
-/// Represents an entity that can be tokenized for natural language processing tasks. May represent multiple sentences.
+/// Exposes token-count metadata for an already-tokenized NLP input. May represent multiple sentences.
 /// </summary>
 public interface ITokenizable
 {
@@ -20,9 +20,4 @@ public interface ITokenizable
     /// </summary>
     int SentenceCount { get; }
 
-    /// <summary>
-    /// Tokenizes the entity using the provided pretrained tokenizer.
-    /// </summary>
-    /// <param name="pretrainedTokenizer">The tokenizer to use for tokenizing the entity.</param>
-    void Tokenize(PretrainedTokenizer pretrainedTokenizer);
 }

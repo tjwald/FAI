@@ -10,7 +10,6 @@ public class MaxPaddedTokensPartitionerTests
     {
         public int MaxTokenLength => TokenCount;
         public int SentenceCount => 1;
-        public void Tokenize(PretrainedTokenizer tokenizer) { }
     }
 
     [Fact]

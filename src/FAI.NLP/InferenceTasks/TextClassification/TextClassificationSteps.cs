@@ -7,33 +7,11 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextClassification;
 
-internal sealed class TokenizerWrapper
+public sealed class TextTensorizingStep : IStep<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
-    public TokenizerWrapper(PretrainedTokenizer tokenizer)
-    {
-        _tokenizer = tokenizer;
-    }
-
-    public BatchTokenizedResult Preprocess(ReadOnlySpan<TokenizedText> input)
-    {
-        if (input[0].Tokens is null)
-        {
-            return _tokenizer.BatchTokenize(new TextView(input));
-        }
-
-        (Tensor<long> tokenization, Tensor<long> mask) = _tokenizer.BatchTokensToTensors(new TokensView(input));
-
-        return new BatchTokenizedResult(tokenization, mask);
-    }
-}
-
-public sealed class TextBatchEncodingStep : IStep<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
-{
-    private readonly PretrainedTokenizer _tokenizer;
-
-    public TextBatchEncodingStep(PretrainedTokenizer tokenizer)
+    public TextTensorizingStep(PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
     }
@@ -53,8 +31,7 @@ public sealed class TextBatchEncodingStep : IStep<ReadOnlyMemory<TokenizedText>,
 
     private Tensor<long>[] Encode(ReadOnlyMemory<TokenizedText> input)
     {
-        var tokenizer = new TokenizerWrapper(_tokenizer);
-        return tokenizer.Preprocess(input.Span).ToArray();
+        return _tokenizer.BatchTokensToTensors(new TokensView(input.Span)).ToArray();
     }
 }
 

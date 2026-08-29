@@ -1,5 +1,4 @@
 using System.Numerics.Tensors;
-using System.Runtime.InteropServices;
 using FAI.Core;
 using FAI.Core.ResultTypes;
 using FAI.Core.Steps;
@@ -9,24 +8,21 @@ using FAI.NLP.Tokenization;
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
 public sealed class TextMultipleChoiceStep :
-    IPreallocatingStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+    IPreallocatingStep<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
 {
-    private readonly PretrainedTokenizer _tokenizer;
     private readonly IStep<Tensor<long>[], TensorOutputs<float>> _modelStep;
     private readonly TextMultipleChoiceOptions _options;
 
     public TextMultipleChoiceStep(
-        PretrainedTokenizer tokenizer,
         IStep<Tensor<long>[], TensorOutputs<float>> modelStep,
         TextMultipleChoiceOptions options)
     {
-        _tokenizer = tokenizer;
         _modelStep = modelStep;
         _options = options;
     }
 
     public bool TryAllocateOutput(
-        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         out Memory<ChoiceResult<TokenizedText>> output)
     {
         output = new ChoiceResult<TokenizedText>[input.Length];
@@ -34,7 +30,7 @@ public sealed class TextMultipleChoiceStep :
     }
 
     public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
-        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         CancellationToken cancellationToken = default)
     {
         _ = TryAllocateOutput(input, out Memory<ChoiceResult<TokenizedText>> output);
@@ -43,7 +39,7 @@ public sealed class TextMultipleChoiceStep :
     }
 
     public async ValueTask ExecuteAsync(
-        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         Memory<ChoiceResult<TokenizedText>> output,
         CancellationToken cancellationToken = default)
     {
@@ -64,13 +60,13 @@ public sealed class TextMultipleChoiceStep :
         Decode(input, modelOutput.GetOutput(0), output);
     }
 
-    private BatchTokenizedResult Preprocess(ReadOnlySpan<TextMultipleChoiceInput> input)
+    private BatchTokenizedResult Preprocess(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)
     {
         int maxChoiceCount = 0;
         int maxTokenCount = 0;
         for (int inputIndex = 0; inputIndex < input.Length; inputIndex++)
         {
-            TextMultipleChoiceInput item = input[inputIndex];
+            TokenizedTextMultipleChoiceInput item = input[inputIndex];
             if (item.Choices.Length > _options.MaxChoices)
             {
                 throw new InvalidOperationException($"Too many choices for text: {item.Context}");
@@ -79,7 +75,6 @@ public sealed class TextMultipleChoiceStep :
             maxChoiceCount = Math.Max(maxChoiceCount, item.Choices.Length);
             foreach (TokenizedText choice in item.Choices)
             {
-                choice.Tokens ??= _tokenizer.Tokenize(item.Context, choice.Text);
                 maxTokenCount = Math.Max(maxTokenCount, choice.TokenCount);
             }
         }
@@ -93,12 +88,12 @@ public sealed class TextMultipleChoiceStep :
         {
             for (int choiceIndex = 0; choiceIndex < input[inputIndex].Choices.Length; choiceIndex++)
             {
-                List<int> choiceTokens = input[inputIndex].Choices[choiceIndex].Tokens!;
+                ReadOnlySpan<int> choiceTokens = input[inputIndex].Choices[choiceIndex].Tokens.Span;
                 int rowIndex = inputIndex * maxChoiceCount + choiceIndex;
                 Span<long> tokenRow = tokenRows[rowIndex].AsSpan();
                 Span<long> maskRow = maskRows[rowIndex].AsSpan();
-                TensorPrimitives.ConvertChecked(CollectionsMarshal.AsSpan(choiceTokens), tokenRow);
-                maskRow[..choiceTokens.Count].Fill(1);
+                TensorPrimitives.ConvertChecked(choiceTokens, tokenRow);
+                maskRow[..choiceTokens.Length].Fill(1);
             }
         }
 
@@ -107,7 +102,7 @@ public sealed class TextMultipleChoiceStep :
     }
 
     private ChoiceResult<TokenizedText> GetMultipleChoiceResult(
-        TextMultipleChoiceInput input,
+        TokenizedTextMultipleChoiceInput input,
         ReadOnlySpan<float> logits)
     {
         Span<float> probabilities = stackalloc float[logits.Length];
@@ -122,7 +117,7 @@ public sealed class TextMultipleChoiceStep :
     }
 
     private void Decode(
-        ReadOnlyMemory<TextMultipleChoiceInput> input,
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         ReadOnlyTensorSpan<float> tensor,
         Memory<ChoiceResult<TokenizedText>> output)
     {

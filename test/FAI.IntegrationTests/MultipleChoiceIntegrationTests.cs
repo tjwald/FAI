@@ -1,3 +1,5 @@
+using FAI.NLP.Steps;
+
 namespace FAI.IntegrationTests;
 
 public class MultipleChoiceIntegrationTests
@@ -12,7 +14,8 @@ public class MultipleChoiceIntegrationTests
             new LogicalMockModelStep([[0.9f, 0.1f]]));
         services
             .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
-            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>(stage => stage.UseTokenizingStep())
+            .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenizationStep>()
+            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>()
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();
