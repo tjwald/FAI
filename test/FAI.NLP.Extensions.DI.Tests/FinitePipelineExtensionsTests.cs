@@ -1,4 +1,6 @@
+using System.Numerics.Tensors;
 using System.Text;
+using FAI.Core;
 using FAI.Core.Extensions.DI;
 using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;
@@ -49,6 +51,32 @@ public class FinitePipelineExtensionsTests
         Assert.Equal([2, 3, 4, 9], inner.ObservedTokenCounts);
         Assert.Equal([2, 1, 1], inner.BatchSizes);
         Assert.Equal([9, 2, 4, 3], output.ToArray());
+    }
+
+    [Fact]
+    public async Task OrderAndPartition_WithTensorOutput_RestoresOutputRows()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateDummyTokenizer());
+        services.AddSingleton(new TokenCountOrderingOptions(Ascending: true));
+        services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 0.5, MaxTokenCount: 10));
+        services
+            .AddPipeline<ReadOnlyMemory<TestTokenizable>>()
+            .Then<ReadOnlyMemory<TestTokenizable>, PassThroughPipeline>()
+            .UseTokenCountOrdering()
+            .UseMaxPaddedTokensPartitioning()
+            .Then<Tensor<int>, TensorRecordingPipeline>()
+            .Build();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Tensor<int>>>();
+        var inner = provider.GetRequiredService<TensorRecordingPipeline>();
+        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(9), new(2), new(4), new(3) };
+
+        Tensor<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        Assert.Equal([2, 3, 4, 9], inner.ObservedTokenCounts);
+        Assert.Equal([2, 1, 1], inner.BatchSizes);
+        Assert.Equal([9, 2, 4, 3], output.AsReadOnlyTensorSpan().AsSpan().ToArray());
     }
 
     private static ServiceProvider BuildProvider(bool useOrdering, bool usePartitioning)
@@ -132,6 +160,46 @@ public class FinitePipelineExtensionsTests
             for (int index = 0; index < input.Length; index++)
             {
                 output.Span[index] = input.Span[index].TokenCount;
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    public sealed class TensorRecordingPipeline : IPreallocatingPipeline<ReadOnlyMemory<TestTokenizable>, Tensor<int>>
+    {
+        public List<int> ObservedTokenCounts { get; } = [];
+        public List<int> BatchSizes { get; } = [];
+
+        public bool TryAllocateOutput(ReadOnlyMemory<TestTokenizable> input, out Tensor<int> output)
+        {
+            output = Tensor.CreateFromShape<int>([input.Length, 1]);
+            return true;
+        }
+
+        public async ValueTask<Tensor<int>> ExecuteAsync(
+            ReadOnlyMemory<TestTokenizable> input,
+            CancellationToken cancellationToken = default)
+        {
+            _ = TryAllocateOutput(input, out Tensor<int> output);
+            await ExecuteAsync(input, output, cancellationToken);
+            return output;
+        }
+
+        public ValueTask ExecuteAsync(
+            ReadOnlyMemory<TestTokenizable> input,
+            Tensor<int> output,
+            CancellationToken cancellationToken = default)
+        {
+            BatchSizes.Add(input.Length);
+            foreach (TestTokenizable item in input.Span)
+            {
+                ObservedTokenCounts.Add(item.TokenCount);
+            }
+
+            for (int index = 0; index < input.Length; index++)
+            {
+                output[index, 0] = input.Span[index].TokenCount;
             }
 
             return ValueTask.CompletedTask;
