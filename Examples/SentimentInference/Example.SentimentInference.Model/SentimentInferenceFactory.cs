@@ -4,12 +4,12 @@ using FAI.Core.Configurations;
 using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Extensions.DI;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextClassification;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
@@ -49,28 +49,25 @@ public static class SentimentInferenceFactory
             localServices.AddSingleton<IPartitionScheduler>(sp =>
                 new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
             localServices.AddSingleton(sp =>
-                ModelExecutorFactory.CreateModelStep(
+                ModelExecutorFactory.CreateModelPipeline(
                     options.ModelExecutorType,
                     sp.GetRequiredService<IModelExecutorOptions>()));
-            localServices.AddSingleton<ClassificationDecodingStep<bool>>();
+            localServices.AddSingleton<ClassificationDecoding<bool>>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<string>>()
-                .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
-                .Then(
-                    pipeline => pipeline
-                        .Then<Tensor<long>[], TextTensorizingStep>()
-                        .Then(sp =>
-                            sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-                        .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
-                        .WithOutputAllocation((input, out output) =>
-                        {
-                            output = new ClassificationResult<bool, float>[input.Length];
-                            return true;
-                        })
-                        .WithPolicies(stage => stage
-                            .UseTokenCountOrderingStep()
-                            .UseMaxPaddedTokensPartitioningStep()))
+                .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
+                .UseTokenCountOrdering()
+                .UseMaxPaddedTokensPartitioning()
+                .Then<Tensor<long>[], TextTensorization>()
+                .Then(sp =>
+                    sp.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>())
+                .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
+                .WithOutputAllocation((input, out output) =>
+                {
+                    output = new ClassificationResult<bool, float>[input.Length];
+                    return true;
+                })
                 .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();

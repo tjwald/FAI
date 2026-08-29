@@ -1,9 +1,9 @@
 using System.Numerics.Tensors;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tests.Mocks;
 using FAI.NLP.Tokenization;
 
@@ -12,30 +12,30 @@ namespace FAI.NLP.Tests.InferenceTasks;
 public class TextMultipleChoiceTaskTests
 {
     [Fact]
-    public async Task TextMultipleChoiceStep_ProcessesBatchIntoCallerOutput()
+    public async Task TextMultipleChoicePipeline_ProcessesBatchIntoCallerOutput()
     {
         var tokenizer = DummyTokenizerFactory.Create();
-        var modelStep = new StubMultipleChoiceModelStep();
+        var modelPipeline = new StubMultipleChoiceModelPipeline();
         var options = new TextMultipleChoiceOptions(MaxChoices: 4, StoreLogits: true);
-        var tokenizationStep = new TextMultipleChoiceTokenizationStep(tokenizer);
-        var step = new TextMultipleChoiceStep(modelStep, options);
+        var tokenizationPipeline = new TextMultipleChoiceTokenization(tokenizer);
+        var pipeline = new TextMultipleChoicePipeline(modelPipeline, options);
         ReadOnlyMemory<TextMultipleChoiceInput> inputs = new TextMultipleChoiceInput[]
         {
             new("context", [new("choice 1"), new("choice 2")]),
             new("context", [new("choice a"), new("choice b")]),
         };
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> tokenizedInputs =
-            await tokenizationStep.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+            await tokenizationPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         var output = new ChoiceResult<TokenizedText>[2];
 
-        await step.ExecuteAsync(tokenizedInputs, output, TestContext.Current.CancellationToken);
+        await pipeline.ExecuteAsync(tokenizedInputs, output, TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 0], output.Select(result => result.ChoiceIndex));
         Assert.Equal(["choice 2", "choice a"], output.Select(result => result.Choice.Text));
-        Assert.Equal(2, modelStep.BatchSize);
+        Assert.Equal(2, modelPipeline.BatchSize);
     }
 
-    private sealed class StubMultipleChoiceModelStep : IStep<Tensor<long>[], TensorOutputs<float>>
+    private sealed class StubMultipleChoiceModelPipeline : IPipeline<Tensor<long>[], TensorOutputs<float>>
     {
         public int BatchSize { get; private set; }
 

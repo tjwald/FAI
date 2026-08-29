@@ -1,4 +1,4 @@
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 
 namespace FAI.IntegrationTests;
 
@@ -10,17 +10,17 @@ public class MultipleChoiceIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(DummyTokenizerFactory.Create());
         services.AddSingleton(new TextMultipleChoiceOptions(MaxChoices: 2));
-        services.AddSingleton<IStep<Tensor<long>[], TensorOutputs<float>>>(
-            new LogicalMockModelStep([[0.9f, 0.1f]]));
+        services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
+            new LogicalMockModelPipeline([[0.9f, 0.1f]]));
         services
             .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
-            .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenizationStep>()
-            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>()
+            .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
+            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoicePipeline>()
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<
-            IStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>>();
+            IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>>();
         ReadOnlyMemory<TextMultipleChoiceInput> input = new TextMultipleChoiceInput[]
         {
             new("Question", [new("choice 1"), new("choice 2")]),

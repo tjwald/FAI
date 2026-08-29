@@ -1,6 +1,6 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tokenization;
 
@@ -10,10 +10,10 @@ public record struct SwagInput(string Context, string Text, string[] Endings);
 
 public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<TokenizedText>>
 {
-    private readonly IStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> _pipeline;
+    private readonly IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> _pipeline;
 
     public SwagMultipleChoiceInference(
-        IStep<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> pipeline)
+        IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> pipeline)
     {
         _pipeline = pipeline;
     }

@@ -1,6 +1,6 @@
 using System.Text;
 using FAI.Core.Extensions.DI;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;
 using FAI.NLP.Tokenization;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,14 +8,14 @@ using Microsoft.ML.Tokenizers;
 
 namespace FAI.NLP.Extensions.DI.Tests;
 
-public class FiniteStepExtensionsTests
+public class FinitePipelineExtensionsTests
 {
     [Fact]
-    public async Task UseTokenCountOrderingStep_RestoresCallerOutputOrder()
+    public async Task UseTokenCountOrdering_RestoresCallerOutputOrder()
     {
-        ServiceProvider provider = BuildProvider(stage => stage.UseTokenCountOrderingStep());
-        var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
-        var inner = provider.GetRequiredService<RecordingStep>();
+        ServiceProvider provider = BuildProvider(useOrdering: true, usePartitioning: false);
+        var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
+        var inner = provider.GetRequiredService<RecordingPipeline>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(10), new(2), new(5) };
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
@@ -24,11 +24,11 @@ public class FiniteStepExtensionsTests
     }
 
     [Fact]
-    public async Task UseMaxPaddedTokensPartitioningStep_ExecutesExpectedRanges()
+    public async Task UseMaxPaddedTokensPartitioning_ExecutesExpectedRanges()
     {
-        ServiceProvider provider = BuildProvider(stage => stage.UseMaxPaddedTokensPartitioningStep());
-        var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
-        var inner = provider.GetRequiredService<RecordingStep>();
+        ServiceProvider provider = BuildProvider(useOrdering: false, usePartitioning: true);
+        var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
+        var inner = provider.GetRequiredService<RecordingPipeline>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(4), new(4), new(4) };
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
@@ -39,11 +39,9 @@ public class FiniteStepExtensionsTests
     [Fact]
     public async Task OrderAndPartition_ExecutesSortedPartitionsAndRestoresOutputOrder()
     {
-        ServiceProvider provider = BuildProvider(stage => stage
-            .UseTokenCountOrderingStep()
-            .UseMaxPaddedTokensPartitioningStep());
-        var pipeline = provider.GetRequiredService<IStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
-        var inner = provider.GetRequiredService<RecordingStep>();
+        ServiceProvider provider = BuildProvider(useOrdering: true, usePartitioning: true);
+        var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
+        var inner = provider.GetRequiredService<RecordingPipeline>();
         ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(9), new(2), new(4), new(3) };
 
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
@@ -53,18 +51,44 @@ public class FiniteStepExtensionsTests
         Assert.Equal([9, 2, 4, 3], output.ToArray());
     }
 
-    private static ServiceProvider BuildProvider(
-        Action<PipelineStageBuilder<ReadOnlyMemory<TestTokenizable>, Memory<int>>> configure)
+    private static ServiceProvider BuildProvider(bool useOrdering, bool usePartitioning)
     {
         var services = new ServiceCollection();
         services.AddSingleton(CreateDummyTokenizer());
         services.AddSingleton(new TokenCountOrderingOptions(Ascending: true));
         services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 0.5, MaxTokenCount: 10));
-        services
+        ComposedPipelineBuilder<ReadOnlyMemory<TestTokenizable>, ReadOnlyMemory<TestTokenizable>> pipeline = services
             .AddPipeline<ReadOnlyMemory<TestTokenizable>>()
-            .Then<Memory<int>, RecordingStep>(configure)
-            .Build();
+            .Then<ReadOnlyMemory<TestTokenizable>, PassThroughPipeline>();
+        if (useOrdering && usePartitioning)
+        {
+            pipeline.UseTokenCountOrdering()
+                .UseMaxPaddedTokensPartitioning()
+                .Then<Memory<int>, RecordingPipeline>()
+                .Build();
+        }
+        else if (useOrdering)
+        {
+            pipeline.UseTokenCountOrdering()
+                .Then<Memory<int>, RecordingPipeline>()
+                .Build();
+        }
+        else
+        {
+            pipeline.UseMaxPaddedTokensPartitioning()
+                .Then<Memory<int>, RecordingPipeline>()
+                .Build();
+        }
+
         return services.BuildServiceProvider();
+    }
+
+    public sealed class PassThroughPipeline : IPipeline<ReadOnlyMemory<TestTokenizable>, ReadOnlyMemory<TestTokenizable>>
+    {
+        public ValueTask<ReadOnlyMemory<TestTokenizable>> ExecuteAsync(
+            ReadOnlyMemory<TestTokenizable> input,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input);
     }
 
     public sealed class TestTokenizable(int tokenCount) : ITokenizable
@@ -74,7 +98,7 @@ public class FiniteStepExtensionsTests
         public int SentenceCount => 1;
     }
 
-    public sealed class RecordingStep : IPreallocatingStep<ReadOnlyMemory<TestTokenizable>, Memory<int>>
+    public sealed class RecordingPipeline : IPreallocatingPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>
     {
         public List<int> ObservedTokenCounts { get; } = [];
         public List<int> BatchSizes { get; } = [];

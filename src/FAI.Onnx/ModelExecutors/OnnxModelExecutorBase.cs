@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics.Tensors;
 using FAI.Core;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.Core.Utilities;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
@@ -28,7 +28,7 @@ public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 /// <summary>
 /// Provides a base implementation for ONNX model executors.
 /// </summary>
-public abstract class OnnxModelExecutorBase : IStep<Tensor<long>[], TensorOutputs<float>>
+public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.

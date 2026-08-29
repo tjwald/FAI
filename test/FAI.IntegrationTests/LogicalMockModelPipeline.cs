@@ -1,7 +1,7 @@
 namespace FAI.IntegrationTests;
 
-public sealed class LogicalMockModelStep(float[][] outputs) :
-    IStep<Tensor<long>[], TensorOutputs<float>>
+public sealed class LogicalMockModelPipeline(float[][] outputs) :
+    IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     private int _callCount;
 

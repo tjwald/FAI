@@ -1,9 +1,9 @@
 # Finite pipelines
 
-Finite pipelines compose steps that transform one complete value into another.
+Finite pipelines compose components that transform one complete value into another.
 
 ```csharp
-public interface IStep<in TInput, TOutput>
+public interface IPipeline<in TInput, TOutput>
 {
     ValueTask<TOutput> ExecuteAsync(
         TInput input,
@@ -18,7 +18,7 @@ public interface IStep<in TInput, TOutput>
 Preallocation is an optional capability, not the base execution contract.
 
 ```csharp
-public interface IPreallocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
+public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
 {
     bool TryAllocateOutput(TInput input, out TOutput output);
 
@@ -29,40 +29,37 @@ public interface IPreallocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
 }
 ```
 
-Interface presence means a step understands destination execution. `TryAllocateOutput` determines whether metadata is sufficient for a particular input. It returns storage only and must not perform inference, tokenization, I/O, probing, or substantive work that execution would repeat. It must not encode hidden execution state into the destination.
+Interface presence means a pipeline understands destination execution. `TryAllocateOutput` determines whether metadata is sufficient for a particular input. It returns storage only and must not perform inference, tokenization, I/O, probing, or substantive work that execution would repeat. It must not encode hidden execution state into the destination.
 
 A supplied compatible destination remains valid for `ExecuteAsync(input, output)` even when `TryAllocateOutput(input, out _)` returns `false`. Invalid metadata and allocation failures throw; `false` means only that this invocation cannot be preallocated from available metadata.
 
 ## Composition
 
-`AddPipeline<TInput>()` starts a typed pipeline. Each `Then<TOutput, TStep>()` changes the current type, so incompatible stages fail at compile time.
+`AddPipeline<TInput>()` starts a typed pipeline. Each `Then<TOutput, TPipeline>()` changes the current type, so incompatible components fail at compile time.
 
 ```csharp
 services
     .AddPipeline<ReadOnlyMemory<string>>()
-    .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
-    .Then(
-        pipeline => pipeline
-            .Then<Tensor<long>[], TextTensorizingStep>()
-            .Then<TensorOutputs<float>>(services =>
-                services.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
-            .WithOutputAllocation((input, out output) =>
-            {
-                output = new ClassificationResult<bool, float>[input.Length];
-                return true;
-            })
-            .WithPolicies(stage => stage
-                .UseTokenCountOrderingStep()
-                .UseMaxPaddedTokensPartitioningStep()))
+    .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
+    .UseTokenCountOrdering()
+    .UseMaxPaddedTokensPartitioning()
+    .Then<Tensor<long>[], TextTensorization>()
+    .Then<TensorOutputs<float>>(services =>
+        services.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>() )
+    .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
+    .WithOutputAllocation((input, out output) =>
+    {
+        output = new ClassificationResult<bool, float>[input.Length];
+        return true;
+    })
     .Build();
 ```
 
-Nested `Then` is an ordinary typed stage and needs no allocator for normal return-value execution. A type-changing nested pipeline may optionally declare a synchronous endpoint allocator with `WithOutputAllocation` when its final stage supports destination execution but cannot derive final storage directly from the nested pipeline's starting input. `WithPolicies` applies ordering, partitioning, routing, or other whole-stage decorators to that composed pipeline. Keeping allocation and policies inside the nested definition makes their scope explicit. The allocator follows the same storage-only Try contract and lets partition decorators preallocate one complete output.
+Nested `Then` is an ordinary typed pipeline and needs no allocator for normal return-value execution. A type-changing pipeline may optionally declare a synchronous endpoint allocator with `WithOutputAllocation` when its final component supports destination execution but cannot derive final storage directly from the pipeline's starting input. The allocator follows the same storage-only Try contract and lets partition decorators preallocate one complete output.
 
-`Use` wraps only the configured stage, and decorators are declared from outermost to innermost.
+`Use` wraps the complete remainder of the chain. Decorators execute in declaration order. To limit a decorator's scope, create that scope with nested `Then(pipeline => pipeline.Use(...).Then(...))`.
 
-For classification, execution order is raw text tokenization, token-count ordering, token-budget partitioning, scheduled tensorization, model execution, decoding, and restoration of original order. `TextTokenizationStep` changes raw strings into immutable `TokenizedText` values. `TextTensorizingStep` only pads those token sequences and creates model input tensors; it never tokenizes or mutates text.
+For classification, execution order is raw text tokenization, token-count ordering, token-budget partitioning, scheduled tensorization, model execution, decoding, and restoration of original order. `TextTokenization` changes raw strings into immutable `TokenizedText` values. `TextTensorization` only pads those token sequences and creates model input tensors; it never tokenizes or mutates text.
 
 ## Batch capabilities
 
@@ -85,7 +82,7 @@ Partitioning selects its strategy from three capabilities:
 
 1. The input operations support contiguous slicing.
 2. The output operations support matching destination slices.
-3. The inner step implements `IPreallocatingStep<TInput, TOutput>` and can allocate for the full input.
+3. The inner pipeline implements `IPreallocatingPipeline<TInput, TOutput>` and can allocate for the full input.
 
 When all are available, partitioning calls `TryAllocateOutput` once with the complete input, slices the input and destination by matching ranges, and schedules writes into disjoint output slices. It never allocates once per partition.
 
@@ -95,10 +92,10 @@ Structural capabilities are selected when generic decorators are configured and 
 
 ## Runtime-owned model outputs
 
-`TensorOutputs<T>` is a Core-owned disposable output value. ONNX implements it with live `OrtValue` instances and returns it from a normal model step:
+`TensorOutputs<T>` is a Core-owned disposable output value. ONNX implements it with live `OrtValue` instances and returns it from a normal model pipeline:
 
 ```csharp
-IStep<Tensor<long>[], TensorOutputs<float>>
+IPipeline<Tensor<long>[], TensorOutputs<float>>
 ```
 
 A decoder obtains `ReadOnlyTensorSpan<T>` views synchronously from the live scope. The scope can remain alive across awaits, while C# prevents a ref-struct span from crossing an await. The composed chain disposes the scope after decoding finishes, including failure and cancellation paths.
@@ -107,7 +104,7 @@ Normal classification therefore performs no managed logits materialization. A co
 
 ## Capability examples
 
-- Tokenization is an explicit type-changing, return-value-only step because dimensions depend on tokenization work.
+- Tokenization is an explicit type-changing, return-value-only pipeline because dimensions depend on tokenization work.
 - Text tensorization is return-value-only when shape discovery would repeat tensor construction work.
 - Static-shape model backends may implement preallocation only when they can bind supplied storage directly.
 - Dynamic-output models remain return-value-only for inputs whose output shape is not metadata-predictable.

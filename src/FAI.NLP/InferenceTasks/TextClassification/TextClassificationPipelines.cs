@@ -1,17 +1,17 @@
 using System.Numerics.Tensors;
 using FAI.Core;
 using FAI.Core.Configurations.InferenceTasks;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextClassification;
 
-public sealed class TextTensorizingStep : IStep<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
+public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
-    public TextTensorizingStep(PretrainedTokenizer tokenizer)
+    public TextTensorization(PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
     }
@@ -35,12 +35,12 @@ public sealed class TextTensorizingStep : IStep<ReadOnlyMemory<TokenizedText>, T
     }
 }
 
-public sealed class ClassificationDecodingStep<TClassification> :
-    IPreallocatingStep<TensorOutputs<float>, Memory<ClassificationResult<TClassification, float>>>
+public sealed class ClassificationDecoding<TClassification> :
+    IPreallocatingPipeline<TensorOutputs<float>, Memory<ClassificationResult<TClassification, float>>>
 {
     private readonly ClassificationOptions<TClassification> _options;
 
-    public ClassificationDecodingStep(ClassificationOptions<TClassification> options)
+    public ClassificationDecoding(ClassificationOptions<TClassification> options)
     {
         _options = options;
     }

@@ -1,7 +1,7 @@
 using System.Numerics.Tensors;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.ModelExecutors;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.ModelExecutorPools;
 using FAI.Onnx.ModelExecutors;
@@ -13,17 +13,17 @@ namespace FAI.Onnx.Factories;
 /// </summary>
 public static class ModelExecutorFactory
 {
-    public static IStep<Tensor<long>[], TensorOutputs<float>> CreateModelStep(
+    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {
         return modelExecutorOptions switch
         {
-            MultiDeviceExecutorOptions multiDeviceOptions => new PooledOnnxModelStep(
+            MultiDeviceExecutorOptions multiDeviceOptions => new PooledOnnxModelPipeline(
                 new MultiDeviceObjectPool(multiDeviceOptions.ExecutorOptions
                     .Select(options => CreateOnnxModelExecutor(executorType, options))
                     .ToList())),
-            PooledExecutorOptions<OnnxModelExecutorOptions> pooledOptions => new PooledOnnxModelStep(
+            PooledExecutorOptions<OnnxModelExecutorOptions> pooledOptions => new PooledOnnxModelPipeline(
                 CreateOnnxModelExecutorPool(executorType, pooledOptions)),
             OnnxModelExecutorOptions onnxOptions => CreateOnnxModelExecutor(executorType, onnxOptions),
             _ => throw new NotImplementedException(modelExecutorOptions.GetType().Name),

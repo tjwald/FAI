@@ -1,8 +1,8 @@
 using FAI.NLP.Configuration;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
 
-namespace FAI.NLP.Tests.StepTests;
+namespace FAI.NLP.Tests.PipelineTests;
 
 public class MaxPaddedTokensPartitionerTests
 {

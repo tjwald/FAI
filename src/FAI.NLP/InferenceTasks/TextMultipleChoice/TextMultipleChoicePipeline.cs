@@ -1,23 +1,23 @@
 using System.Numerics.Tensors;
 using FAI.Core;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
-public sealed class TextMultipleChoiceStep :
-    IPreallocatingStep<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+public sealed class TextMultipleChoicePipeline :
+    IPreallocatingPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
 {
-    private readonly IStep<Tensor<long>[], TensorOutputs<float>> _modelStep;
+    private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
     private readonly TextMultipleChoiceOptions _options;
 
-    public TextMultipleChoiceStep(
-        IStep<Tensor<long>[], TensorOutputs<float>> modelStep,
+    public TextMultipleChoicePipeline(
+        IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline,
         TextMultipleChoiceOptions options)
     {
-        _modelStep = modelStep;
+        _modelPipeline = modelPipeline;
         _options = options;
     }
 
@@ -56,7 +56,7 @@ public sealed class TextMultipleChoiceStep :
         cancellationToken.ThrowIfCancellationRequested();
         BatchTokenizedResult tokenized = Preprocess(input.Span);
         Tensor<long>[] modelInput = tokenized.ToArray();
-        using TensorOutputs<float> modelOutput = await _modelStep.ExecuteAsync(modelInput, cancellationToken);
+        using TensorOutputs<float> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
         Decode(input, modelOutput.GetOutput(0), output);
     }
 

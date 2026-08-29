@@ -1,7 +1,42 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
+
+public static class IndexedBatchOperations
+{
+    public static IWritableIndexedBatch<TBatch> GetWritable<TBatch>()
+        => WritableOperations<TBatch>.Instance;
+
+    private static class WritableOperations<TBatch>
+    {
+        public static readonly IWritableIndexedBatch<TBatch> Instance = Create();
+
+        private static IWritableIndexedBatch<TBatch> Create()
+        {
+            Type batchType = typeof(TBatch);
+            if (!batchType.IsGenericType)
+            {
+                throw UnsupportedBatchType(batchType);
+            }
+
+            Type genericType = batchType.GetGenericTypeDefinition();
+            Type itemType = batchType.GetGenericArguments()[0];
+            Type? operationsType = genericType == typeof(Memory<>)
+                ? typeof(MemoryBatchOperations<>).MakeGenericType(itemType)
+                : genericType == typeof(System.Numerics.Tensors.Tensor<>)
+                    ? typeof(TensorBatchOperations<>).MakeGenericType(itemType)
+                    : null;
+
+            return operationsType is not null
+                ? (IWritableIndexedBatch<TBatch>)Activator.CreateInstance(operationsType)!
+                : throw UnsupportedBatchType(batchType);
+        }
+    }
+
+    private static InvalidOperationException UnsupportedBatchType(Type batchType)
+        => new($"No writable indexed batch operations are registered for '{batchType}'.");
+}
 
 public interface IReadOnlyIndexedBatch<TBatch>
 {

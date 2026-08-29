@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
 public sealed class TensorBatchOperations<T> :
     IReadOnlyIndexedBatch<Tensor<T>>,

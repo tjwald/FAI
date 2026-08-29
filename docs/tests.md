@@ -44,9 +44,9 @@ The test suite covers the following areas:
 
 ## Integration Testing Strategy
 
-Testing every possible permutation of steps and policies is neither feasible nor desirable. Instead, we follow a "Representative Combinations" strategy:
+Testing every possible permutation of pipelines and policies is neither feasible nor desirable. Instead, we follow a "Representative Combinations" strategy:
 
 1. **Common Architectural Patterns**: Prioritize production-like chains such as tokenization, ordering, partitioning, and model execution.
-2. **Component Breadth**: Every major step contract, indexed-batch trait, and policy should appear in focused or integration coverage.
+2. **Component Breadth**: Every major pipeline contract, indexed-batch trait, and policy should appear in focused or integration coverage.
 3. **Lifecycle & Concurrency**: Verify intermediate leases, caller-owned output, order restoration, cancellation, and bounded scheduling.
-4. **Logical Mocks**: Use small `IStep` implementations and disposable `TensorOutputs<T>` values to verify orchestration without runtime-model overhead or nondeterminism.
+4. **Logical Mocks**: Use small `IPipeline` implementations and disposable `TensorOutputs<T>` values to verify orchestration without runtime-model overhead or nondeterminism.

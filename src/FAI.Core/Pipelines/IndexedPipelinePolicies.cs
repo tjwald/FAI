@@ -1,4 +1,4 @@
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
 public interface IBatchPartitioner<in TBatch>
 {
@@ -10,25 +10,25 @@ public interface IIndexOrdering<in TBatch>
     int[] CreateOrder(TBatch batch);
 }
 
-public sealed class PartitioningStep<TInput, TOutput>
-    : IPreallocatingStep<TInput, TOutput>
+public sealed class PartitioningPipeline<TInput, TOutput>
+    : IPreallocatingPipeline<TInput, TOutput>
 {
-    private readonly IStep<TInput, TOutput> _inner;
-    private readonly IPreallocatingStep<TInput, TOutput>? _preallocatingInner;
+    private readonly IPipeline<TInput, TOutput> _inner;
+    private readonly IPreallocatingPipeline<TInput, TOutput>? _preallocatingInner;
     private readonly IBatchPartitioner<TInput> _partitioner;
     private readonly IPartitionScheduler _scheduler;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
     private readonly IWritableIndexedBatch<TOutput> _outputBatch;
 
-    public PartitioningStep(
-        IStep<TInput, TOutput> inner,
+    public PartitioningPipeline(
+        IPipeline<TInput, TOutput> inner,
         IBatchPartitioner<TInput> partitioner,
         IReadOnlyIndexedBatch<TInput> inputBatch,
         IWritableIndexedBatch<TOutput> outputBatch,
         IPartitionScheduler? scheduler = null)
     {
         _inner = inner;
-        _preallocatingInner = inner as IPreallocatingStep<TInput, TOutput>;
+        _preallocatingInner = inner as IPreallocatingPipeline<TInput, TOutput>;
         _partitioner = partitioner;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -58,7 +58,7 @@ public sealed class PartitioningStep<TInput, TOutput>
             }
             catch
             {
-                await StepOutputDisposer.DisposeAsync(output);
+                await PipelineOutputDisposer.DisposeAsync(output);
                 throw;
             }
         }
@@ -98,7 +98,7 @@ public sealed class PartitioningStep<TInput, TOutput>
             }
             catch
             {
-                await StepOutputDisposer.DisposeAsync(aggregate);
+                await PipelineOutputDisposer.DisposeAsync(aggregate);
                 throw;
             }
         }
@@ -108,7 +108,7 @@ public sealed class PartitioningStep<TInput, TOutput>
             {
                 if (partitionOutput is not null)
                 {
-                    await StepOutputDisposer.DisposeAsync(partitionOutput);
+                    await PipelineOutputDisposer.DisposeAsync(partitionOutput);
                 }
             }
         }
@@ -146,7 +146,7 @@ public sealed class PartitioningStep<TInput, TOutput>
                 }
                 finally
                 {
-                    await StepOutputDisposer.DisposeAsync(partitionOutput);
+                    await PipelineOutputDisposer.DisposeAsync(partitionOutput);
                 }
             },
             cancellationToken);
@@ -161,23 +161,23 @@ public sealed class PartitioningStep<TInput, TOutput>
 
 }
 
-public sealed class OrderingStep<TInput, TOutput>
-    : IPreallocatingStep<TInput, TOutput>
+public sealed class OrderingPipeline<TInput, TOutput>
+    : IPreallocatingPipeline<TInput, TOutput>
 {
-    private readonly IStep<TInput, TOutput> _inner;
-    private readonly IPreallocatingStep<TInput, TOutput>? _preallocatingInner;
+    private readonly IPipeline<TInput, TOutput> _inner;
+    private readonly IPreallocatingPipeline<TInput, TOutput>? _preallocatingInner;
     private readonly IIndexOrdering<TInput> _ordering;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
     private readonly IWritableIndexedBatch<TOutput> _outputBatch;
 
-    public OrderingStep(
-        IStep<TInput, TOutput> inner,
+    public OrderingPipeline(
+        IPipeline<TInput, TOutput> inner,
         IIndexOrdering<TInput> ordering,
         IReadOnlyIndexedBatch<TInput> inputBatch,
         IWritableIndexedBatch<TOutput> outputBatch)
     {
         _inner = inner;
-        _preallocatingInner = inner as IPreallocatingStep<TInput, TOutput>;
+        _preallocatingInner = inner as IPreallocatingPipeline<TInput, TOutput>;
         _ordering = ordering;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -226,7 +226,7 @@ public sealed class OrderingStep<TInput, TOutput>
             }
             finally
             {
-                await StepOutputDisposer.DisposeAsync(sortedOutput);
+                await PipelineOutputDisposer.DisposeAsync(sortedOutput);
             }
         }
 

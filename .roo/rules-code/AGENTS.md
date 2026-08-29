@@ -22,4 +22,4 @@ This file provides guidance to agents when working in Code mode within this repo
 - **Stability**: When working on tests, NEVER change the library code unless implementing a new feature (follow TDD).
 - **DI Assembly**: Use `AddPipeline<TInput>()` and `Then<TOutput, TStep>()` to construct compile-time typed finite pipelines.
 - **Decorator Scope**: Configure decorators on the `Then` stage they govern; decorators are declared outermost to innermost.
-- **Inference Implementation**: Implement return-value `IStep<TInput, TOutput>`. Add `IPreallocatingStep<TInput, TOutput>` only for metadata-derived storage and compatible destination writes.
+- **Inference Implementation**: Implement return-value `IPipeline<TInput, TOutput>`. Add `IPreallocatingPipeline<TInput, TOutput>` only for metadata-derived storage and compatible destination writes.

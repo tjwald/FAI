@@ -1,4 +1,4 @@
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
 public sealed class BatchLease<T> : IDisposable
 {

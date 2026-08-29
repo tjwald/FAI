@@ -1,6 +1,6 @@
 using System.Numerics.Tensors;
 using FAI.Core;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.ModelExecutors;
 
@@ -19,10 +19,10 @@ public class AsyncOnnxModelExecutorTests(OnnxModelFixture fixture) : IClassFixtu
             opt.ModelFileName = Path.GetFileName(_modelPath);
         });
 
-        IStep<Tensor<long>[], TensorOutputs<float>> step = AsyncOnnxModelExecutor.FromPretrained(options);
+        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline = AsyncOnnxModelExecutor.FromPretrained(options);
         Tensor<long>[] inputs = [Tensor.Create([10L, 20L, 30L], [1, 3])];
 
-        using TensorOutputs<float> output = await step.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        using TensorOutputs<float> output = await pipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         ReadOnlyTensorSpan<float> tensor = output.GetOutput(0);
 
         Assert.Equal(2, tensor.Rank);

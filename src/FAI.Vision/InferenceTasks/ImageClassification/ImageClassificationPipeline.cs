@@ -2,30 +2,30 @@ using System.Numerics;
 using System.Numerics.Tensors;
 using FAI.Core;
 using FAI.Core.Configurations.InferenceTasks;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.Vision.ImagePreProcessors;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace FAI.Vision.InferenceTasks.ImageClassification;
 
-public sealed class ImageClassificationStep<TPixel, TClassification, TFloat> :
-    IPreallocatingStep<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
+public sealed class ImageClassificationPipeline<TPixel, TClassification, TFloat> :
+    IPreallocatingPipeline<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
     where TPixel : unmanaged, IPixel<TPixel>
     where TFloat : unmanaged, IFloatingPointIeee754<TFloat>
 {
     private readonly IImageProcessor<TPixel, TFloat> _imageProcessor;
-    private readonly IStep<Tensor<TFloat>[], TensorOutputs<TFloat>> _modelStep;
+    private readonly IPipeline<Tensor<TFloat>[], TensorOutputs<TFloat>> _modelPipeline;
     private readonly ClassificationOptions<TClassification> _options;
 
-    public ImageClassificationStep(
+    public ImageClassificationPipeline(
         IImageProcessor<TPixel, TFloat> imageProcessor,
-        IStep<Tensor<TFloat>[], TensorOutputs<TFloat>> modelStep,
+        IPipeline<Tensor<TFloat>[], TensorOutputs<TFloat>> modelPipeline,
         ClassificationOptions<TClassification> options)
     {
         _imageProcessor = imageProcessor;
-        _modelStep = modelStep;
+        _modelPipeline = modelPipeline;
         _options = options;
     }
 
@@ -62,7 +62,7 @@ public sealed class ImageClassificationStep<TPixel, TClassification, TFloat> :
         }
 
         Tensor<TFloat>[] modelInput = _imageProcessor.Preprocess(input.Span);
-        using TensorOutputs<TFloat> modelOutput = await _modelStep.ExecuteAsync(modelInput, cancellationToken);
+        using TensorOutputs<TFloat> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
         ReadOnlyTensorSpan<TFloat> tensor = modelOutput.GetOutput(0);
         int rowCount = checked((int)tensor.Lengths[0]);
         if (rowCount != output.Length)

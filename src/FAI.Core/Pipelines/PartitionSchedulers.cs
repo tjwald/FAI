@@ -1,6 +1,6 @@
 using FAI.Core.Configurations;
 
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
 public interface IPartitionScheduler
 {

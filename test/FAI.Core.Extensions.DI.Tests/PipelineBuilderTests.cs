@@ -1,9 +1,9 @@
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Extensions.DI.Tests;
 
-public sealed class StepPipelineBuilderTests
+public sealed class PipelinePipelineBuilderTests
 {
     [Fact]
     public async Task AddPipeline_ComposesTypedStages()
@@ -12,13 +12,13 @@ public sealed class StepPipelineBuilderTests
 
         services
             .AddPipeline<int[]>()
-            .Then<long[], ToLongStep>()
-            .Then<string[], ToStringStep>()
-            .Then<int[], StringLengthStep>()
+            .Then<long[], ToLongPipeline>()
+            .Then<string[], ToStringPipeline>()
+            .Then<int[], StringLengthPipeline>()
             .Build("lengths");
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int[], int[]> pipeline = serviceProvider.GetRequiredKeyedService<IStep<int[], int[]>>("lengths");
+        IPipeline<int[], int[]> pipeline = serviceProvider.GetRequiredKeyedService<IPipeline<int[], int[]>>("lengths");
 
         int[] output = await pipeline.ExecuteAsync([3, 42, 100], TestContext.Current.CancellationToken);
 
@@ -26,25 +26,72 @@ public sealed class StepPipelineBuilderTests
     }
 
     [Fact]
-    public async Task Then_AppliesDecoratorsToStageInDeclaredOrder()
+    public async Task Use_AppliesDecoratorsToRemainderInDeclaredOrder()
     {
         var services = new ServiceCollection();
         var calls = new List<string>();
 
         services
             .AddPipeline<int[]>()
-            .Then<long[], ToLongStep>(stage => stage
-                .Use((_, inner) => new TrackingStep<int[], long[]>("outer", calls, inner))
-                .Use((_, inner) => new TrackingStep<int[], long[]>("inner", calls, inner)))
+            .Then<long[], ToLongPipeline>()
+            .Use(new TrackingForwardDecorator<long[]>("outer", calls))
+            .Use(new TrackingForwardDecorator<long[]>("inner", calls))
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int[], long[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], long[]>>();
+        IPipeline<int[], long[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], long[]>>();
 
         long[] output = await pipeline.ExecuteAsync([7], TestContext.Current.CancellationToken);
 
         Assert.Equal(["outer", "inner"], calls);
         Assert.Equal([7L], output);
+    }
+
+    [Fact]
+    public async Task Use_DeclaredBeforeThen_WrapsCompleteTypeChangingRemainder()
+    {
+        var services = new ServiceCollection();
+        var calls = new List<string>();
+
+        services
+            .AddPipeline<int[]>()
+            .Then<long[], ToLongPipeline>()
+            .Use(new TrackingForwardDecorator<long[]>("remainder", calls))
+            .Then<string[], ToStringPipeline>()
+            .Then<int[], StringLengthPipeline>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<int[], int[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], int[]>>();
+
+        int[] output = await pipeline.ExecuteAsync([7, 42], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["remainder"], calls);
+        Assert.Equal([1, 2], output);
+    }
+
+    [Fact]
+    public async Task Use_AllowsNestedPipelineInRemainder()
+    {
+        var services = new ServiceCollection();
+        var calls = new List<string>();
+
+        services
+            .AddPipeline<int[]>()
+            .Then<long[], ToLongPipeline>()
+            .Use(new TrackingForwardDecorator<long[]>("remainder", calls))
+            .Then(nested => nested
+                .Then<string[], ToStringPipeline>()
+                .Then<int[], StringLengthPipeline>())
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<int[], int[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], int[]>>();
+
+        int[] output = await pipeline.ExecuteAsync([7, 42], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["remainder"], calls);
+        Assert.Equal([1, 2], output);
     }
 
     [Fact]
@@ -55,20 +102,19 @@ public sealed class StepPipelineBuilderTests
 
         services
             .AddPipeline<ReadOnlyMemory<int>>()
-            .Then<Memory<long>, PartitionedLongStep>(stage => stage
-                .UseBatchPartitioning(
-                    new ReadOnlyMemoryBatchOperations<int>(),
-                    new MemoryBatchOperations<long>()))
+            .Then<ReadOnlyMemory<int>, MemoryIdentityPipeline>()
+            .Use(new PartitioningForwardDecorator<int>())
+            .Then<Memory<long>, PartitionedLongPipeline>()
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<ReadOnlyMemory<int>, Memory<long>> pipeline =
-            serviceProvider.GetRequiredService<IStep<ReadOnlyMemory<int>, Memory<long>>>();
+        IPipeline<ReadOnlyMemory<int>, Memory<long>> pipeline =
+            serviceProvider.GetRequiredService<IPipeline<ReadOnlyMemory<int>, Memory<long>>>();
 
         Memory<long> output = await pipeline.ExecuteAsync(
             new[] { 1, 2, 3, 4, 5 },
             TestContext.Current.CancellationToken);
-        PartitionedLongStep inner = serviceProvider.GetRequiredService<PartitionedLongStep>();
+        PartitionedLongPipeline inner = serviceProvider.GetRequiredService<PartitionedLongPipeline>();
 
         Assert.Equal([1L, 2L, 3L, 4L, 5L], output.ToArray());
         Assert.Equal([1, 2, 2], inner.BatchSizes.Order());
@@ -84,16 +130,16 @@ public sealed class StepPipelineBuilderTests
 
         services
             .AddPipeline<int[]>()
-            .Then<long[], ToLongStep>()
+            .Then<long[], ToLongPipeline>()
             .Then(
                 nested => nested
-                    .Then<string[], ToStringStep>()
-                    .Then<int[], StringLengthStep>(),
-                stage => stage.Use((_, inner) => new TrackingStep<long[], int[]>("nested", calls, inner)))
+                    .Use(new TrackingForwardDecorator<long[]>("nested", calls))
+                    .Then<string[], ToStringPipeline>()
+                    .Then<int[], StringLengthPipeline>())
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int[], int[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], int[]>>();
+        IPipeline<int[], int[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], int[]>>();
 
         int[] output = await pipeline.ExecuteAsync([3, 42, 100], TestContext.Current.CancellationToken);
 
@@ -109,12 +155,12 @@ public sealed class StepPipelineBuilderTests
         services
             .AddPipeline<int[]>()
             .Then(nested => nested
-                .Then<long[], ToLongStep>()
-                .Then<string[], ToStringStep>())
+                .Then<long[], ToLongPipeline>()
+                .Then<string[], ToStringPipeline>())
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int[], string[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], string[]>>();
+        IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
 
         string[] output = await pipeline.ExecuteAsync([7, 42], TestContext.Current.CancellationToken);
 
@@ -129,8 +175,8 @@ public sealed class StepPipelineBuilderTests
         services
             .AddPipeline<int[]>()
             .Then(nested => nested
-                    .Then<long[], ToLongStep>()
-                    .Then<string[], PreallocatingToStringStep>()
+                    .Then<long[], ToLongPipeline>()
+                    .Then<string[], PreallocatingToStringPipeline>()
                     .WithOutputAllocation((input, out output) =>
                     {
                         output = new string[input.Length];
@@ -139,8 +185,8 @@ public sealed class StepPipelineBuilderTests
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int[], string[]> pipeline = serviceProvider.GetRequiredService<IStep<int[], string[]>>();
-        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingStep<int[], string[]>>(pipeline);
+        IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
+        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingPipeline<int[], string[]>>(pipeline);
 
         Assert.True(preallocatingPipeline.TryAllocateOutput([7, 42], out string[]? output));
         await preallocatingPipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
@@ -155,13 +201,13 @@ public sealed class StepPipelineBuilderTests
 
         services
             .AddPipeline<int>()
-            .Then<DisposableValue, DisposableValueStep>()
-            .Then<int, ReadDisposableValueStep>()
+            .Then<DisposableValue, DisposableValuePipeline>()
+            .Then<int, ReadDisposableValuePipeline>()
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-        IStep<int, int> pipeline = serviceProvider.GetRequiredService<IStep<int, int>>();
-        DisposableValueStep first = serviceProvider.GetRequiredService<DisposableValueStep>();
+        IPipeline<int, int> pipeline = serviceProvider.GetRequiredService<IPipeline<int, int>>();
+        DisposableValuePipeline first = serviceProvider.GetRequiredService<DisposableValuePipeline>();
 
         int output = await pipeline.ExecuteAsync(42, TestContext.Current.CancellationToken);
 
@@ -169,19 +215,19 @@ public sealed class StepPipelineBuilderTests
         Assert.True(first.Output!.IsDisposed);
     }
 
-    private sealed class ToLongStep : IStep<int[], long[]>
+    private sealed class ToLongPipeline : IPipeline<int[], long[]>
     {
         public ValueTask<long[]> ExecuteAsync(int[] input, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(input.Select(value => (long)value).ToArray());
     }
 
-    private sealed class ToStringStep : IStep<long[], string[]>
+    private sealed class ToStringPipeline : IPipeline<long[], string[]>
     {
         public ValueTask<string[]> ExecuteAsync(long[] input, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(input.Select(value => value.ToString()).ToArray());
     }
 
-    private sealed class PreallocatingToStringStep : IPreallocatingStep<long[], string[]>
+    private sealed class PreallocatingToStringPipeline : IPreallocatingPipeline<long[], string[]>
     {
         public bool TryAllocateOutput(long[] input, out string[] output)
         {
@@ -210,16 +256,16 @@ public sealed class StepPipelineBuilderTests
         }
     }
 
-    private sealed class StringLengthStep : IStep<string[], int[]>
+    private sealed class StringLengthPipeline : IPipeline<string[], int[]>
     {
         public ValueTask<int[]> ExecuteAsync(string[] input, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(input.Select(value => value.Length).ToArray());
     }
 
-    private sealed class TrackingStep<TInput, TOutput>(
+    private sealed class TrackingPipeline<TInput, TOutput>(
         string name,
         List<string> calls,
-        IStep<TInput, TOutput> inner) : IStep<TInput, TOutput>
+        IPipeline<TInput, TOutput> inner) : IPipeline<TInput, TOutput>
     {
         public ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
         {
@@ -228,7 +274,36 @@ public sealed class StepPipelineBuilderTests
         }
     }
 
-    private sealed class PartitionedLongStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<long>>
+    private sealed class TrackingForwardDecorator<TInput>(string name, List<string> calls) : IForwardPipelineDecorator<TInput>
+    {
+        public IPipeline<TInput, TOutput> Apply<TOutput>(
+            IServiceProvider serviceProvider,
+            IPipeline<TInput, TOutput> pipeline)
+            => new TrackingPipeline<TInput, TOutput>(name, calls, pipeline);
+    }
+
+    private sealed class PartitioningForwardDecorator<T> : IForwardPipelineDecorator<ReadOnlyMemory<T>>
+    {
+        public IPipeline<ReadOnlyMemory<T>, TOutput> Apply<TOutput>(
+            IServiceProvider serviceProvider,
+            IPipeline<ReadOnlyMemory<T>, TOutput> pipeline)
+            => new PartitioningPipeline<ReadOnlyMemory<T>, TOutput>(
+                pipeline,
+                serviceProvider.GetRequiredService<IBatchPartitioner<ReadOnlyMemory<T>>>(),
+                new ReadOnlyMemoryBatchOperations<T>(),
+                IndexedBatchOperations.GetWritable<TOutput>(),
+                serviceProvider.GetService<IPartitionScheduler>());
+    }
+
+    private sealed class MemoryIdentityPipeline : IPipeline<ReadOnlyMemory<int>, ReadOnlyMemory<int>>
+    {
+        public ValueTask<ReadOnlyMemory<int>> ExecuteAsync(
+            ReadOnlyMemory<int> input,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input);
+    }
+
+    private sealed class PartitionedLongPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<long>>
     {
         private readonly Lock _lock = new();
 
@@ -298,7 +373,7 @@ public sealed class StepPipelineBuilderTests
         public void Dispose() => IsDisposed = true;
     }
 
-    private sealed class DisposableValueStep : IStep<int, DisposableValue>
+    private sealed class DisposableValuePipeline : IPipeline<int, DisposableValue>
     {
         public DisposableValue? Output { get; private set; }
 
@@ -309,7 +384,7 @@ public sealed class StepPipelineBuilderTests
         }
     }
 
-    private sealed class ReadDisposableValueStep : IStep<DisposableValue, int>
+    private sealed class ReadDisposableValuePipeline : IPipeline<DisposableValue, int>
     {
         public async ValueTask<int> ExecuteAsync(
             DisposableValue input,

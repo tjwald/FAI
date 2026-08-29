@@ -1,15 +1,15 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 
 namespace Example.SentimentInference.Model;
 
 public sealed class SentimentInference : IInference<string, bool>
 {
-    private readonly IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> _pipeline;
+    private readonly IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> _pipeline;
 
     public SentimentInference(
-        IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> pipeline)
+        IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> pipeline)
     {
         _pipeline = pipeline;
     }

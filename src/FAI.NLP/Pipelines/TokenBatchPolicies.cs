@@ -1,16 +1,16 @@
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tokenization;
 
-namespace FAI.NLP.Steps;
+namespace FAI.NLP.Pipelines;
 
-public sealed class TextTokenizationStep :
-    IStep<ReadOnlyMemory<string>, ReadOnlyMemory<TokenizedText>>
+public sealed class TextTokenization :
+    IPipeline<ReadOnlyMemory<string>, ReadOnlyMemory<TokenizedText>>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
-    public TextTokenizationStep(PretrainedTokenizer tokenizer)
+    public TextTokenization(PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
     }
@@ -29,12 +29,12 @@ public sealed class TextTokenizationStep :
     }
 }
 
-public sealed class TextMultipleChoiceTokenizationStep :
-    IStep<ReadOnlyMemory<TextMultipleChoiceInput>, ReadOnlyMemory<TokenizedTextMultipleChoiceInput>>
+public sealed class TextMultipleChoiceTokenization :
+    IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, ReadOnlyMemory<TokenizedTextMultipleChoiceInput>>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
-    public TextMultipleChoiceTokenizationStep(PretrainedTokenizer tokenizer)
+    public TextMultipleChoiceTokenization(PretrainedTokenizer tokenizer)
     {
         _tokenizer = tokenizer;
     }

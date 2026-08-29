@@ -2,12 +2,12 @@ using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Extensions.DI;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.Core.Steps;
 using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Factories;
@@ -46,18 +46,16 @@ public static class SwagMultipleChoiceInferenceFactory
             );
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddSingleton(sp =>
-                ModelExecutorFactory.CreateModelStep(
+                ModelExecutorFactory.CreateModelPipeline(
                     options.ModelExecutorType,
                     sp.GetRequiredService<IModelExecutorOptions>()));
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
-                .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenizationStep>()
-                .Then(pipeline => pipeline
-                    .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceStep>()
-                    .WithPolicies(stage => stage
-                        .UseTokenCountOrderingStep()
-                        .UseMaxPaddedTokensPartitioningStep()))
+                .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
+                .UseTokenCountOrdering()
+                .UseMaxPaddedTokensPartitioning()
+                .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoicePipeline>()
                 .Build();
 
             localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();

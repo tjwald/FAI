@@ -1,14 +1,14 @@
 using System.Numerics.Tensors;
 using FAI.Core.ModelExecutors;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 
 namespace FAI.Onnx.ModelExecutors;
 
-public sealed class PooledOnnxModelStep : IStep<Tensor<long>[], TensorOutputs<float>>
+public sealed class PooledOnnxModelPipeline : IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     private readonly IObjectPool<OnnxModelExecutorBase> _pool;
 
-    public PooledOnnxModelStep(IObjectPool<OnnxModelExecutorBase> pool)
+    public PooledOnnxModelPipeline(IObjectPool<OnnxModelExecutorBase> pool)
     {
         _pool = pool;
     }

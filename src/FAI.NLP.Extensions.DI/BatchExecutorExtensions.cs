@@ -1,7 +1,7 @@
 using FAI.Core.Extensions.DI;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,35 +9,51 @@ namespace FAI.NLP.Extensions.DI;
 
 public static class BatchExecutorExtensions
 {
-    extension<TInput, TOutput>(PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> stage)
+    extension<TStart, TInput>(ComposedPipelineBuilder<TStart, ReadOnlyMemory<TInput>> pipeline)
         where TInput : ITokenizable
     {
-        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseTokenCountOrderingStep()
-        {
-            return stage.Use((serviceProvider, inner) =>
-                new OrderingStep<
-                    ReadOnlyMemory<TInput>,
-                    Memory<TOutput>>(
-                        inner,
-                        new TokenCountOrdering<TInput>(
-                            serviceProvider.GetRequiredService<TokenCountOrderingOptions>()),
-                        new ReadOnlyMemoryBatchOperations<TInput>(),
-                        new MemoryBatchOperations<TOutput>()));
-        }
+        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseTokenCountOrdering()
+            => pipeline.Use(new TokenCountOrderingDecorator<TInput>());
 
-        public PipelineStageBuilder<ReadOnlyMemory<TInput>, Memory<TOutput>> UseMaxPaddedTokensPartitioningStep()
-        {
-            return stage.Use((serviceProvider, inner) =>
-                new PartitioningStep<
-                    ReadOnlyMemory<TInput>,
-                    Memory<TOutput>>(
-                        inner,
-                        new MaxPaddedTokensPartitioner<TInput>(
-                            serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
-                        new ReadOnlyMemoryBatchOperations<TInput>(),
-                        new MemoryBatchOperations<TOutput>(),
-                        serviceProvider.GetService<IPartitionScheduler>()));
-        }
+        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseMaxPaddedTokensPartitioning()
+            => pipeline.Use(new MaxPaddedTokensPartitioningDecorator<TInput>());
     }
 
+    extension<TStart, TInput>(DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> pipeline)
+        where TInput : ITokenizable
+    {
+        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseTokenCountOrdering()
+            => pipeline.Use(new TokenCountOrderingDecorator<TInput>());
+
+        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseMaxPaddedTokensPartitioning()
+            => pipeline.Use(new MaxPaddedTokensPartitioningDecorator<TInput>());
+    }
+
+    private sealed class TokenCountOrderingDecorator<TInput> : IForwardPipelineDecorator<ReadOnlyMemory<TInput>>
+        where TInput : ITokenizable
+    {
+        public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
+            IServiceProvider serviceProvider,
+            IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
+            => new OrderingPipeline<ReadOnlyMemory<TInput>, TOutput>(
+                pipeline,
+                new TokenCountOrdering<TInput>(serviceProvider.GetRequiredService<TokenCountOrderingOptions>()),
+                new ReadOnlyMemoryBatchOperations<TInput>(),
+                IndexedBatchOperations.GetWritable<TOutput>());
+    }
+
+    private sealed class MaxPaddedTokensPartitioningDecorator<TInput> : IForwardPipelineDecorator<ReadOnlyMemory<TInput>>
+        where TInput : ITokenizable
+    {
+        public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
+            IServiceProvider serviceProvider,
+            IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
+            => new PartitioningPipeline<ReadOnlyMemory<TInput>, TOutput>(
+                pipeline,
+                new MaxPaddedTokensPartitioner<TInput>(
+                    serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
+                new ReadOnlyMemoryBatchOperations<TInput>(),
+                IndexedBatchOperations.GetWritable<TOutput>(),
+                serviceProvider.GetService<IPartitionScheduler>());
+    }
 }

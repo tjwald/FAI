@@ -1,7 +1,7 @@
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
 public sealed record BatchRoute<TInput, TOutput>(
-    IStep<TInput, TOutput> Target,
+    IPipeline<TInput, TOutput> Target,
     int[] InputIndices);
 
 public interface IBatchRoutingStrategy<TInput, TOutput>
@@ -9,13 +9,13 @@ public interface IBatchRoutingStrategy<TInput, TOutput>
     IReadOnlyList<BatchRoute<TInput, TOutput>> Route(TInput input);
 }
 
-public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TOutput>
+public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TInput, TOutput>
 {
     private readonly IBatchRoutingStrategy<TInput, TOutput> _routingStrategy;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
     private readonly IWritableIndexedBatch<TOutput> _outputBatch;
 
-    public RoutingStep(
+    public RoutingPipeline(
         IBatchRoutingStrategy<TInput, TOutput> routingStrategy,
         IReadOnlyIndexedBatch<TInput> inputBatch,
         IWritableIndexedBatch<TOutput> outputBatch)
@@ -28,8 +28,8 @@ public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TO
     public bool TryAllocateOutput(TInput input, out TOutput output)
     {
         IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
-        if (routes.All(route => route.Target is IPreallocatingStep<TInput, TOutput>) &&
-            ((IPreallocatingStep<TInput, TOutput>)routes[0].Target).TryAllocateOutput(input, out TOutput? allocated))
+        if (routes.All(route => route.Target is IPreallocatingPipeline<TInput, TOutput>) &&
+            ((IPreallocatingPipeline<TInput, TOutput>)routes[0].Target).TryAllocateOutput(input, out TOutput? allocated))
         {
             output = allocated;
             return true;
@@ -50,7 +50,7 @@ public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TO
             }
             catch
             {
-                await StepOutputDisposer.DisposeAsync(output);
+                await PipelineOutputDisposer.DisposeAsync(output);
                 throw;
             }
         }
@@ -79,7 +79,7 @@ public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TO
             }
             catch
             {
-                await StepOutputDisposer.DisposeAsync(output);
+                await PipelineOutputDisposer.DisposeAsync(output);
                 throw;
             }
         }
@@ -89,7 +89,7 @@ public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TO
             {
                 if (routeOutput is not null)
                 {
-                    await StepOutputDisposer.DisposeAsync(routeOutput);
+                    await PipelineOutputDisposer.DisposeAsync(routeOutput);
                 }
             }
         }
@@ -108,7 +108,7 @@ public sealed class RoutingStep<TInput, TOutput> : IPreallocatingStep<TInput, TO
         foreach (BatchRoute<TInput, TOutput> route in routes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var target = (IPreallocatingStep<TInput, TOutput>)route.Target;
+            var target = (IPreallocatingPipeline<TInput, TOutput>)route.Target;
             using BatchLease<TInput> routeInput = _inputBatch.Gather(input, route.InputIndices);
             await target.ExecuteAsync(
                 routeInput.Value,

@@ -1,4 +1,4 @@
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 
 namespace FAI.IntegrationTests;
 
@@ -10,21 +10,21 @@ public class TextClassificationIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(new ClassificationOptions<bool>([false, true]));
         services.AddSingleton(DummyTokenizerFactory.Create());
-        services.AddSingleton<IStep<Tensor<long>[], TensorOutputs<float>>>(
-            new LogicalMockModelStep([[0.1f, 0.9f]]));
-        services.AddSingleton<ClassificationDecodingStep<bool>>();
+        services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
+            new LogicalMockModelPipeline([[0.1f, 0.9f]]));
+        services.AddSingleton<ClassificationDecoding<bool>>();
         services
             .AddPipeline<ReadOnlyMemory<string>>()
-            .Then<ReadOnlyMemory<TokenizedText>, TextTokenizationStep>()
-            .Then<Tensor<long>[], TextTensorizingStep>()
+            .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
+            .Then<Tensor<long>[], TextTensorization>()
             .Then(sp =>
-                sp.GetRequiredService<IStep<Tensor<long>[], TensorOutputs<float>>>())
-            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecodingStep<bool>>()
+                sp.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>())
+            .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<
-            IStep<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>>>();
+            IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>>>();
         ReadOnlyMemory<string> input = new string[] { "hello" };
         Memory<ClassificationResult<bool, float>> output =
             await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);

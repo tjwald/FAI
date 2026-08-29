@@ -1,13 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace FAI.Core.Steps;
+namespace FAI.Core.Pipelines;
 
-public interface IStep<in TInput, TOutput>
+public interface IPipeline<in TInput, TOutput>
 {
     ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default);
 }
 
-public interface IPreallocatingStep<in TInput, TOutput> : IStep<TInput, TOutput>
+public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
 {
     bool TryAllocateOutput(TInput input, [MaybeNullWhen(false)] out TOutput output);
 

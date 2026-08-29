@@ -2,12 +2,12 @@
 
 ```mermaid
 graph TD
-  Core[FAI.Core\nstep contracts, leases, policies]
-  DI[FAI.Core.Extensions.DI\ntyped step builder]
-  NLP[FAI.NLP\ntokenization and text task steps]
+  Core[FAI.Core\npipeline contracts, leases, policies]
+  DI[FAI.Core.Extensions.DI\ntyped pipeline builder]
+  NLP[FAI.NLP\ntokenization and text task pipelines]
   NLPDI[FAI.NLP.Extensions.DI\ntext policy decorators]
-  Vision[FAI.Vision\nimage task steps]
-  ONNX[FAI.Onnx\nmodel steps and runtime pools]
+  Vision[FAI.Vision\nimage task pipelines]
+  ONNX[FAI.Onnx\nmodel pipelines and runtime pools]
   App[Application inference facade]
 
   Core --> DI
@@ -23,4 +23,4 @@ graph TD
 
 ## Extension Model
 
-Runtime packages implement `IStep` for model-specific disposable tensor outputs. Domain packages implement task steps and policies without introducing another execution abstraction. Steps that can derive storage synchronously from metadata may also implement `IPreallocatingStep`. Applications compose those pieces with `AddPipeline<TInput>()` and `Then<TOutput, TStep>()`, then expose an `IInference<TInput, TOutput>` facade where needed.
+Runtime packages implement `IPipeline` for model-specific disposable tensor outputs. Domain packages implement task pipelines and policies without introducing another execution abstraction. Pipelines that can derive storage synchronously from metadata may also implement `IPreallocatingPipeline`. Applications compose those pieces with `AddPipeline<TInput>()` and `Then<TOutput, TPipeline>()`, then expose an `IInference<TInput, TOutput>` facade where needed.

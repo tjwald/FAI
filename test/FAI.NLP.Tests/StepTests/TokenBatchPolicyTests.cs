@@ -1,9 +1,9 @@
 using FAI.NLP.Configuration;
-using FAI.NLP.Steps;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tests.Mocks;
 using FAI.NLP.Tokenization;
 
-namespace FAI.NLP.Tests.StepTests;
+namespace FAI.NLP.Tests.PipelineTests;
 
 public class TokenBatchPolicyTests
 {
@@ -26,13 +26,13 @@ public class TokenBatchPolicyTests
     }
 
     [Fact]
-    public async Task TextTokenizationStep_ReturnsImmutableTokenizedBatch()
+    public async Task TextTokenization_ReturnsImmutableTokenizedBatch()
     {
         var tokenizer = DummyTokenizerFactory.Create();
-        var step = new TextTokenizationStep(tokenizer);
+        var pipeline = new TextTokenization(tokenizer);
         ReadOnlyMemory<string> inputs = new string[] { "hello", "hello world" };
 
-        ReadOnlyMemory<TokenizedText> output = await step.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        ReadOnlyMemory<TokenizedText> output = await pipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
 
         Assert.Equal(inputs.ToArray(), output.ToArray().Select(item => item.Text));
         Assert.All(output.ToArray(), item => Assert.True(item.TokenCount > 0));

@@ -1,57 +1,57 @@
 using System.Numerics.Tensors;
 using FAI.Core.Configurations;
-using FAI.Core.Steps;
+using FAI.Core.Pipelines;
 
-namespace FAI.Core.Tests.StepTests;
+namespace FAI.Core.Tests.PipelineTests;
 
-public sealed class IndexedStepPolicyTests
+public sealed class IndexedPipelinePolicyTests
 {
     [Fact]
-    public async Task PartitioningStep_WritesTensorSlicesIntoCallerOutput()
+    public async Task PartitioningPipeline_WritesTensorSlicesIntoCallerOutput()
     {
-        var inner = new TensorCopyStep();
-        var step = new PartitioningStep<Tensor<float>, Tensor<float>>(
+        var inner = new TensorCopyPipeline();
+        var pipeline = new PartitioningPipeline<Tensor<float>, Tensor<float>>(
             inner,
             new FixedTensorPartitioner(2),
             new TensorBatchOperations<float>(),
             new TensorBatchOperations<float>());
 
         Tensor<float> input = CreateTensor([4, 2], [1, 2, 3, 4, 5, 6, 7, 8]);
-        Tensor<float> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Tensor<float> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], output.AsReadOnlyTensorSpan().AsSpan().ToArray());
         Assert.Equal([2, 2], inner.BatchSizes);
     }
 
     [Fact]
-    public async Task PartitioningStep_UsesBoundedParallelScheduler()
+    public async Task PartitioningPipeline_UsesBoundedParallelScheduler()
     {
-        var inner = new DelayedMemoryStep();
-        var step = new PartitioningStep<ReadOnlyMemory<int>, Memory<int>>(
+        var inner = new DelayedMemoryPipeline();
+        var pipeline = new PartitioningPipeline<ReadOnlyMemory<int>, Memory<int>>(
                 inner,
                 new FixedMemoryPartitioner(1),
             new ReadOnlyMemoryBatchOperations<int>(),
             new MemoryBatchOperations<int>(),
                 new ParallelPartitionScheduler(new ParallelPartitionSchedulerOptions(MaxConcurrency: 2)));
         int[] input = [1, 2, 3, 4];
-        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal(input, output.ToArray());
         Assert.Equal(2, inner.MaximumConcurrency);
     }
 
     [Fact]
-    public async Task PartitioningStep_FallsBackWhenPreallocationIsUnavailableForInput()
+    public async Task PartitioningPipeline_FallsBackWhenPreallocationIsUnavailableForInput()
     {
-        var inner = new ConditionalMemoryStep();
-        var step = new PartitioningStep<ReadOnlyMemory<int>, Memory<int>>(
+        var inner = new ConditionalMemoryPipeline();
+        var pipeline = new PartitioningPipeline<ReadOnlyMemory<int>, Memory<int>>(
             inner,
             new FixedMemoryPartitioner(2),
             new ReadOnlyMemoryBatchOperations<int>(),
             new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4, 5];
 
-        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal(input, output.ToArray());
         Assert.Equal(1, inner.PreallocationAttempts);
@@ -60,17 +60,17 @@ public sealed class IndexedStepPolicyTests
     }
 
     [Fact]
-    public async Task OrderingStep_RestoresOriginalMemoryOrder()
+    public async Task OrderingPipeline_RestoresOriginalMemoryOrder()
     {
-        var inner = new MemoryIdentityStep();
-        var step = new OrderingStep<ReadOnlyMemory<int>, Memory<int>>(
+        var inner = new MemoryIdentityPipeline();
+        var pipeline = new OrderingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             inner,
             new DescendingOrdering(),
             new ReadOnlyMemoryBatchOperations<int>(),
             new MemoryBatchOperations<int>());
 
         int[] values = [10, 30, 20];
-        Memory<int> output = await step.ExecuteAsync(values, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(values, TestContext.Current.CancellationToken);
 
         Assert.Equal([30, 20, 10], inner.ObservedInput);
         Assert.Equal(values, output.ToArray());
@@ -88,17 +88,17 @@ public sealed class IndexedStepPolicyTests
     }
 
     [Fact]
-    public async Task RoutingStep_GathersTargetsAndScattersToOriginalOrder()
+    public async Task RoutingPipeline_GathersTargetsAndScattersToOriginalOrder()
     {
-        var even = new MultiplyStep(10);
-        var odd = new MultiplyStep(100);
+        var even = new MultiplyPipeline(10);
+        var odd = new MultiplyPipeline(100);
         var routing = new ParityRoutingStrategy(even, odd);
-        var step = new RoutingStep<ReadOnlyMemory<int>, Memory<int>>(
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
             new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4];
-        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([100, 20, 300, 40], output.ToArray());
         Assert.Equal(1, even.AllocationCount);
@@ -108,16 +108,16 @@ public sealed class IndexedStepPolicyTests
     }
 
     [Fact]
-    public async Task RoutingStep_FallsBackToScatteringReturnedOutputs()
+    public async Task RoutingPipeline_FallsBackToScatteringReturnedOutputs()
     {
-        var routing = new ParityRoutingStrategy(new ReturningMultiplyStep(10), new ReturningMultiplyStep(100));
-        var step = new RoutingStep<ReadOnlyMemory<int>, Memory<int>>(
+        var routing = new ParityRoutingStrategy(new ReturningMultiplyPipeline(10), new ReturningMultiplyPipeline(100));
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
             new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4];
 
-        Memory<int> output = await step.ExecuteAsync(input, TestContext.Current.CancellationToken);
+        Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([100, 20, 300, 40], output.ToArray());
     }
@@ -125,7 +125,7 @@ public sealed class IndexedStepPolicyTests
     private static Tensor<float> CreateTensor(ReadOnlySpan<nint> lengths, float[] values)
         => Tensor.Create(values, lengths);
 
-    private sealed class TensorCopyStep : IPreallocatingStep<Tensor<float>, Tensor<float>>
+    private sealed class TensorCopyPipeline : IPreallocatingPipeline<Tensor<float>, Tensor<float>>
     {
         public List<int> BatchSizes { get; } = [];
 
@@ -164,7 +164,7 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class MemoryIdentityStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MemoryIdentityPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public int[] ObservedInput { get; private set; } = [];
 
@@ -194,7 +194,7 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class DelayedMemoryStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class DelayedMemoryPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         private int _concurrency;
         private int _maximumConcurrency;
@@ -235,7 +235,7 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class ConditionalMemoryStep : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class ConditionalMemoryPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public int PreallocationAttempts { get; private set; }
 
@@ -303,7 +303,7 @@ public sealed class IndexedStepPolicyTests
             => Enumerable.Range(0, batch.Length).OrderByDescending(index => batch.Span[index]).ToArray();
     }
 
-    private sealed class MultiplyStep(int multiplier) : IPreallocatingStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MultiplyPipeline(int multiplier) : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public int AllocationCount { get; private set; }
 
@@ -344,7 +344,7 @@ public sealed class IndexedStepPolicyTests
         }
     }
 
-    private sealed class ReturningMultiplyStep(int multiplier) : IStep<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class ReturningMultiplyPipeline(int multiplier) : IPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
@@ -361,8 +361,8 @@ public sealed class IndexedStepPolicyTests
     }
 
     private sealed class ParityRoutingStrategy(
-        IStep<ReadOnlyMemory<int>, Memory<int>> even,
-        IStep<ReadOnlyMemory<int>, Memory<int>> odd)
+        IPipeline<ReadOnlyMemory<int>, Memory<int>> even,
+        IPipeline<ReadOnlyMemory<int>, Memory<int>> odd)
         : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
     {
         public IReadOnlyList<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)
