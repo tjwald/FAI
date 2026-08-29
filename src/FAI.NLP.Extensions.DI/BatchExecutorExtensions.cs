@@ -1,3 +1,4 @@
+using System.Numerics.Tensors;
 using FAI.Core.Extensions.DI;
 using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;

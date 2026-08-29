@@ -29,11 +29,11 @@ public class EvaluationPipelineTests
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
         var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
-        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput, TestEvaluationResult>>();
-        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>>.Instance;
+        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
+        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions();
 
-        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>(
+        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>(
             dataLoader, inference, evaluator, logger, options);
 
         var inputs = Enumerable.Range(0, 5).Select(i => new TestLoadedInput(i)).ToArray();
@@ -66,11 +66,11 @@ public class EvaluationPipelineTests
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
         var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
-        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput, TestEvaluationResult>>();
-        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>>.Instance;
+        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
+        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions(LoadingChunkSize: 2);
 
-        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>(
+        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>(
             dataLoader, inference, evaluator, logger, options);
 
         var inputs = Enumerable.Range(0, 5).Select(i => new TestLoadedInput(i)).ToArray();
@@ -102,11 +102,11 @@ public class EvaluationPipelineTests
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
         var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
-        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput, TestEvaluationResult>>();
-        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>>.Instance;
+        var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
+        var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions(LoadingChunkSize: 2, ParallelLoading: true, ParallelEvaluation: true);
 
-        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput, TestEvaluationResult>(
+        var pipeline = new EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>(
             dataLoader, inference, evaluator, logger, options);
 
         var inputs = Enumerable.Range(0, 4).Select(i => new TestLoadedInput(i)).ToArray();

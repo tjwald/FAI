@@ -14,3 +14,5 @@ Examples:
 * Multiple choice - BERT large multiple choice model
   * FAI - [MutlipleChoice](MultipleChoice)
   * python - [python/multiple-choice](python/multiple-choice)
+* Text embeddings - local MiniLM embeddings and semantic search
+  * FAI - [TextEmbedding](TextEmbedding)

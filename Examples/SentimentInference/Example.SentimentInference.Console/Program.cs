@@ -19,12 +19,12 @@ var options = SentimentInferenceOptions.DefaultConfig with { UseGpu = !args.Cont
 builder.Services.AddDefaultSentimentInference(options);
 builder.Services.AddSingleton(new EvaluationPipelineOptions());
 builder.Services.AddSingleton<IDataLoader<string, TrainingData, string>, TrainingParquetReader>();
-builder.Services.AddSingleton<IEvaluator<TrainingData, bool, EvaluationSummary>, Evaluator>();
-builder.Services.AddSingleton<EvaluationPipeline<string, TrainingData, string, bool, EvaluationSummary>>();
+builder.Services.AddSingleton<IEvaluator<TrainingData, bool[], EvaluationSummary>, Evaluator>();
+builder.Services.AddSingleton<EvaluationPipeline<string, TrainingData, string, bool[], EvaluationSummary>>();
 
 var app = builder.Build();
 
-var evaluationPipeline = app.Services.GetRequiredService<EvaluationPipeline<string, TrainingData, string, bool, EvaluationSummary>>();
+var evaluationPipeline = app.Services.GetRequiredService<EvaluationPipeline<string, TrainingData, string, bool[], EvaluationSummary>>();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var evaluationPipelineResult = await evaluationPipeline.Evaluate(fileName);
 
@@ -64,7 +64,7 @@ internal class TrainingParquetReader : IDataLoader<string, TrainingData, string>
 }
 
 
-internal class Evaluator : IEvaluator<TrainingData, bool, EvaluationSummary>
+internal class Evaluator : IEvaluator<TrainingData, bool[], EvaluationSummary>
 {
     private readonly ILogger<Evaluator> _logger;
 

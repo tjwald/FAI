@@ -10,14 +10,14 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
     where TLoadedInput : IInferenceInputGetter<TInferenceInput>
 {
     private readonly IDataLoader<TLoaderInput, TLoadedInput, TInferenceInput> _dataLoader;
-    private readonly IInference<TInferenceInput, TInferenceOutput> _inference;
+    private readonly IBatchInference<TInferenceInput, TInferenceOutput> _inference;
     private readonly IEvaluator<TLoadedInput, TInferenceOutput, TEvaluationResult> _evaluator;
     private readonly EvaluationPipelineOptions _options;
     private readonly ILogger<EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TInferenceOutput, TEvaluationResult>> _logger;
 
     public EvaluationPipeline(
         IDataLoader<TLoaderInput, TLoadedInput, TInferenceInput> dataLoader,
-        IInference<TInferenceInput, TInferenceOutput> inference,
+        IBatchInference<TInferenceInput, TInferenceOutput> inference,
         IEvaluator<TLoadedInput, TInferenceOutput, TEvaluationResult> evaluator,
         ILogger<EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TInferenceOutput, TEvaluationResult>> logger,
         EvaluationPipelineOptions options)
@@ -63,7 +63,7 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
         strongBox.Value = count;
     }
 
-    private async IAsyncEnumerable<(TLoadedInput[], TInferenceOutput[])> Infer(IAsyncEnumerable<TLoadedInput> loadedData, StrongBox<TimeSpan> inferenceRuntime)
+    private async IAsyncEnumerable<(TLoadedInput[], TInferenceOutput)> Infer(IAsyncEnumerable<TLoadedInput> loadedData, StrongBox<TimeSpan> inferenceRuntime)
     {
         using var activity = Otel.Source.StartActivity("fai.evaluation.inference");
         activity?.SetTag("fai.evaluation.inference", _inference.GetType().FullName);
@@ -98,9 +98,9 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
         _logger.LogInformation("Finished Inference");
     }
 
-    private async Task<((TLoadedInput[] loadedInputs, TInferenceOutput[] outputs), TimeSpan runtime)> RunInferenceBatch(TLoadedInput[] loadedInputs)
+    private async Task<((TLoadedInput[] loadedInputs, TInferenceOutput outputs), TimeSpan runtime)> RunInferenceBatch(TLoadedInput[] loadedInputs)
     {
-        TInferenceOutput[] outputs;
+        TInferenceOutput outputs;
         TimeSpan runtime;
         using (var inferenceActivity = Otel.Source.StartActivity("fai.evaluation.inference.run"))
         {
@@ -115,7 +115,7 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
         return (yieldItem, runtime);
     }
 
-    private async Task<TEvaluationResult> Evaluate(IAsyncEnumerable<(TLoadedInput[], TInferenceOutput[])> inferenceResults)
+    private async Task<TEvaluationResult> Evaluate(IAsyncEnumerable<(TLoadedInput[], TInferenceOutput)> inferenceResults)
     {
         using var activity = Otel.Source.StartActivity("fai.evaluation.evaluate");
         activity?.SetTag("fai.evaluation.evaluator", _evaluator.GetType().FullName);
