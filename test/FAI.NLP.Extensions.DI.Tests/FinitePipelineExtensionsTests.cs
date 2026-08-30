@@ -60,6 +60,7 @@ public class FinitePipelineExtensionsTests
         services.AddSingleton(CreateDummyTokenizer());
         services.AddSingleton(new TokenCountOrderingOptions(Ascending: true));
         services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 0.5, MaxTokenCount: 10));
+        services.AddTensorBatch<int>();
         services
             .AddPipeline<ReadOnlyMemory<TestTokenizable>>()
             .Then<ReadOnlyMemory<TestTokenizable>, PassThroughPipeline>()
@@ -70,7 +71,7 @@ public class FinitePipelineExtensionsTests
         using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Tensor<int>>>();
         var inner = provider.GetRequiredService<TensorRecordingPipeline>();
-        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(9), new(2), new(4), new(3) };
+        TestTokenizable[] input = [new(9), new(2), new(4), new(3)];
 
         Tensor<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
@@ -161,22 +162,16 @@ public class FinitePipelineExtensionsTests
         }
     }
 
-    public sealed class TensorRecordingPipeline : IPreallocatingPipeline<ReadOnlyMemory<TestTokenizable>, Tensor<int>>
+    public sealed class TensorRecordingPipeline : IDestinationPipeline<ReadOnlyMemory<TestTokenizable>, Tensor<int>>
     {
         public List<int> ObservedTokenCounts { get; } = [];
         public List<int> BatchSizes { get; } = [];
-
-        public bool TryAllocateOutput(ReadOnlyMemory<TestTokenizable> input, out Tensor<int> output)
-        {
-            output = Tensor.CreateFromShape<int>([input.Length, 1]);
-            return true;
-        }
 
         public async ValueTask<Tensor<int>> ExecuteAsync(
             ReadOnlyMemory<TestTokenizable> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Tensor<int> output);
+            Tensor<int> output = Tensor.CreateFromShape<int>([input.Length, 1]);
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }
