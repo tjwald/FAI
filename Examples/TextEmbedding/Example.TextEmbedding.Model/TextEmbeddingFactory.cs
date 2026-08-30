@@ -46,6 +46,7 @@ public static class TextEmbeddingFactory
                 ModelExecutorFactory.CreateModelPipeline(
                     options.ModelExecutorType,
                     serviceProvider.GetRequiredService<IModelExecutorOptions>()));
+            localServices.AddSingleton<EmbeddingModelPipeline>();
             localServices.AddSingleton<EmbeddingPoolingPipeline>();
 
             localServices
@@ -54,6 +55,7 @@ public static class TextEmbeddingFactory
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
                 .Then<Tensor<long>[], TextTensorization>()
+                .Then<EmbeddingModelOutputs, EmbeddingModelPipeline>()
                 .Then<Tensor<float>, EmbeddingPoolingPipeline>()
                 .WithOutputAllocation((input, out output) =>
                 {

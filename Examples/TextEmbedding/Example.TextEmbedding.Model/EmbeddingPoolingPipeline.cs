@@ -1,64 +1,88 @@
+using System.Collections.Concurrent;
 using System.Numerics.Tensors;
-using FAI.Core;
 using FAI.Core.Pipelines;
 
 namespace Example.TextEmbedding.Model;
 
-public sealed class EmbeddingPoolingPipeline : IPreallocatingPipeline<Tensor<long>[], Tensor<float>>
+public sealed class EmbeddingModelOutputs : IDisposable
 {
-    public const int EmbeddingDimensions = 384;
+    public EmbeddingModelOutputs(TensorOutputs<float> modelOutputs, Tensor<long> attentionMask)
+    {
+        ModelOutputs = modelOutputs;
+        AttentionMask = attentionMask;
+    }
 
+    public TensorOutputs<float> ModelOutputs { get; }
+    public Tensor<long> AttentionMask { get; }
+
+    public void Dispose() => ModelOutputs.Dispose();
+}
+
+public sealed class EmbeddingModelPipeline : IPipeline<Tensor<long>[], EmbeddingModelOutputs>
+{
     private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
 
-    public EmbeddingPoolingPipeline(IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline)
+    public EmbeddingModelPipeline(IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline)
     {
         _modelPipeline = modelPipeline;
     }
 
-    public bool TryAllocateOutput(Tensor<long>[] input, out Tensor<float> output)
+    public async ValueTask<EmbeddingModelOutputs> ExecuteAsync(
+        Tensor<long>[] input,
+        CancellationToken cancellationToken = default)
     {
-        if (input.Length < 2)
+        if (input.Length != 2)
+        {
+            throw new ArgumentException("MiniLM embedding inference requires token and attention-mask tensors.", nameof(input));
+        }
+
+        Tensor<long> tokenTypeIds = Tensor.CreateFromShape<long>(input[0].Lengths);
+        TensorOutputs<float> modelOutputs = await _modelPipeline.ExecuteAsync([input[0], input[1], tokenTypeIds], cancellationToken);
+        return new EmbeddingModelOutputs(modelOutputs, input[1]);
+    }
+}
+
+public sealed class EmbeddingPoolingPipeline : IPreallocatingPipeline<EmbeddingModelOutputs, Tensor<float>>
+{
+    public const int EmbeddingDimensions = 384;
+
+    public bool TryAllocateOutput(EmbeddingModelOutputs input, out Tensor<float> output)
+    {
+        if (input.ModelOutputs.Count == 0)
         {
             output = null!;
             return false;
         }
 
-        output = Tensor.CreateFromShape<float>([input[0].Lengths[0], EmbeddingDimensions]);
+        output = Tensor.CreateFromShape<float>([input.ModelOutputs.GetOutput(0).Lengths[0], EmbeddingDimensions]);
         return true;
     }
 
     public async ValueTask<Tensor<float>> ExecuteAsync(
-        Tensor<long>[] input,
+        EmbeddingModelOutputs input,
         CancellationToken cancellationToken = default)
     {
         if (!TryAllocateOutput(input, out Tensor<float> output))
         {
-            throw new ArgumentException("Embedding inference requires token and attention-mask tensors.", nameof(input));
+            throw new InvalidOperationException("The embedding model did not produce an output tensor.");
         }
 
         await ExecuteAsync(input, output, cancellationToken);
         return output;
     }
 
-    public async ValueTask ExecuteAsync(
-        Tensor<long>[] input,
+    public ValueTask ExecuteAsync(
+        EmbeddingModelOutputs input,
         Tensor<float> output,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (input.Length < 2)
-        {
-            throw new ArgumentException("Embedding inference requires token and attention-mask tensors.", nameof(input));
-        }
-
-        Tensor<long>[] modelInput = AddTokenTypeIds(input);
-        using TensorOutputs<float> modelOutputs = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
-        if (modelOutputs.Count == 0)
+        if (input.ModelOutputs.Count == 0)
         {
             throw new InvalidOperationException("The embedding model did not produce an output tensor.");
         }
 
-        ReadOnlyTensorSpan<float> tokenEmbeddings = modelOutputs.GetOutput(0);
+        ReadOnlyTensorSpan<float> tokenEmbeddings = input.ModelOutputs.GetOutput(0);
         if (tokenEmbeddings.Rank != 3)
         {
             throw new InvalidOperationException($"Expected a rank-3 token embedding tensor, but received rank {tokenEmbeddings.Rank}.");
@@ -67,7 +91,7 @@ public sealed class EmbeddingPoolingPipeline : IPreallocatingPipeline<Tensor<lon
         int batchSize = checked((int)tokenEmbeddings.Lengths[0]);
         int tokenCount = checked((int)tokenEmbeddings.Lengths[1]);
         int dimensions = checked((int)tokenEmbeddings.Lengths[2]);
-        Tensor<long> attentionMask = input[1];
+        Tensor<long> attentionMask = input.AttentionMask;
 
         if (dimensions != EmbeddingDimensions)
         {
@@ -80,72 +104,55 @@ public sealed class EmbeddingPoolingPipeline : IPreallocatingPipeline<Tensor<lon
             throw new ArgumentException("The output buffer and attention mask must match the model output shape.", nameof(output));
         }
 
-        TensorDimensionSpan<float> destinationRows = output.GetDimensionSpan(0);
-        ReadOnlySpan<float> tokenEmbeddingValues = tokenEmbeddings.AsSpan();
-        for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
+        Parallel.ForEach(
+            Partitioner.Create(0, batchSize),
+            new ParallelOptions { CancellationToken = cancellationToken },
+            range =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            MeanPoolAndNormalize(
-                tokenEmbeddingValues,
-                attentionMask,
-                batchIndex,
-                tokenCount,
-                destinationRows[batchIndex].AsSpan());
-        }
-    }
+            (int start, int end) = range;
+            ReadOnlyTensorSpan<float> localTokenEmbeddings = input.ModelOutputs.GetOutput(0);
+            TensorDimensionSpan<float> destinationRows = output.GetDimensionSpan(0);
+            ReadOnlyTensorDimensionSpan<float> tokenEmbeddingBatches = localTokenEmbeddings.GetDimensionSpan(0);
+            TensorDimensionSpan<long> attentionMaskRows = attentionMask.GetDimensionSpan(0);
+            for (int batchIndex = start; batchIndex < end; batchIndex++)
+            {
+                MeanPoolAndNormalize(
+                    tokenEmbeddingBatches[batchIndex],
+                    attentionMaskRows[batchIndex],
+                    destinationRows[batchIndex]);
+            }
+        });
 
-    private static Tensor<long>[] AddTokenTypeIds(Tensor<long>[] input)
-    {
-        if (input.Length != 2)
-        {
-            throw new ArgumentException("MiniLM embedding inference requires token and attention-mask tensors.", nameof(input));
-        }
-
-        Tensor<long> tokenTypeIds = Tensor.CreateFromShape<long>(input[0].Lengths);
-        return [input[0], input[1], tokenTypeIds];
+        return ValueTask.CompletedTask;
     }
 
     private static void MeanPoolAndNormalize(
-        ReadOnlySpan<float> tokenEmbeddings,
-        Tensor<long> attentionMask,
-        int batchIndex,
-        int tokenCount,
-        Span<float> embedding)
+        scoped in ReadOnlyTensorSpan<float> tokenEmbeddings,
+        scoped in ReadOnlyTensorSpan<long> attentionMask,
+        scoped in TensorSpan<float> embedding)
     {
         bool hasIncludedTokens = false;
+        ReadOnlyTensorDimensionSpan<float> tokenRows = tokenEmbeddings.GetDimensionSpan(0);
+        int tokenCount = checked((int)tokenEmbeddings.Lengths[0]);
 
         for (int tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)
         {
-            if (attentionMask[batchIndex, tokenIndex] == 0)
+            if (attentionMask[tokenIndex] == 0)
             {
                 continue;
             }
 
             hasIncludedTokens = true;
-            int tokenOffset = ((batchIndex * tokenCount) + tokenIndex) * embedding.Length;
-            TensorPrimitives.Add(tokenEmbeddings.Slice(tokenOffset, embedding.Length), embedding, embedding);
+            Tensor.Add(tokenRows[tokenIndex], embedding, embedding);
         }
 
-        if (!hasIncludedTokens)
+        ReadOnlyTensorSpan<float> embeddingValues = embedding;
+        float norm = Tensor.Norm(embeddingValues);
+        if (!hasIncludedTokens || norm == 0)
         {
             return;
         }
 
-        float squaredNorm = 0;
-        for (int dimension = 0; dimension < embedding.Length; dimension++)
-        {
-            squaredNorm += embedding[dimension] * embedding[dimension];
-        }
-
-        float norm = MathF.Sqrt(squaredNorm);
-        if (norm == 0)
-        {
-            return;
-        }
-
-        for (int dimension = 0; dimension < embedding.Length; dimension++)
-        {
-            embedding[dimension] /= norm;
-        }
+        Tensor.Divide(embedding, norm, embedding);
     }
 }

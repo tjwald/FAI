@@ -16,7 +16,7 @@ public sealed record TextEmbeddingOptions(
         MaxPaddedTokenRatio: 0.1,
         MaxTokenCount: 2048);
 
-    public ParallelPartitionSchedulerOptions ParallelScheduler { get; init; } = new(MaxConcurrency: 8);
+    public ParallelPartitionSchedulerOptions ParallelScheduler { get; init; } = new(MaxConcurrency: 2);
 
     public static TextEmbeddingOptions Create(string modelDirectory)
         => new(modelDirectory, new PretrainedTokenizerOptions(MaxTokenLength: 256));
