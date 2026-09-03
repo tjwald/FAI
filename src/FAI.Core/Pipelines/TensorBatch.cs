@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Numerics.Tensors;
-using System.Runtime.CompilerServices;
 
 namespace FAI.Core.Pipelines;
 
@@ -13,30 +12,33 @@ public sealed class TensorBatchOperations<T> :
     public Tensor<T> Slice(Tensor<T> batch, Range range)
     {
         (int offset, int length) = range.GetOffsetAndLength(Count(batch));
-        var ranges = new NRange[batch.Rank];
+
+        Span<NRange> ranges = stackalloc NRange[batch.Rank];
         ranges[0] = new NRange(offset, offset + length);
-        for (int dimension = 1; dimension < ranges.Length; dimension++)
-        {
-            ranges[dimension] = NRange.All;
-        }
+        ranges[1..].Fill(NRange.All);
 
         return batch.Slice(ranges);
     }
 
     public BatchLease<Tensor<T>> Gather(Tensor<T> source, ReadOnlySpan<int> indices)
     {
-        nint[] lengths = source.Lengths.ToArray();
-        lengths[0] = indices.Length;
-        int elementCount = GetElementCount(lengths);
-        T[] buffer = ArrayPool<T>.Shared.Rent(elementCount);
-        Tensor<T> tensor = Tensor.Create(buffer, 0, lengths, source.Strides);
-        var lease = new BatchLease<Tensor<T>>(
-            tensor,
-            _ => ArrayPool<T>.Shared.Return(buffer, RuntimeHelpers.IsReferenceOrContainsReferences<T>()));
+        Span<nint> batchLengths = stackalloc nint[source.Lengths.Length];
+        batchLengths[0] = indices.Length;
+        source.Lengths[1..].CopyTo(batchLengths[1..]);
+
+        T[] buffer = ArrayPool<T>.Shared.Rent(GetElementCount(batchLengths));
+        Tensor<T> tensor = Tensor.Create(buffer, 0, batchLengths, source.Strides);
+        var lease = new BatchLease<Tensor<T>>(tensor, _ => ArrayPool<T>.Shared.Return(buffer));
         Tensor<T> destination = lease.Value;
+
+        var sourceEnumerator = source.GetDimensionSpan(0);
+        var destinationEnumerator = destination.GetDimensionSpan(0);
+
         for (int destinationIndex = 0; destinationIndex < indices.Length; destinationIndex++)
         {
-            CopyRow(source, indices[destinationIndex], destination, destinationIndex);
+            var sourceRow = sourceEnumerator[indices[destinationIndex]];
+            var destinationRow = destinationEnumerator[destinationIndex];
+            sourceRow.CopyTo(destinationRow);
         }
 
         return lease;
@@ -56,23 +58,54 @@ public sealed class TensorBatchOperations<T> :
             throw new ArgumentException("A destination index is required for every source row.", nameof(destinationIndices));
         }
 
+        var sourceEnumerator = source.GetDimensionSpan(0);
+        var destinationEnumerator = destination.GetDimensionSpan(0);
+
         for (int sourceIndex = 0; sourceIndex < destinationIndices.Length; sourceIndex++)
         {
-            CopyRow(source, sourceIndex, destination, destinationIndices[sourceIndex]);
+            var sourceRow = sourceEnumerator[sourceIndex];
+            var destinationRow = destinationEnumerator[destinationIndices[sourceIndex]];
+            sourceRow.CopyTo(destinationRow);
         }
     }
 
     public void PermuteInPlace(Tensor<T> batch, Span<int> sourceToDestinationIndices)
     {
-        using BatchLease<Tensor<T>> copy = Gather(batch, Enumerable.Range(0, Count(batch)).ToArray());
-        Scatter(copy.Value, batch, sourceToDestinationIndices);
-    }
+        var batchView = batch.GetDimensionSpan(0);
+        var tempLengths = batchView[sourceToDestinationIndices[0]].Lengths;
+        var flattenedLength = GetElementCount(tempLengths);
+        T[] buffer = ArrayPool<T>.Shared.Rent(flattenedLength * 2);
+        TensorSpan<T> currentHolding = new TensorSpan<T>(buffer, 0, tempLengths, batch.Strides);
+        TensorSpan<T> nextHolding = new TensorSpan<T>(buffer, flattenedLength, tempLengths, batch.Strides);
 
-    private void CopyRow(Tensor<T> source, int sourceIndex, Tensor<T> destination, int destinationIndex)
-    {
-        Tensor<T> sourceRow = Slice(source, sourceIndex..(sourceIndex + 1));
-        Tensor<T> destinationRow = Slice(destination, destinationIndex..(destinationIndex + 1));
-        sourceRow.AsReadOnlyTensorSpan().CopyTo(destinationRow.AsTensorSpan());
+        for (int i = 0; i < sourceToDestinationIndices.Length; i++)
+        {
+            if (sourceToDestinationIndices[i] == i)
+                continue;
+
+            int current = i;
+            int dest = sourceToDestinationIndices[current];
+
+            batchView[current].CopyTo(currentHolding);
+
+            while (dest != i)
+            {
+                batchView[dest].CopyTo(nextHolding);
+                currentHolding.CopyTo(batchView[dest]);
+                sourceToDestinationIndices[current] = current;
+
+                TensorSpan<T> swapTemp = currentHolding;
+                currentHolding = nextHolding;
+                nextHolding = swapTemp;
+                current = dest;
+                dest = sourceToDestinationIndices[current];
+            }
+
+            currentHolding.CopyTo(batchView[i]);
+
+            sourceToDestinationIndices[current] = current;
+        }
+        ArrayPool<T>.Shared.Return(buffer);
     }
 
     private static int GetElementCount(ReadOnlySpan<nint> lengths)
