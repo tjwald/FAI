@@ -16,7 +16,7 @@ public sealed class SentimentInference : IInference<string, bool>
 
     public async Task<bool> Predict(string input)
     {
-        bool[] output = await BatchPredict(new[] { input });
+        bool[] output = await BatchPredict([input]);
         return output[0];
     }
 

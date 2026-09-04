@@ -1,12 +1,10 @@
 using FAI.NLP.Configuration;
-using FAI.Onnx.Configuration;
 
 namespace Example.SentimentInference.Model;
 
 public record SentimentInferenceOptions(
     string ModelDir,
     PretrainedTokenizerOptions TokenizerOptions,
-    ModelExecutorType ModelExecutorType,
     bool UseGpu = true)
 {
     public static SentimentInferenceOptions DefaultConfig
@@ -16,8 +14,7 @@ public record SentimentInferenceOptions(
             var modelDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ClassificationModelResources");
             return new SentimentInferenceOptions(
                 ModelDir: modelDir,
-                TokenizerOptions: new PretrainedTokenizerOptions(),
-                ModelExecutorType: ModelExecutorType.Simple
+                TokenizerOptions: new PretrainedTokenizerOptions()
             );
         }
     }

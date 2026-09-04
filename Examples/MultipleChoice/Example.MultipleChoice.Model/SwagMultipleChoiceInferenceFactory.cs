@@ -10,7 +10,7 @@ using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
 using FAI.Onnx.Configuration;
-using FAI.Onnx.Factories;
+using FAI.Onnx.ModelExecutors;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Example.MultipleChoice.Model;
@@ -45,10 +45,7 @@ public static class SwagMultipleChoiceInferenceFactory
                 })
             );
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
-            localServices.AddSingleton(sp =>
-                ModelExecutorFactory.CreateModelPipeline(
-                    options.ModelExecutorType,
-                    sp.GetRequiredService<IModelExecutorOptions>()));
+            localServices.AddSingleton<ConfiguredOnnxModelPipeline>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
