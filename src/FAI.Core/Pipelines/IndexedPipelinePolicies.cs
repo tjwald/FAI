@@ -63,23 +63,20 @@ public sealed class PartitioningPipeline<TInput, TOutput>
             }
         }
 
-        Range[] ranges = _partitioner.Partition(input).ToArray();
+        Range[] ranges = [.. _partitioner.Partition(input)];
         if (ranges.Length == 0)
         {
             throw new InvalidOperationException("Partitioning an empty batch requires preallocation support.");
         }
 
         var partitionOutputs = new TOutput[ranges.Length];
-        Dictionary<Range, int> rangeIndices = ranges
-            .Select((range, index) => (range, index))
-            .ToDictionary(item => item.range, item => item.index);
         try
         {
             await _scheduler.ExecuteAsync(
                 ranges,
                 async (range, token) =>
                 {
-                    int index = rangeIndices[range];
+                    int index = FindRangeIndex(ranges, range);
                     partitionOutputs[index] = await _inner.ExecuteAsync(
                         _inputBatch.Slice(input, range),
                         token);
@@ -155,8 +152,26 @@ public sealed class PartitioningPipeline<TInput, TOutput>
     private void ScatterRange(TOutput source, TOutput destination, Range range)
     {
         (int offset, int length) = range.GetOffsetAndLength(_outputBatch.Count(destination));
-        int[] destinationIndices = Enumerable.Range(offset, length).ToArray();
+        Span<int> destinationIndices = stackalloc int[length];
+        for (int index = 0; index < length; index++)
+        {
+            destinationIndices[index] = offset + index;
+        }
+
         _outputBatch.Scatter(source, destination, destinationIndices);
+    }
+
+    private static int FindRangeIndex(ReadOnlySpan<Range> ranges, Range range)
+    {
+        for (int index = 0; index < ranges.Length; index++)
+        {
+            if (ranges[index].Equals(range))
+            {
+                return index;
+            }
+        }
+
+        throw new InvalidOperationException("The scheduler returned an unknown partition range.");
     }
 
 }
@@ -221,7 +236,13 @@ public sealed class OrderingPipeline<TInput, TOutput>
             TOutput sortedOutput = await _inner.ExecuteAsync(sortedInput.Value, cancellationToken);
             try
             {
-                int[] identity = Enumerable.Range(0, _outputBatch.Count(sortedOutput)).ToArray();
+                int outputCount = _outputBatch.Count(sortedOutput);
+                Span<int> identity = stackalloc int[outputCount];
+                for (int index = 0; index < outputCount; index++)
+                {
+                    identity[index] = index;
+                }
+
                 _outputBatch.Scatter(sortedOutput, output, identity);
             }
             finally
