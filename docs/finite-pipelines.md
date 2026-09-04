@@ -58,6 +58,7 @@ The relevant operations are independent capabilities:
 
 - Cardinality
 - Contiguous slicing
+- Contiguous copying
 - Indexed gathering
 - Aggregate allocation
 - Scattering
@@ -73,7 +74,7 @@ When called via `ExecuteAsync(input, destination)` with a caller-supplied destin
 await _destinationInner.ExecuteAsync(partitionInput, _outputBatch.Slice(destination, range), token);
 ```
 
-When called via the return-value path `ExecuteAsync(input)`, partitioning executes the partitions through the inner pipeline, allocates an aggregate shaped from an actual partition result via `_outputBatch.AllocateLike(...)`, and scatters each partition result into place.
+When called via the return-value path `ExecuteAsync(input)`, partitioning executes the partitions through the inner pipeline, allocates an aggregate shaped from an actual partition result via `_outputBatch.AllocateLike(...)`, and copies each partition result into its slice.
 
 Structural capabilities are selected when generic decorators are configured and the inner step interface is cached when DI constructs the pipeline. Runtime checks cover cardinality, shape compatibility, ranges, cancellation, and disposal.
 

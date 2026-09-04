@@ -55,6 +55,8 @@ namespace FAI.Core.Pipelines
     {
         TBatch AllocateLike(TBatch template, int count);
 
+        void Copy(TBatch source, TBatch destination);
+
         void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
 
         void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);

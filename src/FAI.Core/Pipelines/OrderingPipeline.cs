@@ -40,10 +40,7 @@ public sealed class OrderingPipeline<TInput, TOutput> : IDestinationPipeline<TIn
             TOutput sortedOutput = await _inner.ExecuteAsync(sortedInput.Value, cancellationToken);
             try
             {
-                int outputCount = _outputBatch.Count(sortedOutput);
-                Span<int> identity = stackalloc int[outputCount];
-                for (int index = 0; index < outputCount; index++) identity[index] = index;
-                _outputBatch.Scatter(sortedOutput, destination, identity);
+                _outputBatch.Copy(sortedOutput, destination);
             }
             finally { await PipelineOutputDisposer.DisposeAsync(sortedOutput); }
         }

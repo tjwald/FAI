@@ -81,6 +81,9 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
 
     public Memory<T> AllocateLike(Memory<T> template, int count) => new T[count];
 
+    public void Copy(Memory<T> source, Memory<T> destination)
+        => source.Span.CopyTo(destination.Span);
+
     public void Scatter(Memory<T> source, Memory<T> destination, ReadOnlySpan<int> destinationIndices)
     {
         ReadOnlySpan<T> sourceSpan = source.Span;

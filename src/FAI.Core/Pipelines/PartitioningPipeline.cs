@@ -45,7 +45,11 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline
             TOutput aggregate = _outputBatch.AllocateLike(partitionOutputs[0], _inputBatch.Count(input));
             try
             {
-                for (int i = 0; i < ranges.Length; i++) ScatterRange(partitionOutputs[i], aggregate, ranges[i]);
+                for (int i = 0; i < ranges.Length; i++)
+                {
+                    _outputBatch.Copy(partitionOutputs[i], _outputBatch.Slice(aggregate, ranges[i]));
+                }
+
                 return aggregate;
             }
             catch { await PipelineOutputDisposer.DisposeAsync(aggregate); throw; }
@@ -72,17 +76,9 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline
             }
 
             TOutput partitionOutput = await _inner.ExecuteAsync(partitionInput, token);
-            try { ScatterRange(partitionOutput, destination, range); }
+            try { _outputBatch.Copy(partitionOutput, _outputBatch.Slice(destination, range)); }
             finally { await PipelineOutputDisposer.DisposeAsync(partitionOutput); }
         }, cancellationToken);
-    }
-
-    private void ScatterRange(TOutput source, TOutput destination, Range range)
-    {
-        (int offset, int length) = range.GetOffsetAndLength(_outputBatch.Count(destination));
-        Span<int> destinationIndices = stackalloc int[length];
-        for (int index = 0; index < length; index++) destinationIndices[index] = offset + index;
-        _outputBatch.Scatter(source, destination, destinationIndices);
     }
 
     private static int FindRangeIndex(ReadOnlySpan<Range> ranges, Range range)

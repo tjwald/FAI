@@ -125,7 +125,7 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
                     TOutput routeOutput = await route.Target.ExecuteAsync(routeInput.Value, token);
                     try
                     {
-                        ScatterIdentity(routeOutput, destinationSlice);
+                        _outputBatch.Copy(routeOutput, destinationSlice);
                     }
                     finally
                     {
@@ -136,18 +136,6 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
             cancellationToken);
 
         _outputBatch.PermuteInPlace(destination, sourceToDestination);
-    }
-
-    private void ScatterIdentity(TOutput source, TOutput destination)
-    {
-        int outputCount = _outputBatch.Count(source);
-        Span<int> identity = stackalloc int[outputCount];
-        for (int index = 0; index < outputCount; index++)
-        {
-            identity[index] = index;
-        }
-
-        _outputBatch.Scatter(source, destination, identity);
     }
 
     private static IEnumerable<Range> GetRouteRanges(int count)

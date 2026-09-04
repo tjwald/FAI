@@ -51,6 +51,9 @@ public sealed class TensorBatchOperations<T> :
         return Tensor.CreateFromShape<T>(lengths);
     }
 
+    public void Copy(Tensor<T> source, Tensor<T> destination)
+        => source.AsReadOnlyTensorSpan().CopyTo(destination.AsTensorSpan());
+
     public void Scatter(Tensor<T> source, Tensor<T> destination, ReadOnlySpan<int> destinationIndices)
     {
         if (Count(source) != destinationIndices.Length)
