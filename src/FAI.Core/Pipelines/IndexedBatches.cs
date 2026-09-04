@@ -54,7 +54,7 @@ public interface IWritableIndexedBatch<TBatch> : IReadOnlyIndexedBatch<TBatch>
 
     void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
 
-    void PermuteInPlace(TBatch batch, ReadOnlySpan<int> sourceToDestinationIndices);
+    void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
 }
 
 public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>
@@ -110,7 +110,7 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
         }
     }
 
-    public void PermuteInPlace(Memory<T> batch, ReadOnlySpan<int> sourceToDestinationIndices)
+    public void PermuteInPlace(Memory<T> batch, Span<int> sourceToDestinationIndices)
     {
         T[] copy = ArrayPool<T>.Shared.Rent(batch.Length);
         try
