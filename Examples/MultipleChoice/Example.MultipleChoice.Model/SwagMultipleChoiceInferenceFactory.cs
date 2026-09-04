@@ -1,3 +1,4 @@
+using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
@@ -46,6 +47,8 @@ public static class SwagMultipleChoiceInferenceFactory
             );
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddSingleton<ConfiguredOnnxModelPipeline>();
+            localServices.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(serviceProvider =>
+                serviceProvider.GetRequiredService<ConfiguredOnnxModelPipeline>());
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
