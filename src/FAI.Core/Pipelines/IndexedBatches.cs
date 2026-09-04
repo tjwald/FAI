@@ -93,19 +93,26 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
 
     public void PermuteInPlace(Memory<T> batch, Span<int> sourceToDestinationIndices)
     {
-        T[] copy = ArrayPool<T>.Shared.Rent(batch.Length);
-        try
+        Span<T> values = batch.Span;
+        for (int sourceIndex = 0; sourceIndex < sourceToDestinationIndices.Length; sourceIndex++)
         {
-            batch.Span.CopyTo(copy);
-            Span<T> destination = batch.Span;
-            for (int sourceIndex = 0; sourceIndex < sourceToDestinationIndices.Length; sourceIndex++)
+            int destinationIndex = sourceToDestinationIndices[sourceIndex];
+            if (destinationIndex == sourceIndex)
             {
-                destination[sourceToDestinationIndices[sourceIndex]] = copy[sourceIndex];
+                continue;
             }
-        }
-        finally
-        {
-            ArrayPool<T>.Shared.Return(copy, RuntimeHelpers.IsReferenceOrContainsReferences<T>());
+
+            T value = values[sourceIndex];
+            while (destinationIndex != sourceIndex)
+            {
+                (value, values[destinationIndex]) = (values[destinationIndex], value);
+                int nextDestinationIndex = sourceToDestinationIndices[destinationIndex];
+                sourceToDestinationIndices[destinationIndex] = destinationIndex;
+                destinationIndex = nextDestinationIndex;
+            }
+
+            values[sourceIndex] = value;
+            sourceToDestinationIndices[sourceIndex] = sourceIndex;
         }
     }
 }
