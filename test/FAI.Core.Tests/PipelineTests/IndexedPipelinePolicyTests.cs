@@ -96,15 +96,16 @@ public sealed class IndexedPipelinePolicyTests
         var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
-            new MemoryBatchOperations<int>());
+            new MemoryBatchOperations<int>(),
+            input => new int[input.Length]);
         int[] input = [1, 2, 3, 4];
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([100, 20, 300, 40], output.ToArray());
-        Assert.Equal(1, even.AllocationCount);
+        Assert.Equal(0, even.AllocationCount);
         Assert.Equal(0, odd.AllocationCount);
-        Assert.Equal([2], even.DestinationBatchSizes);
-        Assert.Equal([2], odd.DestinationBatchSizes);
+        Assert.Empty(even.DestinationBatchSizes);
+        Assert.Empty(odd.DestinationBatchSizes);
     }
 
     [Fact]
@@ -114,7 +115,8 @@ public sealed class IndexedPipelinePolicyTests
         var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
-            new MemoryBatchOperations<int>());
+            new MemoryBatchOperations<int>(),
+            input => new int[input.Length]);
         int[] input = [1, 2, 3, 4];
 
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
