@@ -98,7 +98,7 @@ public class FinitePipelineExtensionsTests
         public int SentenceCount => 1;
     }
 
-    public sealed class RecordingPipeline : IPreallocatingPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>
+    public sealed class RecordingPipeline : IDestinationPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>
     {
         public List<int> ObservedTokenCounts { get; } = [];
         public List<int> BatchSizes { get; } = [];

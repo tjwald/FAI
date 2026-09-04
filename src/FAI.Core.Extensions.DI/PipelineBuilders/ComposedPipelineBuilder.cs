@@ -2,7 +2,7 @@ using FAI.Core.Pipelines;
 
 namespace FAI.Core.Extensions.DI;
 
-public sealed class ComposedPipelineBuilder<TStart, TCurrent>
+public sealed class ComposedPipelineBuilder<TStart, TCurrent> : IPipelineBuilder<TStart, TCurrent>
 {
     private readonly IServiceCollection _services;
     private readonly Func<IServiceProvider, IPipeline<TStart, TCurrent>> _build;
@@ -18,15 +18,9 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
     public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(Func<IServiceProvider, IPipeline<TCurrent, TNext>> pipelineFactory)
         => new(_services, serviceProvider => AppendedPipeline.Create(_build(serviceProvider), pipelineFactory(serviceProvider)));
 
-    public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline)
+    public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, IPipelineBuilder<TCurrent, TNext>> buildPipeline)
     {
-        ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
-        return Then(pipeline.BuildPipeline);
-    }
-
-    public ComposedPipelineBuilder<TStart, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, DecoratedPipelineBuilder<TCurrent, TCurrent, TNext>> buildPipeline)
-    {
-        DecoratedPipelineBuilder<TCurrent, TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
+        IPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
         return Then(pipeline.BuildPipeline);
     }
 
@@ -40,5 +34,5 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
         return _services;
     }
 
-    internal IPipeline<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider) => _build(serviceProvider);
+    public IPipeline<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider) => _build(serviceProvider);
 }

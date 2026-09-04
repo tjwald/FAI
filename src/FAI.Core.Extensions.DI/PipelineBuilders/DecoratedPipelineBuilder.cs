@@ -2,7 +2,7 @@ using FAI.Core.Pipelines;
 
 namespace FAI.Core.Extensions.DI;
 
-public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
+public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent> : IPipelineBuilder<TStart, TCurrent>
 {
     private readonly IServiceCollection _services;
     private readonly Func<IServiceProvider, IPipeline<TStart, TBoundary>>? _buildPrefix;
@@ -22,15 +22,9 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
     public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<IServiceProvider, IPipeline<TCurrent, TNext>> pipelineFactory)
         => new(_services, _buildPrefix, serviceProvider => Append(serviceProvider, pipelineFactory), _decorators, false);
 
-    public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline)
+    public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, IPipelineBuilder<TCurrent, TNext>> buildPipeline)
     {
-        ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
-        return Then(pipeline.BuildPipeline);
-    }
-
-    public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, DecoratedPipelineBuilder<TCurrent, TCurrent, TNext>> buildPipeline)
-    {
-        DecoratedPipelineBuilder<TCurrent, TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
+        IPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
         return Then(pipeline.BuildPipeline);
     }
 
@@ -44,7 +38,7 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
         return _services;
     }
 
-    internal IPipeline<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider)
+    public IPipeline<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider)
     {
         IPipeline<TBoundary, TCurrent> suffix = BuildDecoratedSuffix(serviceProvider);
         return _buildPrefix is null

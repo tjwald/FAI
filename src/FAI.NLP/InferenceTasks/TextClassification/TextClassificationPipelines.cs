@@ -36,7 +36,7 @@ public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>,
 }
 
 public sealed class ClassificationDecoding<TClassification> :
-    IPreallocatingPipeline<TensorOutputs<float>, Memory<ClassificationResult<TClassification, float>>>
+    IDestinationPipeline<TensorOutputs<float>, Memory<ClassificationResult<TClassification, float>>>
 {
     private readonly ClassificationOptions<TClassification> _options;
 
@@ -62,24 +62,24 @@ public sealed class ClassificationDecoding<TClassification> :
 
     public ValueTask ExecuteAsync(
         TensorOutputs<float> input,
-        Memory<ClassificationResult<TClassification, float>> output,
+        Memory<ClassificationResult<TClassification, float>> destination,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ReadOnlyTensorSpan<float> tensor = input.GetOutput(0);
         int rowCount = checked((int)tensor.Lengths[0]);
-        if (rowCount != output.Length)
+        if (rowCount != destination.Length)
         {
             throw new ArgumentException(
-                $"The model produced {rowCount} result rows for an output batch of {output.Length}.",
-                nameof(output));
+                $"The model produced {rowCount} result rows for an output batch of {destination.Length}.",
+                nameof(destination));
         }
 
-        Span<ClassificationResult<TClassification, float>> outputSpan = output.Span;
+        Span<ClassificationResult<TClassification, float>> destinationSpan = destination.Span;
         int rowIndex = 0;
         foreach (ReadOnlyTensorSpan<float> row in tensor.GetDimensionSpan(0))
         {
-            outputSpan[rowIndex] = _options.GetClassificationResult(row.AsSpan());
+            destinationSpan[rowIndex] = _options.GetClassificationResult(row.AsSpan());
             rowIndex++;
         }
 

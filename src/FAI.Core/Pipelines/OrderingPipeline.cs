@@ -1,9 +1,9 @@
 namespace FAI.Core.Pipelines;
 
-public sealed class OrderingPipeline<TInput, TOutput> : IPreallocatingPipeline<TInput, TOutput>
+public sealed class OrderingPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>
 {
     private readonly IPipeline<TInput, TOutput> _inner;
-    private readonly IPreallocatingPipeline<TInput, TOutput>? _preallocatingInner;
+    private readonly IDestinationPipeline<TInput, TOutput>? _destinationInner;
     private readonly IIndexOrdering<TInput> _ordering;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
     private readonly IWritableIndexedBatch<TOutput> _outputBatch;
@@ -12,7 +12,7 @@ public sealed class OrderingPipeline<TInput, TOutput> : IPreallocatingPipeline<T
         IReadOnlyIndexedBatch<TInput> inputBatch, IWritableIndexedBatch<TOutput> outputBatch)
     {
         _inner = inner;
-        _preallocatingInner = inner as IPreallocatingPipeline<TInput, TOutput>;
+        _destinationInner = inner as IDestinationPipeline<TInput, TOutput>;
         _ordering = ordering;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -27,13 +27,13 @@ public sealed class OrderingPipeline<TInput, TOutput> : IPreallocatingPipeline<T
         return output;
     }
 
-    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+    public async ValueTask ExecuteAsync(TInput input, TOutput destination, CancellationToken cancellationToken = default)
     {
         int[] sortedToOriginal = _ordering.CreateOrder(input);
         using BatchLease<TInput> sortedInput = _inputBatch.Gather(input, sortedToOriginal);
-        if (_preallocatingInner is not null)
+        if (_destinationInner is not null)
         {
-            await _preallocatingInner.ExecuteAsync(sortedInput.Value, output, cancellationToken);
+            await _destinationInner.ExecuteAsync(sortedInput.Value, destination, cancellationToken);
         }
         else
         {
@@ -43,11 +43,11 @@ public sealed class OrderingPipeline<TInput, TOutput> : IPreallocatingPipeline<T
                 int outputCount = _outputBatch.Count(sortedOutput);
                 Span<int> identity = stackalloc int[outputCount];
                 for (int index = 0; index < outputCount; index++) identity[index] = index;
-                _outputBatch.Scatter(sortedOutput, output, identity);
+                _outputBatch.Scatter(sortedOutput, destination, identity);
             }
             finally { await PipelineOutputDisposer.DisposeAsync(sortedOutput); }
         }
 
-        _outputBatch.PermuteInPlace(output, sortedToOriginal);
+        _outputBatch.PermuteInPlace(destination, sortedToOriginal);
     }
 }

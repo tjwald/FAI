@@ -110,10 +110,10 @@ public sealed class PipelinePipelineBuilderTests
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IPipeline<ReadOnlyMemory<int>, Memory<long>> pipeline =
             serviceProvider.GetRequiredService<IPipeline<ReadOnlyMemory<int>, Memory<long>>>();
-        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<long>>>(pipeline);
+        var destinationPipeline = Assert.IsAssignableFrom<IDestinationPipeline<ReadOnlyMemory<int>, Memory<long>>>(pipeline);
 
         Memory<long> output = new long[5];
-        await preallocatingPipeline.ExecuteAsync(
+        await destinationPipeline.ExecuteAsync(
             new[] { 1, 2, 3, 4, 5 },
             output,
             TestContext.Current.CancellationToken);
@@ -182,10 +182,10 @@ public sealed class PipelinePipelineBuilderTests
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
-        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingPipeline<int[], string[]>>(pipeline);
+        var destinationPipeline = Assert.IsAssignableFrom<IDestinationPipeline<int[], string[]>>(pipeline);
 
         string[] output = new string[2];
-        await preallocatingPipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
+        await destinationPipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
 
         Assert.Equal(["7", "42"], output);
     }
@@ -223,7 +223,7 @@ public sealed class PipelinePipelineBuilderTests
             => ValueTask.FromResult(input.Select(value => value.ToString()).ToArray());
     }
 
-    private sealed class PreallocatingToStringPipeline : IPreallocatingPipeline<long[], string[]>
+    private sealed class PreallocatingToStringPipeline : IDestinationPipeline<long[], string[]>
     {
         public async ValueTask<string[]> ExecuteAsync(long[] input, CancellationToken cancellationToken = default)
         {
@@ -293,7 +293,7 @@ public sealed class PipelinePipelineBuilderTests
             => ValueTask.FromResult(input);
     }
 
-    private sealed class PartitionedLongPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<long>>
+    private sealed class PartitionedLongPipeline : IDestinationPipeline<ReadOnlyMemory<int>, Memory<long>>
     {
         private readonly Lock _lock = new();
 

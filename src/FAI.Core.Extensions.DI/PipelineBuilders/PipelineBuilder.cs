@@ -20,15 +20,9 @@ public sealed class PipelineBuilder<TInput>
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<IServiceProvider, IPipeline<TInput, TOutput>> pipelineFactory)
         => new(_services, pipelineFactory);
 
-    public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<PipelineBuilder<TInput>, ComposedPipelineBuilder<TInput, TOutput>> buildPipeline)
+    public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<PipelineBuilder<TInput>, IPipelineBuilder<TInput, TOutput>> buildPipeline)
     {
-        ComposedPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
-        return Then(pipeline.BuildPipeline);
-    }
-
-    public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<PipelineBuilder<TInput>, DecoratedPipelineBuilder<TInput, TInput, TOutput>> buildPipeline)
-    {
-        DecoratedPipelineBuilder<TInput, TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
+        IPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
         return Then(pipeline.BuildPipeline);
     }
 }

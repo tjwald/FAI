@@ -123,7 +123,7 @@ public sealed class IndexedPipelinePolicyTests
     private static Tensor<float> CreateTensor(ReadOnlySpan<nint> lengths, float[] values)
         => Tensor.Create(values, lengths);
 
-    private sealed class TensorCopyPipeline : IPreallocatingPipeline<Tensor<float>, Tensor<float>>
+    private sealed class TensorCopyPipeline : IDestinationPipeline<Tensor<float>, Tensor<float>>
     {
         public List<int> BatchSizes { get; } = [];
 
@@ -156,7 +156,7 @@ public sealed class IndexedPipelinePolicyTests
         }
     }
 
-    private sealed class MemoryIdentityPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MemoryIdentityPipeline : IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public int[] ObservedInput { get; private set; } = [];
 
@@ -180,7 +180,7 @@ public sealed class IndexedPipelinePolicyTests
         }
     }
 
-    private sealed class DelayedMemoryPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class DelayedMemoryPipeline : IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         private int _concurrency;
         private int _maximumConcurrency;
@@ -262,7 +262,7 @@ public sealed class IndexedPipelinePolicyTests
             => Enumerable.Range(0, batch.Length).OrderByDescending(index => batch.Span[index]).ToArray();
     }
 
-    private sealed class MultiplyPipeline(int multiplier) : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class MultiplyPipeline(int multiplier) : IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
         public List<int> DestinationBatchSizes { get; } = [];
 

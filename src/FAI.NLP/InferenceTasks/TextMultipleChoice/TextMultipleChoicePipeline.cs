@@ -8,7 +8,7 @@ using FAI.NLP.Tokenization;
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
 public sealed class TextMultipleChoicePipeline :
-    IPreallocatingPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+    IDestinationPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
 {
     private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
     private readonly TextMultipleChoiceOptions _options;
@@ -32,12 +32,12 @@ public sealed class TextMultipleChoicePipeline :
 
     public async ValueTask ExecuteAsync(
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
-        Memory<ChoiceResult<TokenizedText>> output,
+        Memory<ChoiceResult<TokenizedText>> destination,
         CancellationToken cancellationToken = default)
     {
-        if (input.Length != output.Length)
+        if (input.Length != destination.Length)
         {
-            throw new ArgumentException("Input and output batch sizes must match.", nameof(output));
+            throw new ArgumentException("Input and output batch sizes must match.", nameof(destination));
         }
 
         if (input.IsEmpty)
@@ -49,7 +49,7 @@ public sealed class TextMultipleChoicePipeline :
         BatchTokenizedResult tokenized = Preprocess(input.Span);
         Tensor<long>[] modelInput = tokenized.ToArray();
         using TensorOutputs<float> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
-        Decode(input, modelOutput.GetOutput(0), output);
+        Decode(input, modelOutput.GetOutput(0), destination);
     }
 
     private BatchTokenizedResult Preprocess(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)

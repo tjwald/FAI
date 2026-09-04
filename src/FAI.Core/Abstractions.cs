@@ -34,11 +34,11 @@ namespace FAI.Core.Pipelines
         ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default);
     }
 
-    public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
+    public interface IDestinationPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
     {
         ValueTask ExecuteAsync(
             TInput input,
-            TOutput output,
+            TOutput destination,
             CancellationToken cancellationToken = default);
     }
 

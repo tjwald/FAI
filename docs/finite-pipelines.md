@@ -18,16 +18,16 @@ public interface IPipeline<in TInput, TOutput>
 Destination execution is an optional capability, not the base execution contract.
 
 ```csharp
-public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
+public interface IDestinationPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
 {
     ValueTask ExecuteAsync(
         TInput input,
-        TOutput output,
+        TOutput destination,
         CancellationToken cancellationToken = default);
 }
 ```
 
-Interface presence means a pipeline understands destination execution. When a caller or decorator supplies an allocated destination buffer (e.g., sliced from a contiguous output buffer or pooled), `ExecuteAsync(input, output)` writes results directly into that buffer without intermediate heap allocations.
+Interface presence means a pipeline understands destination execution. When a caller or decorator supplies an allocated destination buffer (e.g., sliced from a contiguous output buffer or pooled), `ExecuteAsync(input, destination)` writes results directly into that buffer without intermediate heap allocations.
 
 ## Composition
 

@@ -1,9 +1,9 @@
 namespace FAI.Core.Pipelines;
 
-public sealed class PartitioningPipeline<TInput, TOutput> : IPreallocatingPipeline<TInput, TOutput>
+public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>
 {
     private readonly IPipeline<TInput, TOutput> _inner;
-    private readonly IPreallocatingPipeline<TInput, TOutput>? _preallocatingInner;
+    private readonly IDestinationPipeline<TInput, TOutput>? _destinationInner;
     private readonly IBatchPartitioner<TInput> _partitioner;
     private readonly IPartitionScheduler _scheduler;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
@@ -13,7 +13,7 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IPreallocatingPipeli
         IReadOnlyIndexedBatch<TInput> inputBatch, IWritableIndexedBatch<TOutput> outputBatch, IPartitionScheduler? scheduler = null)
     {
         _inner = inner;
-        _preallocatingInner = inner as IPreallocatingPipeline<TInput, TOutput>;
+        _destinationInner = inner as IDestinationPipeline<TInput, TOutput>;
         _partitioner = partitioner;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -57,22 +57,22 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IPreallocatingPipeli
         }
     }
 
-    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+    public async ValueTask ExecuteAsync(TInput input, TOutput destination, CancellationToken cancellationToken = default)
     {
-        if (_inputBatch.Count(input) != _outputBatch.Count(output))
-            throw new ArgumentException("Input and output batch counts must match.", nameof(output));
+        if (_inputBatch.Count(input) != _outputBatch.Count(destination))
+            throw new ArgumentException("Input and output batch counts must match.", nameof(destination));
 
         await _scheduler.ExecuteAsync(_partitioner.Partition(input), async (range, token) =>
         {
             TInput partitionInput = _inputBatch.Slice(input, range);
-            if (_preallocatingInner is not null)
+            if (_destinationInner is not null)
             {
-                await _preallocatingInner.ExecuteAsync(partitionInput, _outputBatch.Slice(output, range), token);
+                await _destinationInner.ExecuteAsync(partitionInput, _outputBatch.Slice(destination, range), token);
                 return;
             }
 
             TOutput partitionOutput = await _inner.ExecuteAsync(partitionInput, token);
-            try { ScatterRange(partitionOutput, output, range); }
+            try { ScatterRange(partitionOutput, destination, range); }
             finally { await PipelineOutputDisposer.DisposeAsync(partitionOutput); }
         }, cancellationToken);
     }

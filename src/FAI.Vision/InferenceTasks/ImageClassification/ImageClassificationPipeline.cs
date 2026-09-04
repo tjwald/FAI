@@ -11,7 +11,7 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace FAI.Vision.InferenceTasks.ImageClassification;
 
 public sealed class ImageClassificationPipeline<TPixel, TClassification, TFloat> :
-    IPreallocatingPipeline<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
+    IDestinationPipeline<ReadOnlyMemory<Image<TPixel>>, Memory<ClassificationResult<TClassification, TFloat>>>
     where TPixel : unmanaged, IPixel<TPixel>
     where TFloat : unmanaged, IFloatingPointIeee754<TFloat>
 {
@@ -40,12 +40,12 @@ public sealed class ImageClassificationPipeline<TPixel, TClassification, TFloat>
 
     public async ValueTask ExecuteAsync(
         ReadOnlyMemory<Image<TPixel>> input,
-        Memory<ClassificationResult<TClassification, TFloat>> output,
+        Memory<ClassificationResult<TClassification, TFloat>> destination,
         CancellationToken cancellationToken = default)
     {
-        if (input.Length != output.Length)
+        if (input.Length != destination.Length)
         {
-            throw new ArgumentException("Input and output batch sizes must match.", nameof(output));
+            throw new ArgumentException("Input and output batch sizes must match.", nameof(destination));
         }
 
         if (input.IsEmpty)
@@ -57,16 +57,16 @@ public sealed class ImageClassificationPipeline<TPixel, TClassification, TFloat>
         using TensorOutputs<TFloat> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
         ReadOnlyTensorSpan<TFloat> tensor = modelOutput.GetOutput(0);
         int rowCount = checked((int)tensor.Lengths[0]);
-        if (rowCount != output.Length)
+        if (rowCount != destination.Length)
         {
             throw new InvalidOperationException(
-                $"The model produced {rowCount} result rows for an input batch of {output.Length}.");
+                $"The model produced {rowCount} result rows for an input batch of {destination.Length}.");
         }
 
         int rowIndex = 0;
         foreach (ReadOnlyTensorSpan<TFloat> row in tensor.GetDimensionSpan(0))
         {
-            output.Span[rowIndex] = _options.GetClassificationResult(row.AsSpan());
+            destination.Span[rowIndex] = _options.GetClassificationResult(row.AsSpan());
             rowIndex++;
         }
     }

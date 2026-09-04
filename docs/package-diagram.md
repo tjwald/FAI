@@ -23,4 +23,4 @@ graph TD
 
 ## Extension Model
 
-Runtime packages implement `IPipeline` for model-specific disposable tensor outputs. Domain packages implement task pipelines and policies without introducing another execution abstraction. Pipelines that can derive storage synchronously from metadata may also implement `IPreallocatingPipeline`. Applications compose those pieces with `AddPipeline<TInput>()` and `Then<TOutput, TPipeline>()`, then expose an `IInference<TInput, TOutput>` facade where needed.
+Runtime packages implement `IPipeline` for model-specific disposable tensor outputs. Domain packages implement task pipelines and policies without introducing another execution abstraction. Pipelines that can write into caller-supplied storage may also implement `IDestinationPipeline`. Applications compose those pieces with `AddPipeline<TInput>()` and `Then<TOutput, TPipeline>()`, then expose an `IInference<TInput, TOutput>` facade where needed.

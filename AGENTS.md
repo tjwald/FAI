@@ -27,6 +27,6 @@ This file provides guidance to agents when working with code in this repository.
     - **Collection Expressions**: Use `[1, 2, 3]` instead of `new int[] { 1, 2, 3 }` in all test code.
 
 ## Critical Patterns
-- **Finite Pipelines**: ML tasks implement return-value `IPipeline<TInput, TOutput>`. Implement `IPreallocatingPipeline<TInput, TOutput>` only when output storage can be derived synchronously from metadata and execution can write a compatible destination.
+- **Finite Pipelines**: ML tasks implement return-value `IPipeline<TInput, TOutput>`. Implement `IDestinationPipeline<TInput, TOutput>` when execution can write into a caller-supplied destination buffer.
 - **DI Fluent API**: Start with `AddPipeline<TInput>()`, append typed pipelines with `Then<TOutput, TPipeline>()`, and use decorators to wrap the remainder of a chain.
 - **Batch Policies**: Ordering, partitioning, routing, and scheduling compose around finite pipelines through indexed-batch operations.
