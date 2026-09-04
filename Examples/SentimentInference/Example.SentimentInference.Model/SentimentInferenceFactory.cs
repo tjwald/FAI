@@ -59,11 +59,6 @@ public static class SentimentInferenceFactory
                 .Then<Tensor<long>[], TextTensorization>()
                 .Then<TensorOutputs<float>, ConfiguredOnnxModelPipeline>()
                 .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
-                .WithOutputAllocation((input, out output) =>
-                {
-                    output = new ClassificationResult<bool, float>[input.Length];
-                    return true;
-                })
                 .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();

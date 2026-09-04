@@ -20,28 +20,18 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IPreallocatingPipeli
         _scheduler = scheduler ?? new SerialPartitionScheduler();
     }
 
-    public bool TryAllocateOutput(TInput input, out TOutput output)
-    {
-        if (_preallocatingInner is not null && _preallocatingInner.TryAllocateOutput(input, out TOutput? allocated))
-        {
-            output = allocated;
-            return true;
-        }
-
-        output = default!;
-        return false;
-    }
-
     public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
     {
-        if (TryAllocateOutput(input, out TOutput? output))
+        if (_inputBatch.Count(input) == 0)
         {
-            try { await ExecuteAsync(input, output, cancellationToken); return output; }
-            catch { await PipelineOutputDisposer.DisposeAsync(output); throw; }
+            return await _inner.ExecuteAsync(input, cancellationToken);
         }
 
         Range[] ranges = [.. _partitioner.Partition(input)];
-        if (ranges.Length == 0) throw new InvalidOperationException("Partitioning an empty batch requires preallocation support.");
+        if (ranges.Length == 0)
+        {
+            return await _inner.ExecuteAsync(input, cancellationToken);
+        }
 
         var partitionOutputs = new TOutput[ranges.Length];
         try

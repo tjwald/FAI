@@ -21,19 +21,11 @@ public sealed class TextMultipleChoicePipeline :
         _options = options;
     }
 
-    public bool TryAllocateOutput(
-        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
-        out Memory<ChoiceResult<TokenizedText>> output)
-    {
-        output = new ChoiceResult<TokenizedText>[input.Length];
-        return true;
-    }
-
     public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         CancellationToken cancellationToken = default)
     {
-        _ = TryAllocateOutput(input, out Memory<ChoiceResult<TokenizedText>> output);
+        Memory<ChoiceResult<TokenizedText>> output = new ChoiceResult<TokenizedText>[input.Length];
         await ExecuteAsync(input, output, cancellationToken);
         return output;
     }

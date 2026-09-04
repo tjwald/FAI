@@ -26,11 +26,6 @@ public class PipelineConfigurationIntegrationTests
             .Then(sp =>
                 sp.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>())
             .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
-            .WithOutputAllocation((input, out output) =>
-            {
-                output = new ClassificationResult<bool, float>[input.Length];
-                return true;
-            })
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();

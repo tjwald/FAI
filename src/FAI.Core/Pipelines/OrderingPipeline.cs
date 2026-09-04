@@ -18,18 +18,6 @@ public sealed class OrderingPipeline<TInput, TOutput> : IPreallocatingPipeline<T
         _outputBatch = outputBatch;
     }
 
-    public bool TryAllocateOutput(TInput input, out TOutput output)
-    {
-        if (_preallocatingInner is not null && _preallocatingInner.TryAllocateOutput(input, out TOutput? allocated))
-        {
-            output = allocated;
-            return true;
-        }
-
-        output = default!;
-        return false;
-    }
-
     public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
     {
         int[] sortedToOriginal = _ordering.CreateOrder(input);

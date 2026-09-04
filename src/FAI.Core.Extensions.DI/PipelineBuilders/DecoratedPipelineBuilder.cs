@@ -37,9 +37,6 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
     public DecoratedPipelineBuilder<TStart, TBoundary, TCurrent> Use(IForwardPipelineDecorator<TBoundary> decorator)
         => new(_services, _buildPrefix, _buildSuffix, [.. _decorators, decorator], _suffixIsEmpty);
 
-    public DecoratedPipelineBuilder<TStart, TBoundary, TCurrent> WithOutputAllocation(TryAllocatePipelineOutput<TBoundary, TCurrent> tryAllocateOutput)
-        => new(_services, _buildPrefix, serviceProvider => PipelineChain.Create(new PreallocatingPipeline<TBoundary, TCurrent>(_buildSuffix(serviceProvider), tryAllocateOutput)), _decorators, false);
-
     public IServiceCollection Build(string? key = null)
     {
         if (key is null) _services.AddSingleton<IPipeline<TStart, TCurrent>>(BuildPipeline);

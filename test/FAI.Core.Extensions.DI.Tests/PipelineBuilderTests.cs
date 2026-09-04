@@ -95,7 +95,7 @@ public sealed class PipelinePipelineBuilderTests
     }
 
     [Fact]
-    public async Task UsePartitioning_PreallocatesFullOutputOnceAndWritesSlices()
+    public async Task UsePartitioning_WritesSlicesIntoCallerOutput()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IBatchPartitioner<ReadOnlyMemory<int>>>(new FixedMemoryPartitioner(2));
@@ -110,16 +110,17 @@ public sealed class PipelinePipelineBuilderTests
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IPipeline<ReadOnlyMemory<int>, Memory<long>> pipeline =
             serviceProvider.GetRequiredService<IPipeline<ReadOnlyMemory<int>, Memory<long>>>();
+        var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<long>>>(pipeline);
 
-        Memory<long> output = await pipeline.ExecuteAsync(
+        Memory<long> output = new long[5];
+        await preallocatingPipeline.ExecuteAsync(
             new[] { 1, 2, 3, 4, 5 },
+            output,
             TestContext.Current.CancellationToken);
         PartitionedLongPipeline inner = serviceProvider.GetRequiredService<PartitionedLongPipeline>();
 
         Assert.Equal([1L, 2L, 3L, 4L, 5L], output.ToArray());
         Assert.Equal([1, 2, 2], inner.BatchSizes.Order());
-        Assert.Equal(1, inner.AllocationCount);
-        Assert.Equal(5, inner.AllocatedLengths.Single());
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public sealed class PipelinePipelineBuilderTests
     }
 
     [Fact]
-    public async Task Then_EndpointAllocatorWritesThroughTypeChangingNestedPipeline()
+    public async Task Then_DestinationExecutionWritesThroughTypeChangingNestedPipeline()
     {
         var services = new ServiceCollection();
 
@@ -176,19 +177,14 @@ public sealed class PipelinePipelineBuilderTests
             .AddPipeline<int[]>()
             .Then(nested => nested
                     .Then<long[], ToLongPipeline>()
-                    .Then<string[], PreallocatingToStringPipeline>()
-                    .WithOutputAllocation((input, out output) =>
-                    {
-                        output = new string[input.Length];
-                        return true;
-                    }))
+                    .Then<string[], PreallocatingToStringPipeline>())
             .Build();
 
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
         var preallocatingPipeline = Assert.IsAssignableFrom<IPreallocatingPipeline<int[], string[]>>(pipeline);
 
-        Assert.True(preallocatingPipeline.TryAllocateOutput([7, 42], out string[]? output));
+        string[] output = new string[2];
         await preallocatingPipeline.ExecuteAsync([7, 42], output, TestContext.Current.CancellationToken);
 
         Assert.Equal(["7", "42"], output);
@@ -229,15 +225,9 @@ public sealed class PipelinePipelineBuilderTests
 
     private sealed class PreallocatingToStringPipeline : IPreallocatingPipeline<long[], string[]>
     {
-        public bool TryAllocateOutput(long[] input, out string[] output)
-        {
-            output = new string[input.Length];
-            return true;
-        }
-
         public async ValueTask<string[]> ExecuteAsync(long[] input, CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out string[] output);
+            string[] output = new string[input.Length];
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }
@@ -309,27 +299,11 @@ public sealed class PipelinePipelineBuilderTests
 
         public List<int> BatchSizes { get; } = [];
 
-        public List<int> AllocatedLengths { get; } = [];
-
-        public int AllocationCount { get; private set; }
-
-        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<long> output)
-        {
-            lock (_lock)
-            {
-                AllocationCount++;
-                AllocatedLengths.Add(input.Length);
-            }
-
-            output = new long[input.Length];
-            return true;
-        }
-
         public async ValueTask<Memory<long>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Memory<long> output);
+            Memory<long> output = new long[input.Length];
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }

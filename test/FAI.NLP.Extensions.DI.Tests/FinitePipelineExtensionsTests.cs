@@ -103,17 +103,11 @@ public class FinitePipelineExtensionsTests
         public List<int> ObservedTokenCounts { get; } = [];
         public List<int> BatchSizes { get; } = [];
 
-        public bool TryAllocateOutput(ReadOnlyMemory<TestTokenizable> input, out Memory<int> output)
-        {
-            output = new int[input.Length];
-            return true;
-        }
-
         public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<TestTokenizable> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Memory<int> output);
+            Memory<int> output = new int[input.Length];
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }

@@ -13,15 +13,13 @@ public interface IPipeline<in TInput, TOutput>
 
 `TInput` and `TOutput` may each represent a complete batch, tensor bundle, or runtime-owned model result. A returned value belongs to the caller. During composition, the chain owns intermediate values and disposes an `IAsyncDisposable` or `IDisposable` intermediate only after the complete downstream asynchronous operation finishes.
 
-## Conditional preallocation
+## Destination execution
 
-Preallocation is an optional capability, not the base execution contract.
+Destination execution is an optional capability, not the base execution contract.
 
 ```csharp
 public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
 {
-    bool TryAllocateOutput(TInput input, out TOutput output);
-
     ValueTask ExecuteAsync(
         TInput input,
         TOutput output,
@@ -29,9 +27,7 @@ public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, 
 }
 ```
 
-Interface presence means a pipeline understands destination execution. `TryAllocateOutput` determines whether metadata is sufficient for a particular input. It returns storage only and must not perform inference, tokenization, I/O, probing, or substantive work that execution would repeat. It must not encode hidden execution state into the destination.
-
-A supplied compatible destination remains valid for `ExecuteAsync(input, output)` even when `TryAllocateOutput(input, out _)` returns `false`. Invalid metadata and allocation failures throw; `false` means only that this invocation cannot be preallocated from available metadata.
+Interface presence means a pipeline understands destination execution. When a caller or decorator supplies an allocated destination buffer (e.g., sliced from a contiguous output buffer or pooled), `ExecuteAsync(input, output)` writes results directly into that buffer without intermediate heap allocations.
 
 ## Composition
 
@@ -47,15 +43,8 @@ services
     .Then<TensorOutputs<float>>(services =>
         services.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>() )
     .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
-    .WithOutputAllocation((input, out output) =>
-    {
-        output = new ClassificationResult<bool, float>[input.Length];
-        return true;
-    })
     .Build();
 ```
-
-Nested `Then` is an ordinary typed pipeline and needs no allocator for normal return-value execution. A type-changing pipeline may optionally declare a synchronous endpoint allocator with `WithOutputAllocation` when its final component supports destination execution but cannot derive final storage directly from the pipeline's starting input. The allocator follows the same storage-only Try contract and lets partition decorators preallocate one complete output.
 
 `Use` wraps the complete remainder of the chain. Decorators execute in declaration order. To limit a decorator's scope, create that scope with nested `Then(pipeline => pipeline.Use(...).Then(...))`.
 
@@ -76,19 +65,17 @@ The relevant operations are independent capabilities:
 
 Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing gathers non-contiguous inputs; its preallocated path writes route results into contiguous output slices and performs one final permutation, while its fallback scatters returned route outputs.
 
-## Partition preallocation
+## Partitioning execution
 
-Partitioning selects its strategy from three capabilities:
+When called via `ExecuteAsync(input, output)` with a caller-supplied destination, partitioning slices both the input and destination by matching ranges:
 
-1. The input operations support contiguous slicing.
-2. The output operations support matching destination slices.
-3. The inner pipeline implements `IPreallocatingPipeline<TInput, TOutput>` and can allocate for the full input.
+```csharp
+await _preallocatingInner.ExecuteAsync(partitionInput, _outputBatch.Slice(output, range), token);
+```
 
-When all are available, partitioning calls `TryAllocateOutput` once with the complete input, slices the input and destination by matching ranges, and schedules writes into disjoint output slices. It never allocates once per partition.
+When called via the return-value path `ExecuteAsync(input)`, partitioning executes the partitions through the inner pipeline, allocates an aggregate shaped from an actual partition result via `_outputBatch.AllocateLike(...)`, and scatters each partition result into place.
 
-If preallocation returns `false`, partitioning executes each partition through the ordinary return-value path, allocates an aggregate shaped from an actual partition result, and scatters each result into place.
-
-Structural capabilities are selected when generic decorators are configured and the inner step interface is cached when DI constructs the pipeline. Runtime checks cover per-input preallocation eligibility, cardinality, shape compatibility, ranges, cancellation, and disposal.
+Structural capabilities are selected when generic decorators are configured and the inner step interface is cached when DI constructs the pipeline. Runtime checks cover cardinality, shape compatibility, ranges, cancellation, and disposal.
 
 ## Runtime-owned model outputs
 

@@ -8,7 +8,7 @@ public static class PipelineChain
             : new PipelineChain<TInput, TOutput>(pipeline);
 }
 
-public sealed class PipelineChain<TInput, TOutput> : IPipelineChain<TInput, TOutput>
+public sealed class PipelineChain<TInput, TOutput> : IPipelineChain<TInput, TOutput>, IPreallocatingPipeline<TInput, TOutput>
 {
     private readonly IPipeline<TInput, TOutput> _pipeline;
 
@@ -21,6 +21,9 @@ public sealed class PipelineChain<TInput, TOutput> : IPipelineChain<TInput, TOut
 
     public ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
         => _pipeline.ExecuteAsync(input, cancellationToken);
+
+    public ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+        => ExecuteIntoAsync(input, output, cancellationToken);
 
     public ValueTask ExecuteIntoAsync(
         TInput input,

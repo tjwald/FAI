@@ -41,9 +41,9 @@ public sealed class IndexedPipelinePolicyTests
     }
 
     [Fact]
-    public async Task PartitioningPipeline_FallsBackWhenPreallocationIsUnavailableForInput()
+    public async Task PartitioningPipeline_FallsBackToReturnPathWhenInnerDoesNotSupportDestinationExecution()
     {
-        var inner = new ConditionalMemoryPipeline();
+        var inner = new ReturnOnlyMemoryPipeline();
         var pipeline = new PartitioningPipeline<ReadOnlyMemory<int>, Memory<int>>(
             inner,
             new FixedMemoryPartitioner(2),
@@ -54,9 +54,7 @@ public sealed class IndexedPipelinePolicyTests
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal(input, output.ToArray());
-        Assert.Equal(1, inner.PreallocationAttempts);
         Assert.Equal([2, 2, 1], inner.ExecutedBatchSizes);
-        Assert.Equal(0, inner.DestinationExecutions);
     }
 
     [Fact]
@@ -102,8 +100,6 @@ public sealed class IndexedPipelinePolicyTests
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([100, 20, 300, 40], output.ToArray());
-        Assert.Equal(0, even.AllocationCount);
-        Assert.Equal(0, odd.AllocationCount);
         Assert.Empty(even.DestinationBatchSizes);
         Assert.Empty(odd.DestinationBatchSizes);
     }
@@ -131,17 +127,11 @@ public sealed class IndexedPipelinePolicyTests
     {
         public List<int> BatchSizes { get; } = [];
 
-        public bool TryAllocateOutput(Tensor<float> input, out Tensor<float> output)
-        {
-            output = Tensor.CreateFromShape<float>(input.Lengths);
-            return true;
-        }
-
         public async ValueTask<Tensor<float>> ExecuteAsync(
             Tensor<float> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Tensor<float> output);
+            Tensor<float> output = Tensor.CreateFromShape<float>(input.Lengths);
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }
@@ -170,17 +160,11 @@ public sealed class IndexedPipelinePolicyTests
     {
         public int[] ObservedInput { get; private set; } = [];
 
-        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
-        {
-            output = new int[input.Length];
-            return true;
-        }
-
         public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Memory<int> output);
+            Memory<int> output = new int[input.Length];
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }
@@ -203,17 +187,11 @@ public sealed class IndexedPipelinePolicyTests
 
         public int MaximumConcurrency => _maximumConcurrency;
 
-        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
-        {
-            output = new int[input.Length];
-            return true;
-        }
-
         public async ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
             CancellationToken cancellationToken = default)
         {
-            _ = TryAllocateOutput(input, out Memory<int> output);
+            Memory<int> output = new int[input.Length];
             await ExecuteAsync(input, output, cancellationToken);
             return output;
         }
@@ -237,20 +215,9 @@ public sealed class IndexedPipelinePolicyTests
         }
     }
 
-    private sealed class ConditionalMemoryPipeline : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class ReturnOnlyMemoryPipeline : IPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
-        public int PreallocationAttempts { get; private set; }
-
-        public int DestinationExecutions { get; private set; }
-
         public List<int> ExecutedBatchSizes { get; } = [];
-
-        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
-        {
-            PreallocationAttempts++;
-            output = default;
-            return false;
-        }
 
         public ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,
@@ -258,16 +225,6 @@ public sealed class IndexedPipelinePolicyTests
         {
             ExecutedBatchSizes.Add(input.Length);
             return ValueTask.FromResult<Memory<int>>(input.ToArray());
-        }
-
-        public ValueTask ExecuteAsync(
-            ReadOnlyMemory<int> input,
-            Memory<int> output,
-            CancellationToken cancellationToken = default)
-        {
-            DestinationExecutions++;
-            input.CopyTo(output);
-            return ValueTask.CompletedTask;
         }
     }
 
@@ -307,16 +264,7 @@ public sealed class IndexedPipelinePolicyTests
 
     private sealed class MultiplyPipeline(int multiplier) : IPreallocatingPipeline<ReadOnlyMemory<int>, Memory<int>>
     {
-        public int AllocationCount { get; private set; }
-
         public List<int> DestinationBatchSizes { get; } = [];
-
-        public bool TryAllocateOutput(ReadOnlyMemory<int> input, out Memory<int> output)
-        {
-            AllocationCount++;
-            output = new int[input.Length];
-            return true;
-        }
 
         public ValueTask<Memory<int>> ExecuteAsync(
             ReadOnlyMemory<int> input,

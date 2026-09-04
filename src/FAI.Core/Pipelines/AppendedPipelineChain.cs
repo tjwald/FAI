@@ -1,6 +1,6 @@
 namespace FAI.Core.Pipelines;
 
-public sealed class AppendedPipelineChain<TInput, TMiddle, TOutput> : IPipelineChain<TInput, TOutput>
+public sealed class AppendedPipelineChain<TInput, TMiddle, TOutput> : IPipelineChain<TInput, TOutput>, IPreallocatingPipeline<TInput, TOutput>
 {
     private readonly IPipelineChain<TInput, TMiddle> _previous;
     private readonly IPipeline<TMiddle, TOutput> _pipeline;
@@ -19,6 +19,9 @@ public sealed class AppendedPipelineChain<TInput, TMiddle, TOutput> : IPipelineC
         try { return await _pipeline.ExecuteAsync(intermediate, cancellationToken); }
         finally { await PipelineOutputDisposer.DisposeAsync(intermediate); }
     }
+
+    public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
+        => await ExecuteIntoAsync(input, output, cancellationToken);
 
     public async ValueTask ExecuteIntoAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
     {

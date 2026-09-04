@@ -29,19 +29,11 @@ public sealed class ImageClassificationPipeline<TPixel, TClassification, TFloat>
         _options = options;
     }
 
-    public bool TryAllocateOutput(
-        ReadOnlyMemory<Image<TPixel>> input,
-        out Memory<ClassificationResult<TClassification, TFloat>> output)
-    {
-        output = new ClassificationResult<TClassification, TFloat>[input.Length];
-        return true;
-    }
-
     public async ValueTask<Memory<ClassificationResult<TClassification, TFloat>>> ExecuteAsync(
         ReadOnlyMemory<Image<TPixel>> input,
         CancellationToken cancellationToken = default)
     {
-        _ = TryAllocateOutput(input, out Memory<ClassificationResult<TClassification, TFloat>> output);
+        Memory<ClassificationResult<TClassification, TFloat>> output = new ClassificationResult<TClassification, TFloat>[input.Length];
         await ExecuteAsync(input, output, cancellationToken);
         return output;
     }

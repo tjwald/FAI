@@ -45,30 +45,17 @@ public sealed class ClassificationDecoding<TClassification> :
         _options = options;
     }
 
-    public bool TryAllocateOutput(
-        TensorOutputs<float> input,
-        out Memory<ClassificationResult<TClassification, float>> output)
-    {
-        if (input.Count == 0)
-        {
-            output = default;
-            return false;
-        }
-
-        int rowCount = checked((int)input.GetOutput(0).Lengths[0]);
-        output = new ClassificationResult<TClassification, float>[rowCount];
-        return true;
-    }
-
     public async ValueTask<Memory<ClassificationResult<TClassification, float>>> ExecuteAsync(
         TensorOutputs<float> input,
         CancellationToken cancellationToken = default)
     {
-        if (!TryAllocateOutput(input, out Memory<ClassificationResult<TClassification, float>> output))
+        if (input.Count == 0)
         {
             throw new InvalidOperationException("Classification requires at least one model output.");
         }
 
+        int rowCount = checked((int)input.GetOutput(0).Lengths[0]);
+        Memory<ClassificationResult<TClassification, float>> output = new ClassificationResult<TClassification, float>[rowCount];
         await ExecuteAsync(input, output, cancellationToken);
         return output;
     }

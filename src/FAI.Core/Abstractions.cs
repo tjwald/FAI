@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 // ReSharper disable once CheckNamespace
 namespace FAI.Core.Abstractions
 {
@@ -38,8 +36,6 @@ namespace FAI.Core.Pipelines
 
     public interface IPreallocatingPipeline<in TInput, TOutput> : IPipeline<TInput, TOutput>
     {
-        bool TryAllocateOutput(TInput input, [MaybeNullWhen(false)] out TOutput output);
-
         ValueTask ExecuteAsync(
             TInput input,
             TOutput output,

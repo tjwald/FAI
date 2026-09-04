@@ -30,9 +30,6 @@ public sealed class ComposedPipelineBuilder<TStart, TCurrent>
         return Then(pipeline.BuildChain);
     }
 
-    public ComposedPipelineBuilder<TStart, TCurrent> WithOutputAllocation(TryAllocatePipelineOutput<TStart, TCurrent> tryAllocateOutput)
-        => new(_services, serviceProvider => PipelineChain.Create(new PreallocatingPipeline<TStart, TCurrent>(_build(serviceProvider), tryAllocateOutput)));
-
     public DecoratedPipelineBuilder<TStart, TCurrent, TCurrent> Use(IForwardPipelineDecorator<TCurrent> decorator)
         => new(_services, _build, _ => PipelineChain.Create(new IdentityPipeline<TCurrent>()), [decorator], true);
 
