@@ -1,15 +1,5 @@
 namespace FAI.Core.Pipelines;
 
-public interface IBatchPartitioner<in TBatch>
-{
-    IEnumerable<Range> Partition(TBatch batch);
-}
-
-public interface IIndexOrdering<in TBatch>
-{
-    int[] CreateOrder(TBatch batch);
-}
-
 public sealed class PartitioningPipeline<TInput, TOutput>
     : IPreallocatingPipeline<TInput, TOutput>
 {

@@ -38,25 +38,6 @@ public static class IndexedBatchOperations
         => new($"No writable indexed batch operations are registered for '{batchType}'.");
 }
 
-public interface IReadOnlyIndexedBatch<TBatch>
-{
-    int Count(TBatch batch);
-
-    TBatch Slice(TBatch batch, Range range);
-
-    BatchLease<TBatch> Gather(TBatch source, ReadOnlySpan<int> indices);
-}
-
-public interface IWritableIndexedBatch<TBatch> : IReadOnlyIndexedBatch<TBatch>
-{
-
-    TBatch AllocateLike(TBatch template, int count);
-
-    void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
-
-    void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
-}
-
 public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>
 {
     public int Count(ReadOnlyMemory<T> batch) => batch.Length;

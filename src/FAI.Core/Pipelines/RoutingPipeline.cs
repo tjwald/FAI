@@ -4,11 +4,6 @@ public sealed record BatchRoute<TInput, TOutput>(
     IPipeline<TInput, TOutput> Target,
     int[] InputIndices);
 
-public interface IBatchRoutingStrategy<TInput, TOutput>
-{
-    List<BatchRoute<TInput, TOutput>> Route(TInput input);
-}
-
 public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TInput, TOutput>
 {
     private readonly IBatchRoutingStrategy<TInput, TOutput> _routingStrategy;

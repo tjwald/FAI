@@ -45,4 +45,55 @@ namespace FAI.Core.Pipelines
             TOutput output,
             CancellationToken cancellationToken = default);
     }
+
+    public interface IPipelineChain<TInput, TOutput> : IPipeline<TInput, TOutput>
+    {
+        bool CanWriteOutput { get; }
+
+        ValueTask ExecuteIntoAsync(
+            TInput input,
+            TOutput output,
+            CancellationToken cancellationToken = default);
+    }
+
+    public interface IReadOnlyIndexedBatch<TBatch>
+    {
+        int Count(TBatch batch);
+
+        TBatch Slice(TBatch batch, Range range);
+
+        BatchLease<TBatch> Gather(TBatch source, ReadOnlySpan<int> indices);
+    }
+
+    public interface IWritableIndexedBatch<TBatch> : IReadOnlyIndexedBatch<TBatch>
+    {
+        TBatch AllocateLike(TBatch template, int count);
+
+        void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
+
+        void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
+    }
+
+    public interface IBatchPartitioner<in TBatch>
+    {
+        IEnumerable<Range> Partition(TBatch batch);
+    }
+
+    public interface IIndexOrdering<in TBatch>
+    {
+        int[] CreateOrder(TBatch batch);
+    }
+
+    public interface IPartitionScheduler
+    {
+        ValueTask ExecuteAsync(
+            IEnumerable<Range> ranges,
+            Func<Range, CancellationToken, ValueTask> execute,
+            CancellationToken cancellationToken = default);
+    }
+
+    public interface IBatchRoutingStrategy<TInput, TOutput>
+    {
+        List<BatchRoute<TInput, TOutput>> Route(TInput input);
+    }
 }

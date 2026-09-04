@@ -2,16 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace FAI.Core.Pipelines;
 
-public interface IPipelineChain<TInput, TOutput> : IPipeline<TInput, TOutput>
-{
-    bool CanWriteOutput { get; }
-
-    ValueTask ExecuteIntoAsync(
-        TInput input,
-        TOutput output,
-        CancellationToken cancellationToken = default);
-}
-
 public static class PipelineChain
 {
     public static IPipelineChain<TInput, TOutput> Create<TInput, TOutput>(IPipeline<TInput, TOutput> pipeline)

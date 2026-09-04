@@ -2,14 +2,6 @@ using FAI.Core.Configurations;
 
 namespace FAI.Core.Pipelines;
 
-public interface IPartitionScheduler
-{
-    ValueTask ExecuteAsync(
-        IEnumerable<Range> ranges,
-        Func<Range, CancellationToken, ValueTask> execute,
-        CancellationToken cancellationToken = default);
-}
-
 public sealed class SerialPartitionScheduler : IPartitionScheduler
 {
     public async ValueTask ExecuteAsync(
