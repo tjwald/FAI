@@ -9,7 +9,7 @@ public sealed class PipelineBuilder<TInput>
     internal PipelineBuilder(IServiceCollection services) => _services = services;
 
     public DecoratedPipelineBuilder<TInput, TInput, TInput> Use(IForwardPipelineDecorator<TInput> decorator)
-        => new(_services, null, _ => PipelineChain.Create(new IdentityPipeline<TInput>()), [decorator], true);
+        => new(_services, null, _ => new IdentityPipeline<TInput>(), [decorator], true);
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput, TPipeline>() where TPipeline : class, IPipeline<TInput, TOutput>
     {
@@ -18,17 +18,17 @@ public sealed class PipelineBuilder<TInput>
     }
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<IServiceProvider, IPipeline<TInput, TOutput>> pipelineFactory)
-        => new(_services, serviceProvider => PipelineChain.Create(pipelineFactory(serviceProvider)));
+        => new(_services, pipelineFactory);
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<PipelineBuilder<TInput>, ComposedPipelineBuilder<TInput, TOutput>> buildPipeline)
     {
         ComposedPipelineBuilder<TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
-        return Then(pipeline.BuildChain);
+        return Then(pipeline.BuildPipeline);
     }
 
     public ComposedPipelineBuilder<TInput, TOutput> Then<TOutput>(Func<PipelineBuilder<TInput>, DecoratedPipelineBuilder<TInput, TInput, TOutput>> buildPipeline)
     {
         DecoratedPipelineBuilder<TInput, TInput, TOutput> pipeline = buildPipeline(new PipelineBuilder<TInput>(_services));
-        return Then(pipeline.BuildChain);
+        return Then(pipeline.BuildPipeline);
     }
 }

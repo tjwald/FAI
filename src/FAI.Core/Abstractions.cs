@@ -42,16 +42,6 @@ namespace FAI.Core.Pipelines
             CancellationToken cancellationToken = default);
     }
 
-    public interface IPipelineChain<TInput, TOutput> : IPipeline<TInput, TOutput>
-    {
-        bool CanWriteOutput { get; }
-
-        ValueTask ExecuteIntoAsync(
-            TInput input,
-            TOutput output,
-            CancellationToken cancellationToken = default);
-    }
-
     public interface IReadOnlyIndexedBatch<TBatch>
     {
         int Count(TBatch batch);

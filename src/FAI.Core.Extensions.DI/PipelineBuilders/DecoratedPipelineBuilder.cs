@@ -5,12 +5,12 @@ namespace FAI.Core.Extensions.DI;
 public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
 {
     private readonly IServiceCollection _services;
-    private readonly Func<IServiceProvider, IPipelineChain<TStart, TBoundary>>? _buildPrefix;
-    private readonly Func<IServiceProvider, IPipelineChain<TBoundary, TCurrent>> _buildSuffix;
+    private readonly Func<IServiceProvider, IPipeline<TStart, TBoundary>>? _buildPrefix;
+    private readonly Func<IServiceProvider, IPipeline<TBoundary, TCurrent>> _buildSuffix;
     private readonly IReadOnlyList<IForwardPipelineDecorator<TBoundary>> _decorators;
     private readonly bool _suffixIsEmpty;
 
-    internal DecoratedPipelineBuilder(IServiceCollection services, Func<IServiceProvider, IPipelineChain<TStart, TBoundary>>? buildPrefix, Func<IServiceProvider, IPipelineChain<TBoundary, TCurrent>> buildSuffix, IReadOnlyList<IForwardPipelineDecorator<TBoundary>> decorators, bool suffixIsEmpty)
+    internal DecoratedPipelineBuilder(IServiceCollection services, Func<IServiceProvider, IPipeline<TStart, TBoundary>>? buildPrefix, Func<IServiceProvider, IPipeline<TBoundary, TCurrent>> buildSuffix, IReadOnlyList<IForwardPipelineDecorator<TBoundary>> decorators, bool suffixIsEmpty)
         => (_services, _buildPrefix, _buildSuffix, _decorators, _suffixIsEmpty) = (services, buildPrefix, buildSuffix, decorators, suffixIsEmpty);
 
     public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext, TPipeline>() where TPipeline : class, IPipeline<TCurrent, TNext>
@@ -25,13 +25,13 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
     public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, ComposedPipelineBuilder<TCurrent, TNext>> buildPipeline)
     {
         ComposedPipelineBuilder<TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
-        return Then(pipeline.BuildChain);
+        return Then(pipeline.BuildPipeline);
     }
 
     public DecoratedPipelineBuilder<TStart, TBoundary, TNext> Then<TNext>(Func<PipelineBuilder<TCurrent>, DecoratedPipelineBuilder<TCurrent, TCurrent, TNext>> buildPipeline)
     {
         DecoratedPipelineBuilder<TCurrent, TCurrent, TNext> pipeline = buildPipeline(new PipelineBuilder<TCurrent>(_services));
-        return Then(pipeline.BuildChain);
+        return Then(pipeline.BuildPipeline);
     }
 
     public DecoratedPipelineBuilder<TStart, TBoundary, TCurrent> Use(IForwardPipelineDecorator<TBoundary> decorator)
@@ -39,20 +39,18 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
 
     public IServiceCollection Build(string? key = null)
     {
-        if (key is null) _services.AddSingleton<IPipeline<TStart, TCurrent>>(BuildPipeline);
-        else _services.AddKeyedSingleton<IPipeline<TStart, TCurrent>>(key, (serviceProvider, _) => BuildPipeline(serviceProvider));
+        if (key is null) _services.AddSingleton(BuildPipeline);
+        else _services.AddKeyedSingleton(key, (serviceProvider, _) => BuildPipeline(serviceProvider));
         return _services;
     }
 
-    internal IPipelineChain<TStart, TCurrent> BuildChain(IServiceProvider serviceProvider)
+    internal IPipeline<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider)
     {
         IPipeline<TBoundary, TCurrent> suffix = BuildDecoratedSuffix(serviceProvider);
         return _buildPrefix is null
-            ? (IPipelineChain<TStart, TCurrent>)(object)PipelineChain.Create(suffix)
-            : new AppendedPipelineChain<TStart, TBoundary, TCurrent>(_buildPrefix(serviceProvider), suffix);
+            ? (IPipeline<TStart, TCurrent>)(object)suffix
+            : AppendedPipeline.Create(_buildPrefix(serviceProvider), suffix);
     }
-
-    private IPipelineChain<TStart, TCurrent> BuildPipeline(IServiceProvider serviceProvider) => BuildChain(serviceProvider);
 
     private IPipeline<TBoundary, TCurrent> BuildDecoratedSuffix(IServiceProvider serviceProvider)
     {
@@ -61,11 +59,11 @@ public sealed class DecoratedPipelineBuilder<TStart, TBoundary, TCurrent>
         return suffix;
     }
 
-    private IPipelineChain<TBoundary, TNext> Append<TNext>(IServiceProvider serviceProvider, Func<IServiceProvider, IPipeline<TCurrent, TNext>> pipelineFactory)
+    private IPipeline<TBoundary, TNext> Append<TNext>(IServiceProvider serviceProvider, Func<IServiceProvider, IPipeline<TCurrent, TNext>> pipelineFactory)
     {
         IPipeline<TCurrent, TNext> pipeline = pipelineFactory(serviceProvider);
         return _suffixIsEmpty
-            ? (IPipelineChain<TBoundary, TNext>)(object)PipelineChain.Create(pipeline)
-            : new AppendedPipelineChain<TBoundary, TCurrent, TNext>(_buildSuffix(serviceProvider), pipeline);
+            ? (IPipeline<TBoundary, TNext>)(object)pipeline
+            : AppendedPipeline.Create(_buildSuffix(serviceProvider), pipeline);
     }
 }
