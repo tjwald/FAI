@@ -47,17 +47,14 @@ public interface IReadOnlyIndexedBatch<TBatch>
     BatchLease<TBatch> Gather(TBatch source, ReadOnlySpan<int> indices);
 }
 
-public interface IWritableIndexedBatch<TBatch>
+public interface IWritableIndexedBatch<TBatch> : IReadOnlyIndexedBatch<TBatch>
 {
-    int Count(TBatch batch);
-
-    TBatch Slice(TBatch batch, Range range);
 
     TBatch AllocateLike(TBatch template, int count);
 
     void Scatter(TBatch source, TBatch destination, ReadOnlySpan<int> destinationIndices);
 
-    void PermuteInPlace(TBatch batch, Span<int> sourceToDestinationIndices);
+    void PermuteInPlace(TBatch batch, ReadOnlySpan<int> sourceToDestinationIndices);
 }
 
 public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>
@@ -87,6 +84,20 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
 
     public Memory<T> Slice(Memory<T> batch, Range range) => batch[range];
 
+    public BatchLease<Memory<T>> Gather(Memory<T> source, ReadOnlySpan<int> indices)
+    {
+        T[] buffer = ArrayPool<T>.Shared.Rent(indices.Length);
+        ReadOnlySpan<T> sourceSpan = source.Span;
+        for (int i = 0; i < indices.Length; i++)
+        {
+            buffer[i] = sourceSpan[indices[i]];
+        }
+
+        return new BatchLease<Memory<T>>(
+            buffer.AsMemory(0, indices.Length),
+            _ => ArrayPool<T>.Shared.Return(buffer, RuntimeHelpers.IsReferenceOrContainsReferences<T>()));
+    }
+
     public Memory<T> AllocateLike(Memory<T> template, int count) => new T[count];
 
     public void Scatter(Memory<T> source, Memory<T> destination, ReadOnlySpan<int> destinationIndices)
@@ -99,7 +110,7 @@ public sealed class MemoryBatchOperations<T> : IWritableIndexedBatch<Memory<T>>
         }
     }
 
-    public void PermuteInPlace(Memory<T> batch, Span<int> sourceToDestinationIndices)
+    public void PermuteInPlace(Memory<T> batch, ReadOnlySpan<int> sourceToDestinationIndices)
     {
         T[] copy = ArrayPool<T>.Shared.Rent(batch.Length);
         try

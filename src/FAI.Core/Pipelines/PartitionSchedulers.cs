@@ -27,13 +27,11 @@ public sealed class SerialPartitionScheduler : IPartitionScheduler
 
 public sealed class ParallelPartitionScheduler : IPartitionScheduler
 {
-    private readonly ParallelOptions _parallelOptions;
+    private readonly int? _maxConcurrency;
 
     public ParallelPartitionScheduler(ParallelPartitionSchedulerOptions options)
     {
-        _parallelOptions = options.MaxConcurrency.HasValue
-            ? new ParallelOptions { MaxDegreeOfParallelism = options.MaxConcurrency.Value }
-            : new ParallelOptions();
+        _maxConcurrency = options.MaxConcurrency;
     }
 
     public async ValueTask ExecuteAsync(
@@ -41,10 +39,14 @@ public sealed class ParallelPartitionScheduler : IPartitionScheduler
         Func<Range, CancellationToken, ValueTask> execute,
         CancellationToken cancellationToken = default)
     {
-        _parallelOptions.CancellationToken = cancellationToken;
+        var parallelOptions = new ParallelOptions
+        {
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = _maxConcurrency ?? -1,
+        };
         await Parallel.ForEachAsync(
             ranges,
-            _parallelOptions,
+            parallelOptions,
             async (range, token) => await execute(range, token));
     }
 }
