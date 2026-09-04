@@ -10,16 +10,8 @@ namespace FAI.Onnx;
 
 public static class OnnxPipelineBuilderExtensions
 {
-    public static ComposedPipelineBuilder<Tensor<long>[], TensorOutputs<float>> ThenOnnxModel(
-        this PipelineBuilder<Tensor<long>[]> builder)
-        => builder.Then(ResolveOnnxModelPipeline);
-
-    public static ComposedPipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
-        this ComposedPipelineBuilder<TStart, Tensor<long>[]> builder)
-        => builder.Then(ResolveOnnxModelPipeline);
-
-    public static DecoratedPipelineBuilder<TStart, TBoundary, TensorOutputs<float>> ThenOnnxModel<TStart, TBoundary>(
-        this DecoratedPipelineBuilder<TStart, TBoundary, Tensor<long>[]> builder)
+    public static PipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
+        this PipelineBuilder<TStart, Tensor<long>[]> builder)
         => builder.Then(ResolveOnnxModelPipeline);
 
     private static IPipeline<Tensor<long>[], TensorOutputs<float>> ResolveOnnxModelPipeline(IServiceProvider serviceProvider)

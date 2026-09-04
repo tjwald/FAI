@@ -4,9 +4,9 @@ public static class FaiBuilderExtensions
 {
     extension(IServiceCollection services)
     {
-        public PipelineBuilder<TInput> AddPipeline<TInput>()
+        public PipelineBuilder<TInput, TInput> AddPipeline<TInput>()
         {
-            return new PipelineBuilder<TInput>(services);
+            return new PipelineBuilder<TInput, TInput>(services, new InitialStage<TInput>());
         }
     }
 }

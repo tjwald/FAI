@@ -9,23 +9,13 @@ namespace FAI.NLP.Extensions.DI;
 
 public static class BatchExecutorExtensions
 {
-    extension<TStart, TInput>(ComposedPipelineBuilder<TStart, ReadOnlyMemory<TInput>> pipeline)
+    extension<TStart, TInput>(PipelineBuilder<TStart, ReadOnlyMemory<TInput>> pipeline)
         where TInput : ITokenizable
     {
-        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseTokenCountOrdering()
+        public PipelineBuilder<TStart, ReadOnlyMemory<TInput>> UseTokenCountOrdering()
             => pipeline.Use(new TokenCountOrderingDecorator<TInput>());
 
-        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseMaxPaddedTokensPartitioning()
-            => pipeline.Use(new MaxPaddedTokensPartitioningDecorator<TInput>());
-    }
-
-    extension<TStart, TInput>(DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> pipeline)
-        where TInput : ITokenizable
-    {
-        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseTokenCountOrdering()
-            => pipeline.Use(new TokenCountOrderingDecorator<TInput>());
-
-        public DecoratedPipelineBuilder<TStart, ReadOnlyMemory<TInput>, ReadOnlyMemory<TInput>> UseMaxPaddedTokensPartitioning()
+        public PipelineBuilder<TStart, ReadOnlyMemory<TInput>> UseMaxPaddedTokensPartitioning()
             => pipeline.Use(new MaxPaddedTokensPartitioningDecorator<TInput>());
     }
 
