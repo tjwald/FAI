@@ -97,6 +97,6 @@ internal record EvaluationSummary(int SampleSize, int Correct)
 
     public override string ToString()
     {
-        return $"{Correct}/{SampleSize}={Accuracy:%}";
+        return $"{Correct}/{SampleSize}={Accuracy:P2}";
     }
 }

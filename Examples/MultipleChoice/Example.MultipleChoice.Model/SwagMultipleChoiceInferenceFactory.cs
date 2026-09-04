@@ -29,7 +29,7 @@ public static class SwagMultipleChoiceInferenceFactory
             localServices.AddSingleton<IPartitionScheduler>(sp =>
                 new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
 
-            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(_ => new OnnxModelExecutorOptions()
+            localServices.AddSingleton(_ => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
@@ -45,6 +45,7 @@ public static class SwagMultipleChoiceInferenceFactory
                     onnxOptions.ModelDir = options.ModelDir;
                 })
             );
+            localServices.AddSingleton<IModelExecutorOptions>(sp => sp.GetRequiredService<OnnxModelExecutorOptions>());
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddSingleton<ConfiguredOnnxModelPipeline>();
             localServices.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(serviceProvider =>

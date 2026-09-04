@@ -24,7 +24,7 @@ public static class SentimentInferenceFactory
     {
         return services.AddLocalServices(localServices =>
         {
-            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(sp => new OnnxModelExecutorOptions()
+            localServices.AddSingleton(sp => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
@@ -40,6 +40,7 @@ public static class SentimentInferenceFactory
                     onnxOptions.ModelDir = options.ModelDir;
                 })
             );
+            localServices.AddSingleton<IModelExecutorOptions>(sp => sp.GetRequiredService<OnnxModelExecutorOptions>());
 
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification");
