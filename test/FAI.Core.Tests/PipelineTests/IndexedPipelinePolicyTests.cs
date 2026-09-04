@@ -94,8 +94,7 @@ public sealed class IndexedPipelinePolicyTests
         var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
-            new MemoryBatchOperations<int>(),
-            input => new int[input.Length]);
+            new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4];
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
@@ -105,14 +104,32 @@ public sealed class IndexedPipelinePolicyTests
     }
 
     [Fact]
+    public async Task RoutingPipeline_WritesDirectlyIntoCallerDestination()
+    {
+        var even = new MultiplyPipeline(10);
+        var odd = new MultiplyPipeline(100);
+        var routing = new ParityRoutingStrategy(even, odd);
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+        Memory<int> destination = new int[4];
+        await pipeline.ExecuteAsync(input, destination, TestContext.Current.CancellationToken);
+
+        Assert.Equal([100, 20, 300, 40], destination.ToArray());
+        Assert.Equal([2], even.DestinationBatchSizes);
+        Assert.Equal([2], odd.DestinationBatchSizes);
+    }
+
+    [Fact]
     public async Task RoutingPipeline_FallsBackToScatteringReturnedOutputs()
     {
         var routing = new ParityRoutingStrategy(new ReturningMultiplyPipeline(10), new ReturningMultiplyPipeline(100));
         var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
             routing,
             new ReadOnlyMemoryBatchOperations<int>(),
-            new MemoryBatchOperations<int>(),
-            input => new int[input.Length]);
+            new MemoryBatchOperations<int>());
         int[] input = [1, 2, 3, 4];
 
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);

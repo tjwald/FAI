@@ -63,19 +63,28 @@ The relevant operations are independent capabilities:
 - Scattering
 - Permutation
 
-Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing gathers non-contiguous inputs; its preallocated path writes route results into contiguous output slices and performs one final permutation, while its fallback scatters returned route outputs.
+Ordering requires indexed gathering and output permutation. Partitioning requires contiguous input slicing. Routing gathers non-contiguous inputs; its destination path writes route results into contiguous output slices and performs one final permutation, while its fallback scatters returned route outputs.
 
 ## Partitioning execution
 
-When called via `ExecuteAsync(input, output)` with a caller-supplied destination, partitioning slices both the input and destination by matching ranges:
+When called via `ExecuteAsync(input, destination)` with a caller-supplied destination, partitioning slices both the input and destination by matching ranges:
 
 ```csharp
-await _preallocatingInner.ExecuteAsync(partitionInput, _outputBatch.Slice(output, range), token);
+await _destinationInner.ExecuteAsync(partitionInput, _outputBatch.Slice(destination, range), token);
 ```
 
 When called via the return-value path `ExecuteAsync(input)`, partitioning executes the partitions through the inner pipeline, allocates an aggregate shaped from an actual partition result via `_outputBatch.AllocateLike(...)`, and scatters each partition result into place.
 
 Structural capabilities are selected when generic decorators are configured and the inner step interface is cached when DI constructs the pipeline. Runtime checks cover cardinality, shape compatibility, ranges, cancellation, and disposal.
+
+## Routing execution
+
+Routing groups non-contiguous input indices by target. When writing into a destination buffer:
+1. Each target writes into its assigned contiguous slice of the destination buffer.
+2. If a target implements `IDestinationPipeline`, it writes directly into that slice with zero intermediate allocation.
+3. Once all routes complete, `PermuteInPlace` restores elements to their original batch positions in a single pass.
+
+When no destination buffer is provided, routing executes each target, allocates an aggregate output using `_outputBatch.AllocateLike(...)`, and scatters each target's results into their respective batch indices.
 
 ## Runtime-owned model outputs
 
