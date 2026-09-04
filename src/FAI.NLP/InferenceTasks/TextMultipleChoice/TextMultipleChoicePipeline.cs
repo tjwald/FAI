@@ -7,52 +7,29 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
-public sealed class TextMultipleChoicePipeline :
-    IDestinationPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Tensor<long>[]>
 {
-    private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
     private readonly TextMultipleChoiceOptions _options;
 
-    public TextMultipleChoicePipeline(
-        IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline,
-        TextMultipleChoiceOptions options)
+    public TextMultipleChoiceTensorization(TextMultipleChoiceOptions options)
     {
-        _modelPipeline = modelPipeline;
         _options = options;
     }
 
-    public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
+    public ValueTask<Tensor<long>[]> ExecuteAsync(
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         CancellationToken cancellationToken = default)
     {
-        Memory<ChoiceResult<TokenizedText>> output = new ChoiceResult<TokenizedText>[input.Length];
-        await ExecuteAsync(input, output, cancellationToken);
-        return output;
-    }
-
-    public async ValueTask ExecuteAsync(
-        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
-        Memory<ChoiceResult<TokenizedText>> destination,
-        CancellationToken cancellationToken = default)
-    {
-        if (input.Length != destination.Length)
-        {
-            throw new ArgumentException("Input and output batch sizes must match.", nameof(destination));
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
         if (input.IsEmpty)
         {
-            return;
+            throw new ArgumentException("Cannot encode an empty multiple choice batch.", nameof(input));
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        BatchTokenizedResult tokenized = Preprocess(input.Span);
-        Tensor<long>[] modelInput = tokenized.ToArray();
-        using TensorOutputs<float> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
-        Decode(input, modelOutput.GetOutput(0), destination);
+        return ValueTask.FromResult(Encode(input.Span));
     }
 
-    private BatchTokenizedResult Preprocess(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)
+    private Tensor<long>[] Encode(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)
     {
         int maxChoiceCount = 0;
         int maxTokenCount = 0;
@@ -90,7 +67,85 @@ public sealed class TextMultipleChoicePipeline :
         }
 
         nint[] shape = [input.Length, maxChoiceCount, maxTokenCount];
-        return new BatchTokenizedResult(tokens.Reshape(shape), mask.Reshape(shape));
+        return new BatchTokenizedResult(tokens.Reshape(shape), mask.Reshape(shape)).ToArray();
+    }
+}
+
+public sealed class TextMultipleChoiceDecoding :
+    IDestinationPipeline<(ReadOnlyMemory<TokenizedTextMultipleChoiceInput> Input, TensorOutputs<float> ModelOutputs), Memory<ChoiceResult<TokenizedText>>>
+{
+    private readonly TextMultipleChoiceOptions _options;
+
+    public TextMultipleChoiceDecoding(TextMultipleChoiceOptions options)
+    {
+        _options = options;
+    }
+
+    public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
+        (ReadOnlyMemory<TokenizedTextMultipleChoiceInput> Input, TensorOutputs<float> ModelOutputs) input,
+        CancellationToken cancellationToken = default)
+    {
+        if (input.ModelOutputs.Count == 0)
+        {
+            throw new InvalidOperationException("Multiple choice requires at least one model output.");
+        }
+
+        int rowCount = checked((int)input.ModelOutputs.GetOutput(0).Lengths[0]);
+        Memory<ChoiceResult<TokenizedText>> output = new ChoiceResult<TokenizedText>[rowCount];
+        await ExecuteAsync(input, output, cancellationToken);
+        return output;
+    }
+
+    public ValueTask ExecuteAsync(
+        (ReadOnlyMemory<TokenizedTextMultipleChoiceInput> Input, TensorOutputs<float> ModelOutputs) input,
+        Memory<ChoiceResult<TokenizedText>> destination,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (input.Input.Length != destination.Length)
+        {
+            throw new ArgumentException(
+                $"Input and output batch sizes must match. Input: {input.Input.Length}, Output: {destination.Length}.",
+                nameof(destination));
+        }
+
+        if (input.Input.IsEmpty)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        if (input.ModelOutputs.Count == 0)
+        {
+            throw new InvalidOperationException("Multiple choice requires at least one model output.");
+        }
+
+        ReadOnlyTensorSpan<float> tensor = input.ModelOutputs.GetOutput(0);
+        int rowCount = checked((int)tensor.Lengths[0]);
+        if (rowCount != destination.Length)
+        {
+            throw new ArgumentException(
+                $"The model produced {rowCount} result rows for an output batch of {destination.Length}.",
+                nameof(destination));
+        }
+
+        Decode(input.Input, tensor, destination);
+        return ValueTask.CompletedTask;
+    }
+
+    private void Decode(
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
+        ReadOnlyTensorSpan<float> tensor,
+        Memory<ChoiceResult<TokenizedText>> output)
+    {
+        int rowIndex = 0;
+        foreach (ReadOnlyTensorSpan<float> row in tensor.GetDimensionSpan(0))
+        {
+            int choiceCount = input.Span[rowIndex].Choices.Length;
+            output.Span[rowIndex] = GetMultipleChoiceResult(
+                input.Span[rowIndex],
+                row.AsSpan()[..choiceCount]);
+            rowIndex++;
+        }
     }
 
     private ChoiceResult<TokenizedText> GetMultipleChoiceResult(
@@ -107,27 +162,52 @@ public sealed class TextMultipleChoicePipeline :
             probabilities[choiceIndex],
             storedLogits);
     }
+}
 
-    private void Decode(
-        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
-        ReadOnlyTensorSpan<float> tensor,
-        Memory<ChoiceResult<TokenizedText>> output)
+[Obsolete("Use TextMultipleChoiceTensorization, ThenOnnxModel, and TextMultipleChoiceDecoding instead.")]
+public sealed class TextMultipleChoicePipeline :
+    IDestinationPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
+{
+    private readonly TextMultipleChoiceTensorization _tensorization;
+    private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
+    private readonly TextMultipleChoiceDecoding _decoding;
+
+    public TextMultipleChoicePipeline(
+        IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline,
+        TextMultipleChoiceOptions options)
     {
-        int rowCount = checked((int)tensor.Lengths[0]);
-        if (rowCount != input.Length)
+        _tensorization = new TextMultipleChoiceTensorization(options);
+        _modelPipeline = modelPipeline;
+        _decoding = new TextMultipleChoiceDecoding(options);
+    }
+
+    public async ValueTask<Memory<ChoiceResult<TokenizedText>>> ExecuteAsync(
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
+        CancellationToken cancellationToken = default)
+    {
+        Memory<ChoiceResult<TokenizedText>> output = new ChoiceResult<TokenizedText>[input.Length];
+        await ExecuteAsync(input, output, cancellationToken);
+        return output;
+    }
+
+    public async ValueTask ExecuteAsync(
+        ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
+        Memory<ChoiceResult<TokenizedText>> destination,
+        CancellationToken cancellationToken = default)
+    {
+        if (input.Length != destination.Length)
         {
-            throw new InvalidOperationException(
-                $"The model produced {rowCount} result rows for an input batch of {input.Length}.");
+            throw new ArgumentException("Input and output batch sizes must match.", nameof(destination));
         }
 
-        int rowIndex = 0;
-        foreach (ReadOnlyTensorSpan<float> row in tensor.GetDimensionSpan(0))
+        if (input.IsEmpty)
         {
-            int choiceCount = input.Span[rowIndex].Choices.Length;
-            output.Span[rowIndex] = GetMultipleChoiceResult(
-                input.Span[rowIndex],
-                row.AsSpan()[..choiceCount]);
-            rowIndex++;
+            return;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        Tensor<long>[] modelInput = await _tensorization.ExecuteAsync(input, cancellationToken);
+        using TensorOutputs<float> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
+        await _decoding.ExecuteAsync((input, modelOutput), destination, cancellationToken);
     }
 }

@@ -11,8 +11,8 @@ using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextClassification;
 using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
+using FAI.Onnx;
 using FAI.Onnx.Configuration;
-using FAI.Onnx.ModelExecutors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -49,7 +49,6 @@ public static class SentimentInferenceFactory
             localServices.AddConfigurationAndBind<ParallelPartitionSchedulerOptions>("SentimentInference:BatchExecutors:ParallelSchedular");
             localServices.AddSingleton<IPartitionScheduler>(sp =>
                 new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
-            localServices.AddSingleton<ConfiguredOnnxModelPipeline>();
             localServices.AddSingleton<ClassificationDecoding<bool>>();
 
             localServices
@@ -58,7 +57,7 @@ public static class SentimentInferenceFactory
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
                 .Then<Tensor<long>[], TextTensorization>()
-                .Then<TensorOutputs<float>, ConfiguredOnnxModelPipeline>()
+                .ThenOnnxModel()
                 .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
                 .Build();
 

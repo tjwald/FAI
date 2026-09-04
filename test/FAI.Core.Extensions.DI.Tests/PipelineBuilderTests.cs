@@ -211,6 +211,96 @@ public sealed class PipelinePipelineBuilderTests
         Assert.True(first.Output!.IsDisposed);
     }
 
+    [Fact]
+    public async Task Fork_SingleBranch_PairsInputWithOutput()
+    {
+        var services = new ServiceCollection();
+
+        services
+            .AddPipeline<int[]>()
+            .Fork(branch => branch
+                .Then<long[], ToLongPipeline>())
+            .Then<string[], FormatPairPipeline>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
+
+        string[] output = await pipeline.ExecuteAsync([3, 42], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["3:3", "42:42"], output);
+    }
+
+    [Fact]
+    public async Task Fork_TwoBranches_PairsBranchOutputs()
+    {
+        var services = new ServiceCollection();
+
+        services
+            .AddPipeline<int[]>()
+            .Fork(
+                branch1 => branch1.Then<long[], ToLongPipeline>(),
+                branch2 => branch2.Then<string[], IntsToStringPipeline>())
+            .Then<string[], FormatTwoBranchesPipeline>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<int[], string[]> pipeline = serviceProvider.GetRequiredService<IPipeline<int[], string[]>>();
+
+        string[] output = await pipeline.ExecuteAsync([3, 42], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["3:3", "42:42"], output);
+    }
+
+    [Fact]
+    public async Task Fork_DisposesDisposableBranchOutputAfterDownstreamCompletes()
+    {
+        var services = new ServiceCollection();
+
+        services
+            .AddPipeline<int>()
+            .Fork(branch => branch
+                .Then<DisposableValue, DisposableValuePipeline>())
+            .Then<int, CombineDisposablePipeline>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<int, int> pipeline = serviceProvider.GetRequiredService<IPipeline<int, int>>();
+        DisposableValuePipeline branchPipeline = serviceProvider.GetRequiredService<DisposableValuePipeline>();
+
+        int output = await pipeline.ExecuteAsync(21, TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, output);
+        Assert.True(branchPipeline.Output!.IsDisposed);
+    }
+
+    private sealed class FormatPairPipeline : IPipeline<(int[] Input, long[] Output), string[]>
+    {
+        public ValueTask<string[]> ExecuteAsync((int[] Input, long[] Output) input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Input.Zip(input.Output, (a, b) => $"{a}:{b}").ToArray());
+    }
+
+    private sealed class FormatTwoBranchesPipeline : IPipeline<(long[] Branch1, string[] Branch2), string[]>
+    {
+        public ValueTask<string[]> ExecuteAsync((long[] Branch1, string[] Branch2) input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Branch1.Zip(input.Branch2, (a, b) => $"{a}:{b}").ToArray());
+    }
+
+    private sealed class CombineDisposablePipeline : IPipeline<(int Input, DisposableValue Output), int>
+    {
+        public ValueTask<int> ExecuteAsync((int Input, DisposableValue Output) input, CancellationToken cancellationToken = default)
+        {
+            Assert.False(input.Output.IsDisposed);
+            return ValueTask.FromResult(input.Input + input.Output.Value);
+        }
+    }
+
+    private sealed class IntsToStringPipeline : IPipeline<int[], string[]>
+    {
+        public ValueTask<string[]> ExecuteAsync(int[] input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(input.Select(value => value.ToString()).ToArray());
+    }
+
     private sealed class ToLongPipeline : IPipeline<int[], long[]>
     {
         public ValueTask<long[]> ExecuteAsync(int[] input, CancellationToken cancellationToken = default)

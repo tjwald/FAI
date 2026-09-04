@@ -10,8 +10,8 @@ using FAI.NLP.Extensions.DI;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
+using FAI.Onnx;
 using FAI.Onnx.Configuration;
-using FAI.Onnx.ModelExecutors;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Example.MultipleChoice.Model;
@@ -47,16 +47,18 @@ public static class SwagMultipleChoiceInferenceFactory
             );
             localServices.AddSingleton<IModelExecutorOptions>(sp => sp.GetRequiredService<OnnxModelExecutorOptions>());
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
-            localServices.AddSingleton<ConfiguredOnnxModelPipeline>();
-            localServices.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(serviceProvider =>
-                serviceProvider.GetRequiredService<ConfiguredOnnxModelPipeline>());
+            localServices.AddSingleton<TextMultipleChoiceTensorization>();
+            localServices.AddSingleton<TextMultipleChoiceDecoding>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
                 .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
-                .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoicePipeline>()
+                .Fork(inner => inner
+                    .Then<Tensor<long>[], TextMultipleChoiceTensorization>()
+                    .ThenOnnxModel())
+                .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
                 .Build();
 
             localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();

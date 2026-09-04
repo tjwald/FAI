@@ -6,5 +6,25 @@ internal static class PipelineOutputDisposer
     {
         if (value is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
         else if (value is IDisposable disposable) disposable.Dispose();
+        else if (value is System.Runtime.CompilerServices.ITuple tuple)
+        {
+            Exception? firstException = null;
+            for (int i = 0; i < tuple.Length; i++)
+            {
+                try
+                {
+                    await DisposeAsync(tuple[i]);
+                }
+                catch (Exception ex)
+                {
+                    firstException ??= ex;
+                }
+            }
+
+            if (firstException is not null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(firstException).Throw();
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 using FAI.NLP.Pipelines;
+using FAI.Onnx;
 
 namespace FAI.IntegrationTests;
 
@@ -12,10 +13,15 @@ public class MultipleChoiceIntegrationTests
         services.AddSingleton(new TextMultipleChoiceOptions(MaxChoices: 2));
         services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
             new LogicalMockModelPipeline([[0.9f, 0.1f]]));
+        services.AddSingleton<TextMultipleChoiceTensorization>();
+        services.AddSingleton<TextMultipleChoiceDecoding>();
         services
             .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
             .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
-            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoicePipeline>()
+            .Fork(inner => inner
+                .Then<Tensor<long>[], TextMultipleChoiceTensorization>()
+                .ThenOnnxModel())
+            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
             .Build();
 
         await using ServiceProvider provider = services.BuildServiceProvider();
