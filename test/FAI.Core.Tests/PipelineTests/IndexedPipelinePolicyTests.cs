@@ -365,7 +365,7 @@ public sealed class IndexedPipelinePolicyTests
         IPipeline<ReadOnlyMemory<int>, Memory<int>> odd)
         : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
     {
-        public IReadOnlyList<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)
+        public List<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)
         {
             int[] evenIndices = Enumerable.Range(0, input.Length).Where(index => input.Span[index] % 2 == 0).ToArray();
             int[] oddIndices = Enumerable.Range(0, input.Length).Where(index => input.Span[index] % 2 != 0).ToArray();

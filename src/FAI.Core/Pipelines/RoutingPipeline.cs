@@ -6,7 +6,7 @@ public sealed record BatchRoute<TInput, TOutput>(
 
 public interface IBatchRoutingStrategy<TInput, TOutput>
 {
-    IReadOnlyList<BatchRoute<TInput, TOutput>> Route(TInput input);
+    List<BatchRoute<TInput, TOutput>> Route(TInput input);
 }
 
 public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TInput, TOutput>
@@ -27,9 +27,9 @@ public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TI
 
     public bool TryAllocateOutput(TInput input, out TOutput output)
     {
-        IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
-        if (routes.All(route => route.Target is IPreallocatingPipeline<TInput, TOutput>) &&
-            ((IPreallocatingPipeline<TInput, TOutput>)routes[0].Target).TryAllocateOutput(input, out TOutput? allocated))
+        List<BatchRoute<TInput, TOutput>> routes = _routingStrategy.Route(input);
+        if (routes.Count > 0 && routes[0].Target is IPreallocatingPipeline<TInput, TOutput> preallocatingPipeline &&
+            preallocatingPipeline.TryAllocateOutput(input, out TOutput? allocated))
         {
             output = allocated;
             return true;
@@ -55,7 +55,11 @@ public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TI
             }
         }
 
-        IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
+        List<BatchRoute<TInput, TOutput>> routes = _routingStrategy.Route(input);
+        if (routes.Count == 0)
+        {
+            throw new InvalidOperationException("Routing requires at least one route.");
+        }
         var routeOutputs = new TOutput[routes.Count];
         try
         {
@@ -97,7 +101,7 @@ public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TI
 
     public async ValueTask ExecuteAsync(TInput input, TOutput output, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<BatchRoute<TInput, TOutput>> routes = GetValidatedRoutes(input);
+        List<BatchRoute<TInput, TOutput>> routes = _routingStrategy.Route(input);
         if (_inputBatch.Count(input) != _outputBatch.Count(output))
         {
             throw new ArgumentException("Input and output batch counts must match.", nameof(output));
@@ -121,34 +125,4 @@ public sealed class RoutingPipeline<TInput, TOutput> : IPreallocatingPipeline<TI
         _outputBatch.PermuteInPlace(output, sourceToDestination);
     }
 
-    private IReadOnlyList<BatchRoute<TInput, TOutput>> GetValidatedRoutes(TInput input)
-    {
-        IReadOnlyList<BatchRoute<TInput, TOutput>> routes = _routingStrategy.Route(input);
-        int count = _inputBatch.Count(input);
-        if (count == 0 || routes.Count == 0)
-        {
-            throw new InvalidOperationException("Routing an empty batch requires an explicit output allocator.");
-        }
-
-        var seen = new bool[count];
-        foreach (BatchRoute<TInput, TOutput> route in routes)
-        {
-            foreach (int index in route.InputIndices)
-            {
-                if ((uint)index >= (uint)count || seen[index])
-                {
-                    throw new InvalidOperationException("Routes must contain each input index exactly once.");
-                }
-
-                seen[index] = true;
-            }
-        }
-
-        if (seen.Contains(false))
-        {
-            throw new InvalidOperationException("Routes must contain each input index exactly once.");
-        }
-
-        return routes;
-    }
 }
