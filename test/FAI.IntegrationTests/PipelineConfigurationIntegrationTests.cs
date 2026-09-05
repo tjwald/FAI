@@ -17,6 +17,7 @@ public class PipelineConfigurationIntegrationTests
         services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
             new LogicalMockModelPipeline([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecoding<bool>>();
+        services.AddMemoryBatch<ClassificationResult<bool, float>>();
         services
             .AddPipeline<ReadOnlyMemory<string>>()
             .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()

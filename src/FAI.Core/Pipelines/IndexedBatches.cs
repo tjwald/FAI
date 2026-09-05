@@ -3,39 +3,47 @@ using System.Runtime.CompilerServices;
 
 namespace FAI.Core.Pipelines;
 
-public static class IndexedBatchOperations
+public interface IIndexedBatchRegistry
 {
-    public static IWritableIndexedBatch<TBatch> GetWritable<TBatch>()
-        => WritableOperations<TBatch>.Instance;
+    IWritableIndexedBatch<TBatch> GetWritable<TBatch>();
 
-    private static class WritableOperations<TBatch>
+    IReadOnlyIndexedBatch<TBatch> GetReadOnly<TBatch>();
+}
+
+public sealed class IndexedBatchRegistry : IIndexedBatchRegistry
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public IndexedBatchRegistry(IServiceProvider serviceProvider)
     {
-        public static readonly IWritableIndexedBatch<TBatch> Instance = Create();
-
-        private static IWritableIndexedBatch<TBatch> Create()
-        {
-            Type batchType = typeof(TBatch);
-            if (!batchType.IsGenericType)
-            {
-                throw UnsupportedBatchType(batchType);
-            }
-
-            Type genericType = batchType.GetGenericTypeDefinition();
-            Type itemType = batchType.GetGenericArguments()[0];
-            Type? operationsType = genericType == typeof(Memory<>)
-                ? typeof(MemoryBatchOperations<>).MakeGenericType(itemType)
-                : genericType == typeof(System.Numerics.Tensors.Tensor<>)
-                    ? typeof(TensorBatchOperations<>).MakeGenericType(itemType)
-                    : null;
-
-            return operationsType is not null
-                ? (IWritableIndexedBatch<TBatch>)Activator.CreateInstance(operationsType)!
-                : throw UnsupportedBatchType(batchType);
-        }
+        _serviceProvider = serviceProvider;
     }
 
-    private static InvalidOperationException UnsupportedBatchType(Type batchType)
-        => new($"No writable indexed batch operations are registered for '{batchType}'.");
+    public IWritableIndexedBatch<TBatch> GetWritable<TBatch>()
+    {
+        var batch = (IWritableIndexedBatch<TBatch>?)_serviceProvider.GetService(typeof(IWritableIndexedBatch<TBatch>));
+        if (batch is not null)
+        {
+            return batch;
+        }
+
+        throw new InvalidOperationException(
+            $"No writable indexed batch operations are registered in the service collection for '{typeof(TBatch).Name}'. " +
+            $"Register them using services.AddBatchOperations<{typeof(TBatch).Name}, ...>() or services.AddMemoryBatch<T>().");
+    }
+
+    public IReadOnlyIndexedBatch<TBatch> GetReadOnly<TBatch>()
+    {
+        var batch = (IReadOnlyIndexedBatch<TBatch>?)_serviceProvider.GetService(typeof(IReadOnlyIndexedBatch<TBatch>));
+        if (batch is not null)
+        {
+            return batch;
+        }
+
+        throw new InvalidOperationException(
+            $"No read-only indexed batch operations are registered in the service collection for '{typeof(TBatch).Name}'. " +
+            $"Register them using services.AddBatchOperations<{typeof(TBatch).Name}, ...>() or services.AddReadOnlyMemoryBatch<T>().");
+    }
 }
 
 public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>

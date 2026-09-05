@@ -49,6 +49,7 @@ public static class SwagMultipleChoiceInferenceFactory
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
             localServices.AddSingleton<TextMultipleChoiceTensorization>();
             localServices.AddSingleton<TextMultipleChoiceDecoding>();
+            localServices.AddMemoryBatch<ChoiceResult<TokenizedText>>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()

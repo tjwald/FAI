@@ -50,6 +50,7 @@ public static class SentimentInferenceFactory
             localServices.AddSingleton<IPartitionScheduler>(sp =>
                 new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
             localServices.AddSingleton<ClassificationDecoding<bool>>();
+            localServices.AddMemoryBatch<ClassificationResult<bool, float>>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<string>>()

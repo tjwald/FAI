@@ -25,11 +25,15 @@ public static class BatchExecutorExtensions
         public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
             IServiceProvider serviceProvider,
             IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
-            => new OrderingPipeline<ReadOnlyMemory<TInput>, TOutput>(
+        {
+            var registry = serviceProvider.GetRequiredService<IIndexedBatchRegistry>();
+            return new OrderingPipeline<ReadOnlyMemory<TInput>, TOutput>(
                 pipeline,
                 new TokenCountOrdering<TInput>(serviceProvider.GetRequiredService<TokenCountOrderingOptions>()),
-                new ReadOnlyMemoryBatchOperations<TInput>(),
-                IndexedBatchOperations.GetWritable<TOutput>());
+                serviceProvider.GetService<IReadOnlyIndexedBatch<ReadOnlyMemory<TInput>>>()
+                    ?? new ReadOnlyMemoryBatchOperations<TInput>(),
+                registry.GetWritable<TOutput>());
+        }
     }
 
     private sealed class MaxPaddedTokensPartitioningDecorator<TInput> : IForwardPipelineDecorator<ReadOnlyMemory<TInput>>
@@ -38,12 +42,16 @@ public static class BatchExecutorExtensions
         public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
             IServiceProvider serviceProvider,
             IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
-            => new PartitioningPipeline<ReadOnlyMemory<TInput>, TOutput>(
+        {
+            var registry = serviceProvider.GetRequiredService<IIndexedBatchRegistry>();
+            return new PartitioningPipeline<ReadOnlyMemory<TInput>, TOutput>(
                 pipeline,
                 new MaxPaddedTokensPartitioner<TInput>(
                     serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
-                new ReadOnlyMemoryBatchOperations<TInput>(),
-                IndexedBatchOperations.GetWritable<TOutput>(),
+                serviceProvider.GetService<IReadOnlyIndexedBatch<ReadOnlyMemory<TInput>>>()
+                    ?? new ReadOnlyMemoryBatchOperations<TInput>(),
+                registry.GetWritable<TOutput>(),
                 serviceProvider.GetService<IPartitionScheduler>());
+        }
     }
 }

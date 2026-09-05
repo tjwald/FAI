@@ -371,7 +371,7 @@ public sealed class PipelinePipelineBuilderTests
                 pipeline,
                 serviceProvider.GetRequiredService<IBatchPartitioner<ReadOnlyMemory<T>>>(),
                 new ReadOnlyMemoryBatchOperations<T>(),
-                IndexedBatchOperations.GetWritable<TOutput>(),
+                serviceProvider.GetRequiredService<IIndexedBatchRegistry>().GetWritable<TOutput>(),
                 serviceProvider.GetService<IPartitionScheduler>());
     }
 
