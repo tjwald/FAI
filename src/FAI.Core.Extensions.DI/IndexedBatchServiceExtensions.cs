@@ -46,22 +46,4 @@ public static class IndexedBatchServiceExtensions
         services.TryAddSingleton<IReadOnlyIndexedBatch<System.Numerics.Tensors.Tensor<T>>>(sp => sp.GetRequiredService<TensorBatchOperations<T>>());
         return services;
     }
-
-    public static IServiceCollection AddDefaultIndexedBatches(this IServiceCollection services)
-    {
-        services.AddIndexedBatchRegistry();
-        services.AddMemoryBatch<int>();
-        services.AddMemoryBatch<long>();
-        services.AddMemoryBatch<float>();
-        services.AddMemoryBatch<double>();
-        services.AddMemoryBatch<string>();
-        services.AddMemoryBatch<bool>();
-        services.AddReadOnlyMemoryBatch<int>();
-        services.AddReadOnlyMemoryBatch<long>();
-        services.AddReadOnlyMemoryBatch<float>();
-        services.AddReadOnlyMemoryBatch<string>();
-        services.AddTensorBatch<float>();
-        services.AddTensorBatch<long>();
-        return services;
-    }
 }

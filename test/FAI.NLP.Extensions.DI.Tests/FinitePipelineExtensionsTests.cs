@@ -57,6 +57,7 @@ public class FinitePipelineExtensionsTests
         services.AddSingleton(CreateDummyTokenizer());
         services.AddSingleton(new TokenCountOrderingOptions(Ascending: true));
         services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 0.5, MaxTokenCount: 10));
+        services.AddMemoryBatch<int>();
         PipelineBuilder<ReadOnlyMemory<TestTokenizable>, ReadOnlyMemory<TestTokenizable>> pipeline = services
             .AddPipeline<ReadOnlyMemory<TestTokenizable>>()
             .Then<ReadOnlyMemory<TestTokenizable>, PassThroughPipeline>();

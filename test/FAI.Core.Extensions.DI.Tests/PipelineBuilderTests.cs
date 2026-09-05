@@ -99,6 +99,7 @@ public sealed class PipelinePipelineBuilderTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IBatchPartitioner<ReadOnlyMemory<int>>>(new FixedMemoryPartitioner(2));
+        services.AddMemoryBatch<long>();
 
         services
             .AddPipeline<ReadOnlyMemory<int>>()

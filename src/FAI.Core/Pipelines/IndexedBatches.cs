@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FAI.Core.Pipelines;
 
@@ -10,40 +11,19 @@ public interface IIndexedBatchRegistry
     IReadOnlyIndexedBatch<TBatch> GetReadOnly<TBatch>();
 }
 
-public sealed class IndexedBatchRegistry : IIndexedBatchRegistry
+public sealed class IndexedBatchRegistry(IServiceProvider serviceProvider) : IIndexedBatchRegistry
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public IndexedBatchRegistry(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
     public IWritableIndexedBatch<TBatch> GetWritable<TBatch>()
-    {
-        var batch = (IWritableIndexedBatch<TBatch>?)_serviceProvider.GetService(typeof(IWritableIndexedBatch<TBatch>));
-        if (batch is not null)
-        {
-            return batch;
-        }
-
-        throw new InvalidOperationException(
-            $"No writable indexed batch operations are registered in the service collection for '{typeof(TBatch).Name}'. " +
-            $"Register them using services.AddBatchOperations<{typeof(TBatch).Name}, ...>() or services.AddMemoryBatch<T>().");
-    }
+        => serviceProvider.GetService<IWritableIndexedBatch<TBatch>>()
+            ?? throw new InvalidOperationException(
+                $"No writable indexed batch operations are registered in the service collection for '{typeof(TBatch)}'. " +
+                $"Register them using services.AddBatchOperations<{typeof(TBatch)}, ...>() or services.AddMemoryBatch<T>().");
 
     public IReadOnlyIndexedBatch<TBatch> GetReadOnly<TBatch>()
-    {
-        var batch = (IReadOnlyIndexedBatch<TBatch>?)_serviceProvider.GetService(typeof(IReadOnlyIndexedBatch<TBatch>));
-        if (batch is not null)
-        {
-            return batch;
-        }
-
-        throw new InvalidOperationException(
-            $"No read-only indexed batch operations are registered in the service collection for '{typeof(TBatch).Name}'. " +
-            $"Register them using services.AddBatchOperations<{typeof(TBatch).Name}, ...>() or services.AddReadOnlyMemoryBatch<T>().");
-    }
+        => serviceProvider.GetService<IReadOnlyIndexedBatch<TBatch>>()
+            ?? throw new InvalidOperationException(
+                $"No read-only indexed batch operations are registered in the service collection for '{typeof(TBatch)}'. " +
+                $"Register them using services.AddBatchOperations<{typeof(TBatch)}, ...>() or services.AddReadOnlyMemoryBatch<T>().");
 }
 
 public sealed class ReadOnlyMemoryBatchOperations<T> : IReadOnlyIndexedBatch<ReadOnlyMemory<T>>
