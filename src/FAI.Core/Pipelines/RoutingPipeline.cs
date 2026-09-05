@@ -116,22 +116,7 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
                 Range destinationRange = routeOffsets[routeIndex]..(routeOffsets[routeIndex] + route.InputIndices.Length);
                 TOutput destinationSlice = _outputBatch.Slice(destination, destinationRange);
 
-                if (route.Target is IDestinationPipeline<TInput, TOutput> destinationTarget)
-                {
-                    await destinationTarget.ExecuteAsync(routeInput.Value, destinationSlice, token);
-                }
-                else
-                {
-                    TOutput routeOutput = await route.Target.ExecuteAsync(routeInput.Value, token);
-                    try
-                    {
-                        _outputBatch.Copy(routeOutput, destinationSlice);
-                    }
-                    finally
-                    {
-                        await PipelineOutputDisposer.DisposeAsync(routeOutput);
-                    }
-                }
+                await DestinationPipeline.ExecuteAsync(route.Target, routeInput.Value, destinationSlice, _outputBatch, token);
             },
             cancellationToken);
 

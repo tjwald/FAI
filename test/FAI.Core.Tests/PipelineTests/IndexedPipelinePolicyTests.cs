@@ -75,6 +75,74 @@ public sealed class IndexedPipelinePolicyTests
     }
 
     [Fact]
+    public async Task OrderingPipeline_WritesDirectlyIntoCallerDestinationWhenInnerSupportsIt()
+    {
+        var inner = new MultiplyPipeline(2);
+        var pipeline = new OrderingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            inner,
+            new DescendingOrdering(),
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+
+        int[] values = [10, 30, 20];
+        Memory<int> destination = new int[3];
+        await pipeline.ExecuteAsync(values, destination, TestContext.Current.CancellationToken);
+
+        Assert.Equal([20, 60, 40], destination.ToArray());
+        Assert.Equal([3], inner.DestinationBatchSizes);
+    }
+
+    [Fact]
+    public async Task OrderingPipeline_FallsBackToCopyWhenInnerDoesNotSupportDestinationExecution()
+    {
+        var inner = new ReturningMultiplyPipeline(2);
+        var pipeline = new OrderingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            inner,
+            new DescendingOrdering(),
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+
+        int[] values = [10, 30, 20];
+        Memory<int> destination = new int[3];
+        await pipeline.ExecuteAsync(values, destination, TestContext.Current.CancellationToken);
+
+        Assert.Equal([20, 60, 40], destination.ToArray());
+    }
+
+    [Fact]
+    public void DestinationPipeline_AsDestinationPipeline_ReturnsSameInstanceIfAlreadyDestinationPipeline()
+    {
+        var destinationInner = new MultiplyPipeline(2);
+        var outputBatch = new MemoryBatchOperations<int>();
+
+        IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>> adapted =
+            destinationInner.AsDestinationPipeline(outputBatch);
+
+        Assert.Same(destinationInner, adapted);
+    }
+
+    [Fact]
+    public async Task DestinationPipeline_AsDestinationPipeline_WrapsReturnOnlyPipeline()
+    {
+        var inner = new ReturningMultiplyPipeline(2);
+        var outputBatch = new MemoryBatchOperations<int>();
+
+        IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>> adapted =
+            inner.AsDestinationPipeline(outputBatch);
+
+        Assert.NotSame(inner, adapted);
+
+        int[] values = [1, 2, 3];
+        Memory<int> destination = new int[3];
+        await adapted.ExecuteAsync(values, destination, TestContext.Current.CancellationToken);
+
+        Assert.Equal([2, 4, 6], destination.ToArray());
+
+        Memory<int> returned = await adapted.ExecuteAsync(values, TestContext.Current.CancellationToken);
+        Assert.Equal([2, 4, 6], returned.ToArray());
+    }
+
+    [Fact]
     public void TensorBatch_SliceIsAViewOfOriginalTensor()
     {
         Tensor<float> tensor = CreateTensor([3, 2], [1, 2, 3, 4, 5, 6]);

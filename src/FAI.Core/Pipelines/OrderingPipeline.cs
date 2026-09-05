@@ -2,8 +2,7 @@ namespace FAI.Core.Pipelines;
 
 public sealed class OrderingPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>
 {
-    private readonly IPipeline<TInput, TOutput> _inner;
-    private readonly IDestinationPipeline<TInput, TOutput>? _destinationInner;
+    private readonly IDestinationPipeline<TInput, TOutput> _inner;
     private readonly IIndexOrdering<TInput> _ordering;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
     private readonly IWritableIndexedBatch<TOutput> _outputBatch;
@@ -11,8 +10,12 @@ public sealed class OrderingPipeline<TInput, TOutput> : IDestinationPipeline<TIn
     public OrderingPipeline(IPipeline<TInput, TOutput> inner, IIndexOrdering<TInput> ordering,
         IReadOnlyIndexedBatch<TInput> inputBatch, IWritableIndexedBatch<TOutput> outputBatch)
     {
-        _inner = inner;
-        _destinationInner = inner as IDestinationPipeline<TInput, TOutput>;
+        ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(ordering);
+        ArgumentNullException.ThrowIfNull(inputBatch);
+        ArgumentNullException.ThrowIfNull(outputBatch);
+
+        _inner = inner.AsDestinationPipeline(outputBatch);
         _ordering = ordering;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -31,20 +34,7 @@ public sealed class OrderingPipeline<TInput, TOutput> : IDestinationPipeline<TIn
     {
         int[] sortedToOriginal = _ordering.CreateOrder(input);
         using BatchLease<TInput> sortedInput = _inputBatch.Gather(input, sortedToOriginal);
-        if (_destinationInner is not null)
-        {
-            await _destinationInner.ExecuteAsync(sortedInput.Value, destination, cancellationToken);
-        }
-        else
-        {
-            TOutput sortedOutput = await _inner.ExecuteAsync(sortedInput.Value, cancellationToken);
-            try
-            {
-                _outputBatch.Copy(sortedOutput, destination);
-            }
-            finally { await PipelineOutputDisposer.DisposeAsync(sortedOutput); }
-        }
-
+        await _inner.ExecuteAsync(sortedInput.Value, destination, cancellationToken);
         _outputBatch.PermuteInPlace(destination, sortedToOriginal);
     }
 }

@@ -2,8 +2,7 @@ namespace FAI.Core.Pipelines;
 
 public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>
 {
-    private readonly IPipeline<TInput, TOutput> _inner;
-    private readonly IDestinationPipeline<TInput, TOutput>? _destinationInner;
+    private readonly IDestinationPipeline<TInput, TOutput> _inner;
     private readonly IBatchPartitioner<TInput> _partitioner;
     private readonly IPartitionScheduler _scheduler;
     private readonly IReadOnlyIndexedBatch<TInput> _inputBatch;
@@ -12,8 +11,12 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline
     public PartitioningPipeline(IPipeline<TInput, TOutput> inner, IBatchPartitioner<TInput> partitioner,
         IReadOnlyIndexedBatch<TInput> inputBatch, IWritableIndexedBatch<TOutput> outputBatch, IPartitionScheduler? scheduler = null)
     {
-        _inner = inner;
-        _destinationInner = inner as IDestinationPipeline<TInput, TOutput>;
+        ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(partitioner);
+        ArgumentNullException.ThrowIfNull(inputBatch);
+        ArgumentNullException.ThrowIfNull(outputBatch);
+
+        _inner = inner.AsDestinationPipeline(outputBatch);
         _partitioner = partitioner;
         _inputBatch = inputBatch;
         _outputBatch = outputBatch;
@@ -69,15 +72,8 @@ public sealed class PartitioningPipeline<TInput, TOutput> : IDestinationPipeline
         await _scheduler.ExecuteAsync(_partitioner.Partition(input), async (range, token) =>
         {
             TInput partitionInput = _inputBatch.Slice(input, range);
-            if (_destinationInner is not null)
-            {
-                await _destinationInner.ExecuteAsync(partitionInput, _outputBatch.Slice(destination, range), token);
-                return;
-            }
-
-            TOutput partitionOutput = await _inner.ExecuteAsync(partitionInput, token);
-            try { _outputBatch.Copy(partitionOutput, _outputBatch.Slice(destination, range)); }
-            finally { await PipelineOutputDisposer.DisposeAsync(partitionOutput); }
+            TOutput partitionDestination = _outputBatch.Slice(destination, range);
+            await _inner.ExecuteAsync(partitionInput, partitionDestination, token);
         }, cancellationToken);
     }
 
