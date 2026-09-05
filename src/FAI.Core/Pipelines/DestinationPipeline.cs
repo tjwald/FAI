@@ -13,33 +13,6 @@ public static class DestinationPipeline
             ? destinationPipeline
             : new BatchCopyDestinationPipeline<TInput, TOutput>(pipeline, outputBatch);
     }
-
-    public static async ValueTask ExecuteAsync<TInput, TOutput>(
-        IPipeline<TInput, TOutput> pipeline,
-        TInput input,
-        TOutput destination,
-        IWritableIndexedBatch<TOutput> outputBatch,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(pipeline);
-        ArgumentNullException.ThrowIfNull(outputBatch);
-
-        if (pipeline is IDestinationPipeline<TInput, TOutput> destinationPipeline)
-        {
-            await destinationPipeline.ExecuteAsync(input, destination, cancellationToken);
-            return;
-        }
-
-        TOutput output = await pipeline.ExecuteAsync(input, cancellationToken);
-        try
-        {
-            outputBatch.Copy(output, destination);
-        }
-        finally
-        {
-            await PipelineOutputDisposer.DisposeAsync(output);
-        }
-    }
 }
 
 internal sealed class BatchCopyDestinationPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>

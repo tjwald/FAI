@@ -82,7 +82,7 @@ Structural capabilities are selected when generic decorators are configured and 
 
 Routing groups non-contiguous input indices by target. When writing into a destination buffer:
 1. Each target writes into its assigned contiguous slice of the destination buffer.
-2. If a target implements `IDestinationPipeline`, it writes directly into that slice with zero intermediate allocation.
+2. Targets are normalized as `IDestinationPipeline`, writing directly into their assigned slices without per-batch allocation.
 3. Once all routes complete, `PermuteInPlace` restores elements to their original batch positions in a single pass.
 
 When no destination buffer is provided, routing executes each target, allocates an aggregate output using `_outputBatch.AllocateLike(...)`, and scatters each target's results into their respective batch indices.

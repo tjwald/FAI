@@ -205,6 +205,21 @@ public sealed class IndexedPipelinePolicyTests
         Assert.Equal([100, 20, 300, 40], output.ToArray());
     }
 
+    [Fact]
+    public async Task RoutingPipeline_WritesIntoCallerDestinationWhenTargetsAreReturnOnly()
+    {
+        var routing = new ParityRoutingStrategy(new ReturningMultiplyPipeline(10), new ReturningMultiplyPipeline(100));
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+        Memory<int> destination = new int[4];
+        await pipeline.ExecuteAsync(input, destination, TestContext.Current.CancellationToken);
+
+        Assert.Equal([100, 20, 300, 40], destination.ToArray());
+    }
+
     private static Tensor<float> CreateTensor(ReadOnlySpan<nint> lengths, float[] values)
         => Tensor.Create(values, lengths);
 
@@ -395,19 +410,29 @@ public sealed class IndexedPipelinePolicyTests
         }
     }
 
-    private sealed class ParityRoutingStrategy(
-        IPipeline<ReadOnlyMemory<int>, Memory<int>> even,
-        IPipeline<ReadOnlyMemory<int>, Memory<int>> odd)
-        : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
+    private sealed class ParityRoutingStrategy : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
     {
+        private readonly IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>> _even;
+        private readonly IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>> _odd;
+
+        public ParityRoutingStrategy(
+            IPipeline<ReadOnlyMemory<int>, Memory<int>> even,
+            IPipeline<ReadOnlyMemory<int>, Memory<int>> odd,
+            IWritableIndexedBatch<Memory<int>>? outputBatch = null)
+        {
+            outputBatch ??= new MemoryBatchOperations<int>();
+            _even = even.AsDestinationPipeline(outputBatch);
+            _odd = odd.AsDestinationPipeline(outputBatch);
+        }
+
         public List<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)
         {
             int[] evenIndices = Enumerable.Range(0, input.Length).Where(index => input.Span[index] % 2 == 0).ToArray();
             int[] oddIndices = Enumerable.Range(0, input.Length).Where(index => input.Span[index] % 2 != 0).ToArray();
             return
             [
-                new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(even, evenIndices),
-                new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(odd, oddIndices),
+                new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(_even, evenIndices),
+                new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(_odd, oddIndices),
             ];
         }
     }

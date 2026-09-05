@@ -1,7 +1,7 @@
 namespace FAI.Core.Pipelines;
 
 public sealed record BatchRoute<TInput, TOutput>(
-    IPipeline<TInput, TOutput> Target,
+    IDestinationPipeline<TInput, TOutput> Target,
     int[] InputIndices);
 
 public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInput, TOutput>
@@ -116,7 +116,7 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
                 Range destinationRange = routeOffsets[routeIndex]..(routeOffsets[routeIndex] + route.InputIndices.Length);
                 TOutput destinationSlice = _outputBatch.Slice(destination, destinationRange);
 
-                await DestinationPipeline.ExecuteAsync(route.Target, routeInput.Value, destinationSlice, _outputBatch, token);
+                await route.Target.ExecuteAsync(routeInput.Value, destinationSlice, token);
             },
             cancellationToken);
 
