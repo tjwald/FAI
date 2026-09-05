@@ -25,15 +25,12 @@ public static class BatchExecutorExtensions
         public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
             IServiceProvider serviceProvider,
             IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
-        {
-            var registry = serviceProvider.GetRequiredService<IIndexedBatchRegistry>();
-            return new OrderingPipeline<ReadOnlyMemory<TInput>, TOutput>(
+            => new OrderingPipeline<ReadOnlyMemory<TInput>, TOutput>(
                 pipeline,
                 new TokenCountOrdering<TInput>(serviceProvider.GetRequiredService<TokenCountOrderingOptions>()),
                 serviceProvider.GetService<IReadOnlyIndexedBatch<ReadOnlyMemory<TInput>>>()
                     ?? new ReadOnlyMemoryBatchOperations<TInput>(),
-                registry.GetWritable<TOutput>());
-        }
+                serviceProvider.GetRequiredWritableBatch<TOutput>());
     }
 
     private sealed class MaxPaddedTokensPartitioningDecorator<TInput> : IForwardPipelineDecorator<ReadOnlyMemory<TInput>>
@@ -42,16 +39,13 @@ public static class BatchExecutorExtensions
         public IPipeline<ReadOnlyMemory<TInput>, TOutput> Apply<TOutput>(
             IServiceProvider serviceProvider,
             IPipeline<ReadOnlyMemory<TInput>, TOutput> pipeline)
-        {
-            var registry = serviceProvider.GetRequiredService<IIndexedBatchRegistry>();
-            return new PartitioningPipeline<ReadOnlyMemory<TInput>, TOutput>(
+            => new PartitioningPipeline<ReadOnlyMemory<TInput>, TOutput>(
                 pipeline,
                 new MaxPaddedTokensPartitioner<TInput>(
                     serviceProvider.GetRequiredService<MaxPaddedTokensPartitionerOptions>()),
                 serviceProvider.GetService<IReadOnlyIndexedBatch<ReadOnlyMemory<TInput>>>()
                     ?? new ReadOnlyMemoryBatchOperations<TInput>(),
-                registry.GetWritable<TOutput>(),
+                serviceProvider.GetRequiredWritableBatch<TOutput>(),
                 serviceProvider.GetService<IPartitionScheduler>());
-        }
     }
 }

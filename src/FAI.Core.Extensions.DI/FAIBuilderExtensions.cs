@@ -6,7 +6,6 @@ public static class FaiBuilderExtensions
     {
         public PipelineBuilder<TInput, TInput> AddPipeline<TInput>()
         {
-            services.AddIndexedBatchRegistry();
             return new PipelineBuilder<TInput, TInput>(services, new InitialStage<TInput>());
         }
     }
