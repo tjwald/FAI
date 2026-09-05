@@ -14,7 +14,7 @@ builder.ConfigureOpenTelemetry();
 
 const string fileName = "train-00000-of-00001.parquet";
 
-var options = SentimentInferenceOptions.DefaultConfig;
+var options = SentimentInferenceOptions.DefaultConfig with { UseGpu = !args.Contains("--cpu", StringComparer.OrdinalIgnoreCase) };
 
 builder.Services.AddDefaultSentimentInference(options);
 builder.Services.AddSingleton(new EvaluationPipelineOptions());
@@ -97,6 +97,6 @@ internal record EvaluationSummary(int SampleSize, int Correct)
 
     public override string ToString()
     {
-        return $"{Correct}/{SampleSize}={Accuracy:%}";
+        return $"{Correct}/{SampleSize}={Accuracy:P2}";
     }
 }

@@ -1,11 +1,18 @@
+using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
+using FAI.Core.Configurations;
+using FAI.Core.Configurations.InferenceTasks;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Extensions.DI;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
+using FAI.NLP.Configuration;
 using FAI.NLP.Extensions.DI;
+using FAI.NLP.InferenceTasks.TextClassification;
+using FAI.NLP.Pipelines;
 using FAI.NLP.Tokenization;
+using FAI.Onnx;
 using FAI.Onnx.Configuration;
-using FAI.Onnx.Factories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -17,35 +24,43 @@ public static class SentimentInferenceFactory
     {
         return services.AddLocalServices(localServices =>
         {
-            localServices.AddSingleton<IModelExecutorOptions, OnnxModelExecutorOptions>(sp => new OnnxModelExecutorOptions()
+            localServices.AddSingleton(sp => new OnnxModelExecutorOptions()
                 .ConfigureOnnxOptions(onnxOptions =>
                 {
                     onnxOptions.ConfigureSessionOptions(sessionOptions =>
                     {
-                        sessionOptions.AppendExecutionProvider_CUDA();
-                        sp.GetRequiredService<ILogger<OnnxModelExecutorOptions>>().LogInformation("Using GPU accelerator");
+                        if (options.UseGpu)
+                        {
+                            sessionOptions.AppendExecutionProvider_CUDA();
+                            sp.GetRequiredService<ILogger<OnnxModelExecutorOptions>>().LogInformation("Using GPU accelerator");
+                        }
 
                         sessionOptions.AppendExecutionProvider_CPU();
                     });
                     onnxOptions.ModelDir = options.ModelDir;
                 })
             );
+            localServices.AddSingleton<IModelExecutorOptions>(sp => sp.GetRequiredService<OnnxModelExecutorOptions>());
 
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDir, options.TokenizerOptions));
+            localServices.AddConfigurationAndBind<ClassificationOptions<bool>>("SentimentInference:Classification");
+            localServices.AddConfigurationAndBind<TokenCountOrderingOptions>("SentimentInference:BatchExecutors:TokenCountSorting");
+            localServices.AddConfigurationAndBind<MaxPaddedTokensPartitionerOptions>("SentimentInference:BatchExecutors:MaxPaddedTokens");
+            localServices.AddConfigurationAndBind<ParallelPartitionSchedulerOptions>("SentimentInference:BatchExecutors:ParallelSchedular");
+            localServices.AddSingleton<IPartitionScheduler>(sp =>
+                new ParallelPartitionScheduler(sp.GetRequiredService<ParallelPartitionSchedulerOptions>()));
+            localServices.AddSingleton<ClassificationDecoding<bool>>();
+            localServices.AddMemoryBatch<ClassificationResult<bool, float>>();
 
-            localServices.AddPipeline<TokenizedText, ClassificationResult<bool, float>>()
-                .AddModelExecutor(sp =>
-                {
-                    var executorOptions = sp.GetRequiredService<IModelExecutorOptions>();
-                    return ModelExecutorFactory.CreateModelExecutor(options.ModelExecutorType, executorOptions);
-                })
-                .WithTextClassification(section: "SentimentInference:Classification")
-                .UseTokenSorting(section: "SentimentInference:BatchExecutors:TokenCountSorting")
-                .UsePartitioning(partitionBuilder =>
-                    partitionBuilder
-                        .WithMaxPaddedTokens(section: "SentimentInference:BatchExecutors:MaxPaddedTokens")
-                        .WithParallelSchedular(section: "SentimentInference:BatchExecutors:ParallelSchedular")
-                );
+            localServices
+                .AddPipeline<ReadOnlyMemory<string>>()
+                .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
+                .UseTokenCountOrdering()
+                .UseMaxPaddedTokensPartitioning()
+                .Then<Tensor<long>[], TextTensorization>()
+                .ThenOnnxModel()
+                .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
+                .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();
 

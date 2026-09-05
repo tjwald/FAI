@@ -1,22 +1,23 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
-using FAI.NLP.Tokenization;
 
 namespace Example.SentimentInference.Model;
 
 public sealed class SentimentInference : IInference<string, bool>
 {
-    private readonly IPipeline<TokenizedText, ClassificationResult<bool, float>> _pipeline;
+    private readonly IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> _pipeline;
 
-    public SentimentInference(IPipeline<TokenizedText, ClassificationResult<bool, float>> pipeline)
+    public SentimentInference(
+        IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> pipeline)
     {
         _pipeline = pipeline;
     }
 
     public async Task<bool> Predict(string input)
     {
-        ClassificationResult<bool, float> classificationResult = await _pipeline.Predict(input);
-        return classificationResult.Choice;
+        bool[] output = await BatchPredict(new[] { input });
+        return output[0];
     }
 
     public async Task<bool[]> BatchPredict(ReadOnlyMemory<string> input)
@@ -28,20 +29,16 @@ public sealed class SentimentInference : IInference<string, bool>
 
     public async Task BatchPredict(ReadOnlyMemory<string> input, Memory<bool> output)
     {
-        var classificationResults = new ClassificationResult<bool, float>[input.Length];
-        var textInputs = new TokenizedText[input.Length];
-        ReadOnlySpan<string> inputSpan = input.Span;
-        for (int i = 0; i < input.Length; i++)
+        if (input.Length != output.Length)
         {
-            textInputs[i] = inputSpan[i];
+            throw new ArgumentException("Input and output batch sizes must match.", nameof(output));
         }
 
-        await _pipeline.BatchPredict(textInputs, classificationResults);
+        Memory<ClassificationResult<bool, float>> classificationResults = await _pipeline.ExecuteAsync(input);
 
-        Span<bool> outputSpan = output.Span;
-        for (int i = 0; i < classificationResults.Length; i++)
+        for (int index = 0; index < classificationResults.Length; index++)
         {
-            outputSpan[i] = classificationResults[i].Choice;
+            output.Span[index] = classificationResults.Span[index].Choice;
         }
     }
 }

@@ -47,7 +47,7 @@ I am using the training data set, in the parquet provided in the folder. The ide
 
 A 5X improvement on a small model with no logic outside the model.
 
-After further optimizations and fixing TokenCountSortingBatchExecutor I was able to further reduce the time taken.
+After further optimizations and fixing token-count ordering I was able to further reduce the time taken.
 
 ### C#
 * ONNX + GPU
@@ -83,7 +83,7 @@ The time per batch size (4 threads):
 | 450        | 3.78        |
 | 500        | 3.86        |
 
-With TokenBatchSizeBatchExecutor + Streamed in addition to TokenCountSortingBatchExecutor we get:
+With max-padded-token partitioning and token-count ordering we get:
 
 * ONNX + GPU
 * ORT_SEQUENTIAL

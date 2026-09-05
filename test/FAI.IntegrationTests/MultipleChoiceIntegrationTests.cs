@@ -1,4 +1,5 @@
-using FAI.NLP.PipelineBatchExecutors;
+using FAI.NLP.Pipelines;
+using FAI.Onnx;
 
 namespace FAI.IntegrationTests;
 
@@ -7,34 +8,33 @@ public class MultipleChoiceIntegrationTests
     [Fact]
     public async Task FullPipeline_ShouldHandleMultipleChoice()
     {
-        // Arrange
         var services = new ServiceCollection();
+        services.AddSingleton(DummyTokenizerFactory.Create());
+        services.AddSingleton(new TextMultipleChoiceOptions(MaxChoices: 2));
+        services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
+            new LogicalMockModelPipeline([[0.9f, 0.1f]]));
+        services.AddSingleton<TextMultipleChoiceTensorization>();
+        services.AddSingleton<TextMultipleChoiceDecoding>();
+        services
+            .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
+            .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
+            .Fork(inner => inner
+                .Then<Tensor<long>[], TextMultipleChoiceTensorization>()
+                .ThenOnnxModel())
+            .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
+            .Build();
 
-        services.AddPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>()
-                .Use<TokenizerBatchExecutor<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        var pipeline = provider.GetRequiredService<
+            IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>>();
+        ReadOnlyMemory<TextMultipleChoiceInput> input = new TextMultipleChoiceInput[]
+        {
+            new("Question", [new("choice 1"), new("choice 2")]),
+        };
+        Memory<ChoiceResult<TokenizedText>> output =
+            await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
-        var tokenizer = DummyTokenizerFactory.Create();
-        services.AddSingleton(tokenizer);
-        services.AddSingleton(new TextMultipleChoiceOptions { MaxChoices = 2 });
-
-        // Mock model: always returns [0.9, 0.1] logits
-        services.AddSingleton<IModelExecutor<long, float>>(new LogicalMockModelExecutor([[0.9f, 0.1f]]));
-
-        services.AddSingleton<IInferenceSteps<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>, TextMultipleChoiceTask>();
-
-        var provider = services.BuildServiceProvider();
-        var pipeline = provider.GetRequiredService<IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>>>();
-
-        var input = new TextMultipleChoiceInput(
-            "Question",
-            [new TokenizedText("choice 1"), new TokenizedText("choice 2")]
-        );
-
-        // Act
-        var results = await pipeline.BatchPredict(new[] { input });
-
-        // Assert
-        results.Should().HaveCount(1);
-        results[0].ChoiceIndex.Should().Be(0); // Chosen first choice
+        output.ToArray().Should().HaveCount(1);
+        output.Span[0].ChoiceIndex.Should().Be(0);
     }
 }

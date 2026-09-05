@@ -22,11 +22,11 @@ This file provides guidance to agents when working with code in this repository.
 - **Library Stability**: When working on tests, NEVER change the library code unless implementing a new feature (follow TDD).
 - **Testing Style Guide**:
     - **Assertions**: Use explicit collection matching for ranges and outputs. Avoid partial assertions like `Assert.Single` when the full state can be verified.
-    - **Mocks**: When testing components that offload work (e.g., `BackgroundPipelineBatchExecutor`), always verify that the exact data passed to the component reached the inner dependency.
+    - **Mocks**: When testing decorators or schedulers, verify that exact input ranges reach the inner pipeline and preallocated slices receive the expected values.
     - **DI Testing**: Focus on verifying that the correct implementation types are resolved and that the component chain is assembled in the intended order.
     - **Collection Expressions**: Use `[1, 2, 3]` instead of `new int[] { 1, 2, 3 }` in all test code.
 
 ## Critical Patterns
-- **Middleware Chain**: `IPipelineBatchExecutor` follows a decorator/middleware pattern.
-- **DI Fluent API**: Use `PipelineBuilder<TIn, TOut>` to assemble pipelines; executors are added in stack order (last added runs after previous).
-- **Abstractions**: All ML tasks must implement `IInferenceSteps<TInput, TOutput>` or extend `InferenceSteps<...>`.
+- **Finite Pipelines**: ML tasks implement return-value `IPipeline<TInput, TOutput>`. Implement `IDestinationPipeline<TInput, TOutput>` when execution can write into a caller-supplied destination buffer.
+- **DI Fluent API**: Start with `AddPipeline<TInput>()`, append typed pipelines with `Then<TOutput, TPipeline>()`, and use decorators to wrap the remainder of a chain.
+- **Batch Policies**: Ordering, partitioning, routing, and scheduling compose around finite pipelines through indexed-batch operations.

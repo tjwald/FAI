@@ -12,7 +12,7 @@ const string fileName = "swag_train.parquet";
 
 var builder = Host.CreateApplicationBuilder(args);
 
-var options = SwagMultipleChoiceInferenceOptions.DefaultConfig;
+var options = SwagMultipleChoiceInferenceOptions.DefaultConfig with { UseGpu = !args.Contains("--cpu", StringComparer.OrdinalIgnoreCase) };
 
 builder.Services.AddDefaultSwagInference(options);
 

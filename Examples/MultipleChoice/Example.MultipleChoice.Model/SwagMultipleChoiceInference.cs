@@ -1,4 +1,5 @@
 using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 using FAI.Core.ResultTypes;
 using FAI.NLP.InferenceTasks.TextMultipleChoice;
 using FAI.NLP.Tokenization;
@@ -9,17 +10,18 @@ public record struct SwagInput(string Context, string Text, string[] Endings);
 
 public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<TokenizedText>>
 {
-    private readonly IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> _pipeline;
+    private readonly IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> _pipeline;
 
-    public SwagMultipleChoiceInference(IPipeline<TextMultipleChoiceInput, ChoiceResult<TokenizedText>> pipeline)
+    public SwagMultipleChoiceInference(
+        IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> pipeline)
     {
         _pipeline = pipeline;
     }
 
     public async Task<ChoiceResult<TokenizedText>> Predict(SwagInput input)
     {
-        var pipelineInput = MapSwagInputToPipelineInput(input);
-        return await _pipeline.Predict(pipelineInput);
+        ChoiceResult<TokenizedText>[] output = await BatchPredict(new[] { input });
+        return output[0];
     }
 
     public async Task<ChoiceResult<TokenizedText>[]> BatchPredict(ReadOnlyMemory<SwagInput> input)
@@ -38,12 +40,13 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
             pipelineInput[i] = MapSwagInputToPipelineInput(inputSpan[i]);
         }
 
-        await _pipeline.BatchPredict(pipelineInput, output);
+        Memory<ChoiceResult<TokenizedText>> results = await _pipeline.ExecuteAsync(pipelineInput);
+        results.CopyTo(output);
     }
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)
     {
-        var choices = new TokenizedText[input.Endings.Length];
+        var choices = new string[input.Endings.Length];
         for (int i = 0; i < choices.Length; i++)
         {
             choices[i] = input.Text + " " + input.Endings[i];

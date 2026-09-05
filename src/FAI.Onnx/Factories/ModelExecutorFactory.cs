@@ -1,6 +1,7 @@
-using FAI.Core.Abstractions;
+using System.Numerics.Tensors;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.ModelExecutors;
+using FAI.Core.Pipelines;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.ModelExecutorPools;
 using FAI.Onnx.ModelExecutors;
@@ -12,41 +13,34 @@ namespace FAI.Onnx.Factories;
 /// </summary>
 public static class ModelExecutorFactory
 {
-    /// <summary>
-    /// Creates an instance of <see cref="IModelExecutor{TInput, TOutput}"/> based on the specified executor type and configuration.
-    /// </summary>
-    /// <param name="executorType">The type of model executor to create.</param>
-    /// <param name="modelExecutorOptions">The configuration options for the model executor.</param>
-    /// <returns>Task that creates a model executor</returns>
-    /// <exception cref="NotImplementedException">
-    /// Thrown when the specified <paramref name="executorType"/> is not implemented.
-    /// </exception>
-    public static IModelExecutor<long, float> CreateModelExecutor(
+    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {
-        switch (modelExecutorOptions)
+        return modelExecutorOptions switch
         {
-            case MultiDeviceExecutorOptions multiDeviceExecutorOptions:
-                List<OnnxModelExecutorBase> executors = multiDeviceExecutorOptions.ExecutorOptions
-                    .Select(options => CreateOnnxModelExecutor(executorType, options)).ToList();
+            MultiDeviceExecutorOptions multiDeviceOptions => new PooledOnnxModelPipeline(
+                new MultiDeviceObjectPool(multiDeviceOptions.ExecutorOptions
+                    .Select(options => CreateOnnxModelExecutor(executorType, options))
+                    .ToList())),
+            PooledExecutorOptions<OnnxModelExecutorOptions> pooledOptions => new PooledOnnxModelPipeline(
+                CreateOnnxModelExecutorPool(executorType, pooledOptions)),
+            OnnxModelExecutorOptions onnxOptions => CreateOnnxModelExecutor(executorType, onnxOptions),
+            _ => throw new NotImplementedException(modelExecutorOptions.GetType().Name),
+        };
+    }
 
-                return new PooledModelExecutor<long, float>(new MultiDeviceObjectPool(executors));
-            case PooledExecutorOptions<OnnxModelExecutorOptions> pooledExecutorOptions:
-            {
-                Console.WriteLine($"Using pooling for {executorType}");
-                IObjectPool<IModelExecutor<long, float>> objectPool = executorType switch
-                {
-                    ModelExecutorType.Simple => new OnnxModelExecutorObjectPool<OnnxModelExecutor>(pooledExecutorOptions),
-                    ModelExecutorType.Async => new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(pooledExecutorOptions),
-                    ModelExecutorType.Tensor => new OnnxModelExecutorObjectPool<OnnxModelTensorExecutor>(pooledExecutorOptions),
-                    _ => throw new NotImplementedException(nameof(executorType)),
-                };
-                return new PooledModelExecutor<long, float>(objectPool);
-            }
-        }
-
-        return CreateOnnxModelExecutor(executorType, (OnnxModelExecutorOptions)modelExecutorOptions);
+    private static IObjectPool<OnnxModelExecutorBase> CreateOnnxModelExecutorPool(
+        ModelExecutorType executorType,
+        PooledExecutorOptions<OnnxModelExecutorOptions> options)
+    {
+        return executorType switch
+        {
+            ModelExecutorType.Simple => new OnnxModelExecutorObjectPool<OnnxModelExecutor>(options),
+            ModelExecutorType.Async => new OnnxModelExecutorObjectPool<AsyncOnnxModelExecutor>(options),
+            ModelExecutorType.Tensor => new OnnxModelExecutorObjectPool<OnnxModelTensorExecutor>(options),
+            _ => throw new NotImplementedException(nameof(executorType)),
+        };
     }
 
     private static OnnxModelExecutorBase CreateOnnxModelExecutor(

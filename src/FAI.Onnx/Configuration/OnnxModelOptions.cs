@@ -10,6 +10,8 @@ public class OnnxModelExecutorOptions : IModelExecutorOptions
 {
     private Action<OnnxOptions>? _configureOptions;
 
+    public ModelExecutorType ModelExecutorType { get; set; } = ModelExecutorType.Simple;
+
     /// <summary>
     /// Gets the OnnxOptions object, configured using the provided delegate if available.
     /// </summary>

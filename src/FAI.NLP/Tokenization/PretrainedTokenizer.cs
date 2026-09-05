@@ -113,24 +113,6 @@ public sealed class PretrainedTokenizer
         return (tokenizedContextEnumerable, tokenizedTextEnumerable);
     }
 
-    public BatchTokenizedResult BatchTokenize(TextView inputs)
-    {
-        int maxTokenSize = 0;
-        Span<List<int>> tokenizedInputs = new List<int>[inputs.Count];
-        for (int i = 0; i < tokenizedInputs.Length; i++)
-        {
-            List<int> tokenizedInput = Tokenize(inputs[i]);
-            tokenizedInputs[i] = tokenizedInput;
-            inputs.SetTokens(i, tokenizedInput);
-            if (tokenizedInput.Count > maxTokenSize)
-            {
-                maxTokenSize = tokenizedInput.Count;
-            }
-        }
-
-        return BatchTokensToTensors(tokenizedInputs, _tokenizerOptions, maxTokenSize);
-    }
-
     public BatchTokenizedResult BatchTokenize(ReadOnlySpan<string> inputs)
     {
         int maxTokenSize = 0;
@@ -162,7 +144,7 @@ public sealed class PretrainedTokenizer
         TensorDimensionSpan<long> maskSpan = result.Mask.GetDimensionSpan(0);
         for (int i = 0; i < batchSize; i++)
         {
-            TokenizeRow(tokenizerOptions, inputs[i], tokenizationSpan, maskSpan, i);
+            TokenizeRow(tokenizerOptions, CollectionsMarshal.AsSpan(inputs[i]), tokenizationSpan, maskSpan, i);
         }
 
         return result;
@@ -201,21 +183,20 @@ public sealed class PretrainedTokenizer
         return new BatchTokenizedResult(tokenization, mask);
     }
 
-    private static void TokenizeRow(PretrainedTokenizerOptions tokenizerOptions, List<int> rowTokens, TensorDimensionSpan<long> tokenizationSpan,
+    private static void TokenizeRow(PretrainedTokenizerOptions tokenizerOptions, ReadOnlySpan<int> rowTokens, TensorDimensionSpan<long> tokenizationSpan,
         TensorDimensionSpan<long> maskSpan, int i)
     {
-        Span<int> tokenizedInput = CollectionsMarshal.AsSpan(rowTokens);
         Span<long> tokenizationRowSpan = tokenizationSpan[i].AsSpan();
         Span<long> maskRowSpan = maskSpan[i].AsSpan();
 
-        TensorPrimitives.ConvertChecked(tokenizedInput, tokenizationRowSpan);
+        TensorPrimitives.ConvertChecked(rowTokens, tokenizationRowSpan);
 
         if (tokenizerOptions.PaddingToken != 0) // No need - initialized to 0
         {
-            tokenizationRowSpan[tokenizedInput.Length..].Fill(tokenizerOptions.PaddingToken);
+            tokenizationRowSpan[rowTokens.Length..].Fill(tokenizerOptions.PaddingToken);
         }
 
-        maskRowSpan[..tokenizedInput.Length].Fill(1);
+        maskRowSpan[..rowTokens.Length].Fill(1);
         // maskRow[tokenizedInput.Count..].Fill(0);  No need - initialized to 0
     }
 }
