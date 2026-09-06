@@ -23,11 +23,12 @@ public static class OnnxPipelineBuilderExtensions
             return existing;
         }
 
-        OnnxModelExecutorOptions? onnxOptions = serviceProvider.GetService<OnnxModelExecutorOptions>();
-        IModelExecutorOptions executorOptions = (IModelExecutorOptions?)onnxOptions
+        IModelExecutorOptions executorOptions =
+            serviceProvider.GetService<OnnxModelExecutorOptions>()
+            ?? serviceProvider.GetService<PooledExecutorOptions<OnnxModelExecutorOptions>>()
+            ?? serviceProvider.GetService<MultiDeviceExecutorOptions>()
             ?? serviceProvider.GetRequiredService<IModelExecutorOptions>();
-        ModelExecutorType executorType = onnxOptions?.ModelExecutorType ?? ModelExecutorType.Simple;
 
-        return ModelExecutorFactory.CreateModelPipeline(executorType, executorOptions);
+        return ModelExecutorFactory.CreateModelPipeline(executorOptions);
     }
 }

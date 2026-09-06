@@ -154,6 +154,51 @@ public sealed class IndexedPipelinePolicyTests
     }
 
     [Fact]
+    public void TensorBatch_PermuteInPlace_RestoresOrderForRank2Tensor()
+    {
+        var ops = new TensorBatchOperations<float>();
+        // Shape [3, 2]: rows are [1, 2], [3, 4], [5, 6]
+        Tensor<float> tensor = CreateTensor([3, 2], [1, 2, 3, 4, 5, 6]);
+
+        // Permute: row 0 -> 1, row 1 -> 2, row 2 -> 0. Target rows: [5, 6], [1, 2], [3, 4]
+        Span<int> mapping = [1, 2, 0];
+        ops.PermuteInPlace(tensor, mapping);
+
+        Assert.Equal([5, 6, 1, 2, 3, 4], tensor.AsReadOnlyTensorSpan().AsSpan().ToArray());
+    }
+
+    [Fact]
+    public void TensorBatch_PermuteInPlace_RestoresOrderForRank3Tensor()
+    {
+        var ops = new TensorBatchOperations<float>();
+        // Shape [3, 2, 2]: 3 elements along dim 0, each row is shape [2, 2]
+        Tensor<float> tensor = CreateTensor([3, 2, 2], [
+            1, 2, 3, 4,
+            5, 6, 7, 8,
+            9, 10, 11, 12
+        ]);
+
+        // Swap row 0 and row 2 (mapping: 2, 1, 0)
+        Span<int> mapping = [2, 1, 0];
+        ops.PermuteInPlace(tensor, mapping);
+
+        Assert.Equal([
+            9, 10, 11, 12,
+            5, 6, 7, 8,
+            1, 2, 3, 4
+        ], tensor.AsReadOnlyTensorSpan().AsSpan().ToArray());
+    }
+
+    [Fact]
+    public void TensorBatch_PermuteInPlace_Empty_DoesNotThrow()
+    {
+        var ops = new TensorBatchOperations<float>();
+        Tensor<float> tensor = CreateTensor([0, 2], []);
+        Span<int> mapping = [];
+        ops.PermuteInPlace(tensor, mapping);
+    }
+
+    [Fact]
     public async Task RoutingPipeline_GathersTargetsAndScattersToOriginalOrder()
     {
         var even = new MultiplyPipeline(10);

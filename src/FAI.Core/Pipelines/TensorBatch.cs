@@ -74,39 +74,50 @@ public sealed class TensorBatchOperations<T> :
 
     public void PermuteInPlace(Tensor<T> batch, Span<int> sourceToDestinationIndices)
     {
+        if (sourceToDestinationIndices.Length == 0)
+        {
+            return;
+        }
+
         var batchView = batch.GetDimensionSpan(0);
-        var tempLengths = batchView[sourceToDestinationIndices[0]].Lengths;
+        var tempLengths = batchView[0].Lengths;
         var flattenedLength = GetElementCount(tempLengths);
         T[] buffer = ArrayPool<T>.Shared.Rent(flattenedLength * 2);
-        TensorSpan<T> currentHolding = new TensorSpan<T>(buffer, 0, tempLengths, batch.Strides);
-        TensorSpan<T> nextHolding = new TensorSpan<T>(buffer, flattenedLength, tempLengths, batch.Strides);
-
-        for (int i = 0; i < sourceToDestinationIndices.Length; i++)
+        try
         {
-            if (sourceToDestinationIndices[i] == i)
-                continue;
+            TensorSpan<T> currentHolding = new(buffer.AsSpan(0, flattenedLength), tempLengths);
+            TensorSpan<T> nextHolding = new(buffer.AsSpan(flattenedLength, flattenedLength), tempLengths);
 
-            int current = i;
-            int destination = sourceToDestinationIndices[current];
-            batchView[current].CopyTo(currentHolding);
-
-            while (destination != i)
+            for (int i = 0; i < sourceToDestinationIndices.Length; i++)
             {
-                batchView[destination].CopyTo(nextHolding);
-                currentHolding.CopyTo(batchView[destination]);
+                if (sourceToDestinationIndices[i] == i)
+                    continue;
+
+                int current = i;
+                int destination = sourceToDestinationIndices[current];
+                batchView[current].CopyTo(currentHolding);
+
+                while (destination != i)
+                {
+                    batchView[destination].CopyTo(nextHolding);
+                    currentHolding.CopyTo(batchView[destination]);
+                    sourceToDestinationIndices[current] = current;
+
+                    TensorSpan<T> swapTemp = currentHolding;
+                    currentHolding = nextHolding;
+                    nextHolding = swapTemp;
+                    current = destination;
+                    destination = sourceToDestinationIndices[current];
+                }
+
+                currentHolding.CopyTo(batchView[i]);
                 sourceToDestinationIndices[current] = current;
-
-                TensorSpan<T> swapTemp = currentHolding;
-                currentHolding = nextHolding;
-                nextHolding = swapTemp;
-                current = destination;
-                destination = sourceToDestinationIndices[current];
             }
-
-            currentHolding.CopyTo(batchView[i]);
-            sourceToDestinationIndices[current] = current;
         }
-        ArrayPool<T>.Shared.Return(buffer);
+        finally
+        {
+            ArrayPool<T>.Shared.Return(buffer);
+        }
     }
 
     private static int GetElementCount(ReadOnlySpan<nint> lengths)

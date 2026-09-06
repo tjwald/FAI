@@ -13,26 +13,52 @@ internal static class OnnxInferenceUtils
     /// <param name="session">The ONNX runtime inference session to run the inference on.</param>
     /// <param name="options">The runtime options to use during the inference.</param>
     /// <param name="ortValues">An array of input tensor values to feed into the session.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable read-only collection of <see cref="OrtValue"/>.</returns>
     /// <exception cref="Exception">Thrown if an error occurs during inference.</exception>
     public static Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInferenceAsync(
         InferenceSession session,
         RunOptions options,
-        OrtValue[] ortValues)
+        OrtValue[] ortValues,
+        CancellationToken cancellationToken = default)
     {
-        var tcs = new TaskCompletionSource<IDisposableReadOnlyCollection<OrtValue>>();
-        ThreadPool.QueueUserWorkItem(ortValues =>
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<IDisposableReadOnlyCollection<OrtValue>>(cancellationToken);
+        }
+
+        var tcs = new TaskCompletionSource<IDisposableReadOnlyCollection<OrtValue>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        CancellationTokenRegistration registration = cancellationToken.CanBeCanceled
+            ? cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken))
+            : default;
+
+        ThreadPool.QueueUserWorkItem(_ =>
         {
             try
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    tcs.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
                 IDisposableReadOnlyCollection<OrtValue> x = session.Run(options, session.InputNames, ortValues, session.OutputNames);
-                tcs.SetResult(x);
+                if (!tcs.TrySetResult(x))
+                {
+                    x.Dispose();
+                }
             }
             catch (Exception e)
             {
-                tcs.SetException(e);
+                tcs.TrySetException(e);
             }
-        }, ortValues, true);
+            finally
+            {
+                registration.Dispose();
+            }
+        });
+
         return tcs.Task;
     }
 }

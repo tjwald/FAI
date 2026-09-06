@@ -107,30 +107,32 @@ public sealed class MaxPaddedTokensPartitioner<TInput> : IBatchPartitioner<ReadO
         while (currentIndex < batch.Length)
         {
             int start = currentIndex;
-            int candidate = batch.Span[currentIndex].TokenCount;
-            int batchCount = 1;
-            int batchSum = candidate;
+            TInput first = batch.Span[currentIndex];
+            int maxTokenLength = first.MaxTokenLength;
+            int cumulativeSentences = first.SentenceCount;
+            int cumulativeTokens = first.TokenCount;
             currentIndex++;
 
             while (currentIndex < batch.Length)
             {
                 TInput current = batch.Span[currentIndex];
-                candidate = current.MaxTokenLength;
-                int newBatchCount = batchCount + current.SentenceCount;
-                int newPadded = newBatchCount * candidate;
+                int newMaxTokenLength = Math.Max(maxTokenLength, current.MaxTokenLength);
+                int newCumulativeSentences = cumulativeSentences + current.SentenceCount;
+                int newPadded = newCumulativeSentences * newMaxTokenLength;
                 if (newPadded > _options.MaxTokenCount)
                 {
                     break;
                 }
 
-                int newSum = batchSum + candidate;
-                if (newSum < newPadded * factor)
+                int newCumulativeTokens = cumulativeTokens + current.TokenCount;
+                if (newCumulativeTokens < newPadded * factor)
                 {
                     break;
                 }
 
-                batchCount = newBatchCount;
-                batchSum = newSum;
+                maxTokenLength = newMaxTokenLength;
+                cumulativeSentences = newCumulativeSentences;
+                cumulativeTokens = newCumulativeTokens;
                 currentIndex++;
             }
 

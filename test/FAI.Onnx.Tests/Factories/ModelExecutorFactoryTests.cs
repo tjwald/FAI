@@ -63,6 +63,35 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
         Assert.Throws<NotImplementedException>(() => ModelExecutorFactory.CreateModelPipeline(unknownType, options));
     }
 
+    [Fact]
+    public void ResolveModelExecutorType_ExtractsConfiguredTypeFromAllOptionShapes()
+    {
+        var onnxOptions = new OnnxModelExecutorOptions { ModelExecutorType = ModelExecutorType.Async };
+        Assert.Equal(ModelExecutorType.Async, ModelExecutorFactory.ResolveModelExecutorType(onnxOptions));
+
+        var pooledOptions = new PooledExecutorOptions<OnnxModelExecutorOptions>(
+            new OnnxModelExecutorOptions { ModelExecutorType = ModelExecutorType.Tensor }, 2);
+        Assert.Equal(ModelExecutorType.Tensor, ModelExecutorFactory.ResolveModelExecutorType(pooledOptions));
+
+        var multiOptions = new MultiDeviceExecutorOptions()
+            .AddOptions(opt => opt.ModelExecutorType = ModelExecutorType.Async);
+        Assert.Equal(ModelExecutorType.Async, ModelExecutorFactory.ResolveModelExecutorType(multiOptions));
+    }
+
+    [Fact]
+    public async Task CreateModelPipeline_InfersExecutorTypeFromPooledOptions()
+    {
+        var onnxOptions = CreateOnnxOptions();
+        onnxOptions.ModelExecutorType = ModelExecutorType.Async;
+        var options = new PooledExecutorOptions<OnnxModelExecutorOptions>(onnxOptions, 2);
+
+        // Infers Async from options.ExecutorConfig.ModelExecutorType
+        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline =
+            ModelExecutorFactory.CreateModelPipeline(options);
+
+        await AssertFinitePipelineOutput(pipeline);
+    }
+
     private OnnxModelExecutorOptions CreateOnnxOptions()
     {
         var options = new OnnxModelExecutorOptions();

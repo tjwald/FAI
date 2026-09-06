@@ -64,29 +64,38 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <param name="ortValues">The prepared ONNX tensor values.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
-    protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(Tensor<long>[] inputs, OrtValue[] ortValues);
+    protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
+        Tensor<long>[] inputs,
+        OrtValue[] ortValues,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Executes the model asynchronously with the provided input tensors.
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous execution, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
-    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(Tensor<long>[] inputs)
+    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
+        Tensor<long>[] inputs,
+        CancellationToken cancellationToken)
     {
-        OrtValue[] ortValues = GetModelInputs(inputs);
-        try
+        cancellationToken.ThrowIfCancellationRequested();
+        using (await _semaphore.EnterScope(cancellationToken))
         {
-            using (await _semaphore.EnterScope())
+            cancellationToken.ThrowIfCancellationRequested();
+            OrtValue[] ortValues = GetModelInputs(inputs);
+            try
             {
-                return await RunSessionInference(inputs, ortValues);
+                return await RunSessionInference(inputs, ortValues, cancellationToken);
             }
-        }
-        finally
-        {
-            foreach (OrtValue input in ortValues)
+            finally
             {
-                input.Dispose();
+                foreach (OrtValue input in ortValues)
+                {
+                    input.Dispose();
+                }
             }
         }
     }
@@ -101,7 +110,7 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
             throw new ArgumentException("At least one model input tensor is required.", nameof(input));
         }
 
-        IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input);
+        IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();

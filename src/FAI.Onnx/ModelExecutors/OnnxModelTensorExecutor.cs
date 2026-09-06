@@ -68,12 +68,16 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <param name="ortValues">The prepared ONNX tensor values.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>
     /// A task representing the asynchronous inference operation, containing the result
     /// as a disposable collection of <see cref="OrtValue"/>.
     /// </returns>
-    protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(Tensor<long>[] inputs, OrtValue[] ortValues)
+    protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
+        Tensor<long>[] inputs,
+        OrtValue[] ortValues,
+        CancellationToken cancellationToken = default)
     {
-        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, ortValues);
+        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, ortValues, cancellationToken);
     }
 }

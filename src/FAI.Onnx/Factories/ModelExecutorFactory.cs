@@ -14,6 +14,21 @@ namespace FAI.Onnx.Factories;
 public static class ModelExecutorFactory
 {
     public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
+        IModelExecutorOptions modelExecutorOptions)
+        => CreateModelPipeline(ResolveModelExecutorType(modelExecutorOptions), modelExecutorOptions);
+
+    public static ModelExecutorType ResolveModelExecutorType(IModelExecutorOptions options)
+    {
+        return options switch
+        {
+            OnnxModelExecutorOptions onnx => onnx.ModelExecutorType,
+            PooledExecutorOptions<OnnxModelExecutorOptions> pooled => pooled.ExecutorConfig.ModelExecutorType,
+            MultiDeviceExecutorOptions multi when multi.ExecutorOptions.Count > 0 => multi.ExecutorOptions[0].ModelExecutorType,
+            _ => ModelExecutorType.Simple,
+        };
+    }
+
+    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {

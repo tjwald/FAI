@@ -57,15 +57,16 @@ public static class SemaphoreScopeExtensions
     /// Enters a semaphore scope asynchronously, ensuring the semaphore is released when the scope is disposed.
     /// </summary>
     /// <param name="semaphore">The semaphore to enter. If null, an empty scope is returned.</param>
+    /// <param name="cancellationToken">The cancellation token to observe while waiting for the semaphore.</param>
     /// <returns>A disposable scope that releases the semaphore when disposed.</returns>
-    public static async Task<IDisposable> EnterScope(this SemaphoreSlim? semaphore)
+    public static async Task<IDisposable> EnterScope(this SemaphoreSlim? semaphore, CancellationToken cancellationToken = default)
     {
         if (semaphore is null)
         {
             return EmptyScope.Instance;
         }
 
-        await semaphore.WaitAsync();
+        await semaphore.WaitAsync(cancellationToken);
         return new SemaphoreScope(semaphore);
     }
 }
