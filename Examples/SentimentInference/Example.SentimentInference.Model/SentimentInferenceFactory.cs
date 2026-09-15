@@ -63,8 +63,10 @@ public static class SentimentInferenceFactory
                 .Build();
 
             localServices.AddSingleton<IInference<string, bool>, SentimentInference>();
+            localServices.AddSingleton<IBatchInference<string, bool[]>>(sp => sp.GetRequiredService<IInference<string, bool>>());
 
             localServices.CopyToGlobal<IInference<string, bool>>();
+            localServices.CopyToGlobal<IBatchInference<string, bool[]>>();
         });
     }
 }

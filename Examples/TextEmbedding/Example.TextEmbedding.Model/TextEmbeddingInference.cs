@@ -23,6 +23,13 @@ public sealed class TextEmbeddingInference : IBatchInference<string, Tensor<floa
             throw new ArgumentException("Cannot embed an empty text batch.", nameof(input));
         }
 
+        if (_pipeline is IDestinationPipeline<ReadOnlyMemory<string>, Tensor<float>> destinationPipeline)
+        {
+            Tensor<float> output = Tensor.CreateFromShape<float>([input.Length, EmbeddingPoolingPipeline.EmbeddingDimensions]);
+            await destinationPipeline.ExecuteAsync(input, output);
+            return output;
+        }
+
         return await _pipeline.ExecuteAsync(input);
     }
 }

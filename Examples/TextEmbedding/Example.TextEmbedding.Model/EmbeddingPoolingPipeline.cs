@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Numerics.Tensors;
+using FAI.Core;
 using FAI.Core.Pipelines;
 
 namespace Example.TextEmbedding.Model;
@@ -93,55 +93,36 @@ public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingMod
             throw new ArgumentException("The output buffer and attention mask must match the model output shape.", nameof(output));
         }
 
-        Parallel.ForEach(
-            Partitioner.Create(0, batchSize),
-            new ParallelOptions { CancellationToken = cancellationToken },
-            range =>
+        ReadOnlySpan<float> allTokens = tokenEmbeddings.AsSpan();
+        Span<float> allOutput = output.AsTensorSpan().AsSpan();
+        ReadOnlySpan<long> allMask = attentionMask.AsTensorSpan().AsSpan();
+
+        for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
         {
-            (int start, int end) = range;
-            ReadOnlyTensorSpan<float> localTokenEmbeddings = input.ModelOutputs.GetOutput(0);
-            TensorDimensionSpan<float> destinationRows = output.GetDimensionSpan(0);
-            ReadOnlyTensorDimensionSpan<float> tokenEmbeddingBatches = localTokenEmbeddings.GetDimensionSpan(0);
-            TensorDimensionSpan<long> attentionMaskRows = attentionMask.GetDimensionSpan(0);
-            for (int batchIndex = start; batchIndex < end; batchIndex++)
+            Span<float> embedding = allOutput.Slice(batchIndex * dimensions, dimensions);
+            ReadOnlySpan<long> mask = allMask.Slice(batchIndex * tokenCount, tokenCount);
+            int batchTokenOffset = batchIndex * tokenCount * dimensions;
+            bool hasIncludedTokens = false;
+
+            for (int tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)
             {
-                MeanPoolAndNormalize(
-                    tokenEmbeddingBatches[batchIndex],
-                    attentionMaskRows[batchIndex],
-                    destinationRows[batchIndex]);
+                if (mask[tokenIndex] == 0)
+                {
+                    continue;
+                }
+
+                hasIncludedTokens = true;
+                ReadOnlySpan<float> tokenRow = allTokens.Slice(batchTokenOffset + tokenIndex * dimensions, dimensions);
+                TensorPrimitives.Add(embedding, tokenRow, embedding);
             }
-        });
+
+            float norm = TensorPrimitives.Norm(embedding);
+            if (hasIncludedTokens && norm > 0)
+            {
+                TensorPrimitives.Divide(embedding, norm, embedding);
+            }
+        }
 
         return ValueTask.CompletedTask;
-    }
-
-    private static void MeanPoolAndNormalize(
-        scoped in ReadOnlyTensorSpan<float> tokenEmbeddings,
-        scoped in ReadOnlyTensorSpan<long> attentionMask,
-        scoped in TensorSpan<float> embedding)
-    {
-        bool hasIncludedTokens = false;
-        ReadOnlyTensorDimensionSpan<float> tokenRows = tokenEmbeddings.GetDimensionSpan(0);
-        int tokenCount = checked((int)tokenEmbeddings.Lengths[0]);
-
-        for (int tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)
-        {
-            if (attentionMask[tokenIndex] == 0)
-            {
-                continue;
-            }
-
-            hasIncludedTokens = true;
-            Tensor.Add(tokenRows[tokenIndex], embedding, embedding);
-        }
-
-        ReadOnlyTensorSpan<float> embeddingValues = embedding;
-        float norm = Tensor.Norm(embeddingValues);
-        if (!hasIncludedTokens || norm == 0)
-        {
-            return;
-        }
-
-        Tensor.Divide(embedding, norm, embedding);
     }
 }
