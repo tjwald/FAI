@@ -36,6 +36,7 @@ public static class TextEmbeddingFactory
                     onnxOptions.ModelDir = options.ModelDirectory;
                     onnxOptions.ModelFileName = "model.onnx";
                 }));
+            localServices.AddSingleton(options);
             localServices.AddSingleton(_ => TokenizationUtils.BERTTokenizerFromPretrained(options.ModelDirectory, options.TokenizerOptions));
             localServices.AddSingleton(options.TokenCountOrdering);
             localServices.AddSingleton(options.MaxPaddedTokens);

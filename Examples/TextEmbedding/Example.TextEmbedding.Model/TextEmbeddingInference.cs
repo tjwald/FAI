@@ -7,14 +7,20 @@ namespace Example.TextEmbedding.Model;
 public sealed class TextEmbeddingInference : IBatchInference<string, Tensor<float>>
 {
     private readonly IPipeline<ReadOnlyMemory<string>, Tensor<float>> _pipeline;
+    private readonly TextEmbeddingOptions? _options;
+    private int? _embeddingDimensions;
 
-    public TextEmbeddingInference(IPipeline<ReadOnlyMemory<string>, Tensor<float>> pipeline)
+    public TextEmbeddingInference(
+        IPipeline<ReadOnlyMemory<string>, Tensor<float>> pipeline,
+        TextEmbeddingOptions? options = null)
     {
         _pipeline = pipeline;
+        _options = options;
+        _embeddingDimensions = options?.EmbeddingDimensions;
     }
 
     public Task<Tensor<float>> Predict(string input)
-        => BatchPredict(new[] { input });
+        => BatchPredict((string[])[input]);
 
     public async Task<Tensor<float>> BatchPredict(ReadOnlyMemory<string> input)
     {
@@ -25,9 +31,20 @@ public sealed class TextEmbeddingInference : IBatchInference<string, Tensor<floa
 
         if (_pipeline is IDestinationPipeline<ReadOnlyMemory<string>, Tensor<float>> destinationPipeline)
         {
-            Tensor<float> output = Tensor.CreateFromShape<float>([input.Length, EmbeddingPoolingPipeline.EmbeddingDimensions]);
-            await destinationPipeline.ExecuteAsync(input, output);
-            return output;
+            if (_embeddingDimensions is int dimensions)
+            {
+                Tensor<float> output = Tensor.CreateFromShape<float>([input.Length, dimensions]);
+                await destinationPipeline.ExecuteAsync(input, output);
+                return output;
+            }
+
+            Tensor<float> result = await _pipeline.ExecuteAsync(input);
+            if (result.Lengths.Length >= 2)
+            {
+                _embeddingDimensions = checked((int)result.Lengths[1]);
+            }
+
+            return result;
         }
 
         return await _pipeline.ExecuteAsync(input);

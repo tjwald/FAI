@@ -44,7 +44,13 @@ public sealed class EmbeddingModelPipeline : IPipeline<Tensor<long>[], Embedding
 
 public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingModelOutputs, Tensor<float>>
 {
-    public const int EmbeddingDimensions = 384;
+    public const int DefaultEmbeddingDimensions = 384;
+    private readonly TextEmbeddingOptions? _options;
+
+    public EmbeddingPoolingPipeline(TextEmbeddingOptions? options = null)
+    {
+        _options = options;
+    }
 
     public async ValueTask<Tensor<float>> ExecuteAsync(
         EmbeddingModelOutputs input,
@@ -55,7 +61,9 @@ public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingMod
             throw new InvalidOperationException("The embedding model did not produce an output tensor.");
         }
 
-        Tensor<float> output = Tensor.CreateFromShape<float>([input.ModelOutputs.GetOutput(0).Lengths[0], EmbeddingDimensions]);
+        ReadOnlyTensorSpan<float> tokenEmbeddings = input.ModelOutputs.GetOutput(0);
+        int dimensions = checked((int)tokenEmbeddings.Lengths[2]);
+        Tensor<float> output = Tensor.CreateFromShape<float>([tokenEmbeddings.Lengths[0], dimensions]);
         await ExecuteAsync(input, output, cancellationToken);
         return output;
     }
@@ -82,9 +90,9 @@ public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingMod
         int dimensions = checked((int)tokenEmbeddings.Lengths[2]);
         Tensor<long> attentionMask = input.AttentionMask;
 
-        if (dimensions != EmbeddingDimensions)
+        if (_options?.EmbeddingDimensions is int expectedDimensions && expectedDimensions != dimensions)
         {
-            throw new InvalidOperationException($"Expected {EmbeddingDimensions} embedding dimensions, but the model produced {dimensions}.");
+            throw new InvalidOperationException($"Expected {expectedDimensions} embedding dimensions, but the model produced {dimensions}.");
         }
 
         if (output.Rank != 2 || output.Lengths[0] != batchSize || output.Lengths[1] != dimensions ||
@@ -97,12 +105,65 @@ public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingMod
         Span<float> allOutput = output.AsTensorSpan().AsSpan();
         ReadOnlySpan<long> allMask = attentionMask.AsTensorSpan().AsSpan();
 
+        PoolingStrategy strategy = _options?.PoolingStrategy ?? PoolingStrategy.Mean;
+        bool normalize = _options?.Normalize ?? true;
+
+        if (strategy == PoolingStrategy.ClsToken)
+        {
+            PoolClsToken(batchSize, tokenCount, dimensions, allTokens, allOutput, normalize);
+        }
+        else
+        {
+            PoolMean(batchSize, tokenCount, dimensions, allTokens, allOutput, allMask, normalize);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    private static void PoolClsToken(
+        int batchSize,
+        int tokenCount,
+        int dimensions,
+        ReadOnlySpan<float> allTokens,
+        Span<float> allOutput,
+        bool normalize)
+    {
+        for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
+        {
+            Span<float> embedding = allOutput.Slice(batchIndex * dimensions, dimensions);
+            int batchTokenOffset = batchIndex * tokenCount * dimensions;
+            ReadOnlySpan<float> clsRow = allTokens.Slice(batchTokenOffset, dimensions);
+            clsRow.CopyTo(embedding);
+
+            if (normalize)
+            {
+                float norm = TensorPrimitives.Norm(embedding);
+                if (norm > 0)
+                {
+                    TensorPrimitives.Divide(embedding, norm, embedding);
+                }
+            }
+        }
+    }
+
+    private static void PoolMean(
+        int batchSize,
+        int tokenCount,
+        int dimensions,
+        ReadOnlySpan<float> allTokens,
+        Span<float> allOutput,
+        ReadOnlySpan<long> allMask,
+        bool normalize)
+    {
         for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
         {
             Span<float> embedding = allOutput.Slice(batchIndex * dimensions, dimensions);
             ReadOnlySpan<long> mask = allMask.Slice(batchIndex * tokenCount, tokenCount);
             int batchTokenOffset = batchIndex * tokenCount * dimensions;
             bool hasIncludedTokens = false;
+            int includedCount = 0;
+
+            embedding.Clear();
 
             for (int tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)
             {
@@ -112,17 +173,23 @@ public sealed class EmbeddingPoolingPipeline : IDestinationPipeline<EmbeddingMod
                 }
 
                 hasIncludedTokens = true;
+                includedCount++;
                 ReadOnlySpan<float> tokenRow = allTokens.Slice(batchTokenOffset + tokenIndex * dimensions, dimensions);
                 TensorPrimitives.Add(embedding, tokenRow, embedding);
             }
 
-            float norm = TensorPrimitives.Norm(embedding);
-            if (hasIncludedTokens && norm > 0)
+            if (!normalize && includedCount > 0)
             {
-                TensorPrimitives.Divide(embedding, norm, embedding);
+                TensorPrimitives.Divide(embedding, includedCount, embedding);
+            }
+            else if (normalize)
+            {
+                float norm = TensorPrimitives.Norm(embedding);
+                if (hasIncludedTokens && norm > 0)
+                {
+                    TensorPrimitives.Divide(embedding, norm, embedding);
+                }
             }
         }
-
-        return ValueTask.CompletedTask;
     }
 }
