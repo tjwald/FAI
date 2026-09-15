@@ -14,6 +14,11 @@ public sealed class ForkPipeline<TInput, TBranch> : IPipeline<TInput, (TInput In
         CancellationToken cancellationToken = default)
     {
         TBranch branchOutput = await _branch.ExecuteAsync(input, cancellationToken);
+        if (input is not null && !typeof(TInput).IsValueType && (input is IDisposable or IAsyncDisposable))
+        {
+            PipelineOutputDisposer.PreserveBorrowed(input);
+        }
+
         return (input, branchOutput);
     }
 }

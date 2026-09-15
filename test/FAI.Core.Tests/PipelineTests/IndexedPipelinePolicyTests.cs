@@ -265,6 +265,51 @@ public sealed class IndexedPipelinePolicyTests
         Assert.Equal([100, 20, 300, 40], destination.ToArray());
     }
 
+    [Fact]
+    public async Task RoutingPipeline_ThrowsWhenRoutesDoNotCoverAllInputs()
+    {
+        var routing = new FixedIndicesRoutingStrategy(new ReturningMultiplyPipeline(10), [0, 2]);
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+        Memory<int> destination = new int[4];
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => pipeline.ExecuteAsync(input, destination, TestContext.Current.CancellationToken).AsTask());
+    }
+
+    [Fact]
+    public async Task RoutingPipeline_ThrowsWhenRoutesContainDuplicateIndices()
+    {
+        var routing = new FixedIndicesRoutingStrategy(new ReturningMultiplyPipeline(10), [0, 1], [1, 2]);
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+        Memory<int> destination = new int[4];
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => pipeline.ExecuteAsync(input, destination, TestContext.Current.CancellationToken).AsTask());
+    }
+
+    [Fact]
+    public async Task RoutingPipeline_ThrowsWhenRoutesContainOutOfRangeIndices()
+    {
+        var routing = new FixedIndicesRoutingStrategy(new ReturningMultiplyPipeline(10), [0, 1, 2, 4]);
+        var pipeline = new RoutingPipeline<ReadOnlyMemory<int>, Memory<int>>(
+            routing,
+            new ReadOnlyMemoryBatchOperations<int>(),
+            new MemoryBatchOperations<int>());
+        int[] input = [1, 2, 3, 4];
+        Memory<int> destination = new int[4];
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => pipeline.ExecuteAsync(input, destination, TestContext.Current.CancellationToken).AsTask());
+    }
+
     private static Tensor<float> CreateTensor(ReadOnlySpan<nint> lengths, float[] values)
         => Tensor.Create(values, lengths);
 
@@ -480,5 +525,22 @@ public sealed class IndexedPipelinePolicyTests
                 new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(_odd, oddIndices),
             ];
         }
+    }
+
+    private sealed class FixedIndicesRoutingStrategy : IBatchRoutingStrategy<ReadOnlyMemory<int>, Memory<int>>
+    {
+        private readonly IDestinationPipeline<ReadOnlyMemory<int>, Memory<int>> _target;
+        private readonly int[][] _routeIndices;
+
+        public FixedIndicesRoutingStrategy(
+            IPipeline<ReadOnlyMemory<int>, Memory<int>> target,
+            params int[][] routeIndices)
+        {
+            _target = target.AsDestinationPipeline(new MemoryBatchOperations<int>());
+            _routeIndices = routeIndices;
+        }
+
+        public List<BatchRoute<ReadOnlyMemory<int>, Memory<int>>> Route(ReadOnlyMemory<int> input)
+            => _routeIndices.Select(indices => new BatchRoute<ReadOnlyMemory<int>, Memory<int>>(_target, indices)).ToList();
     }
 }

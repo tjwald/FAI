@@ -25,7 +25,7 @@ public class TextClassificationIntegrationTests
         await using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<
             IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>>>();
-        ReadOnlyMemory<string> input = new string[] { "hello" };
+        string[] input = ["hello"];
         Memory<ClassificationResult<bool, float>> output =
             await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 

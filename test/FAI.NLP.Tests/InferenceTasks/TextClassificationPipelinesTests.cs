@@ -17,11 +17,11 @@ public class TextClassificationPipelinesTests
         var options = new ClassificationOptions<string>(["Negative", "Positive"]);
         var encodingPipeline = new TextTensorization(tokenizer);
         var decodingPipeline = new ClassificationDecoding<string>(options);
-        ReadOnlyMemory<TokenizedText> inputs = new TokenizedText[]
-        {
+        TokenizedText[] inputs =
+        [
             new("hello", tokenizer.Tokenize("hello").ToArray()),
             new("world", tokenizer.Tokenize("world").ToArray()),
-        };
+        ];
         Tensor<long>[] encoded = await encodingPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         Tensor<float> logits = Tensor.Create([0.1f, 0.9f, 0.8f, 0.2f], [2, 2]);
         using var outputs = new TestTensorOutputs(logits);

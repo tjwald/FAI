@@ -97,9 +97,24 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
         for (int i = 0; i < routes.Count; i++)
         {
             routeOffsets[i] = currentOffset;
-            routes[i].InputIndices.CopyTo(sourceToDestination, currentOffset);
-            currentOffset += routes[i].InputIndices.Length;
+            int[] indices = routes[i].InputIndices;
+            if (currentOffset + indices.Length > totalCount)
+            {
+                throw new InvalidOperationException(
+                    $"Routing routes cover more than the total batch count of {totalCount}.");
+            }
+
+            indices.CopyTo(sourceToDestination, currentOffset);
+            currentOffset += indices.Length;
         }
+
+        if (currentOffset != totalCount)
+        {
+            throw new InvalidOperationException(
+                $"Routing routes must cover all {totalCount} input items, but routes only covered {currentOffset} items.");
+        }
+
+        ValidatePermutation(sourceToDestination, totalCount);
 
         await _scheduler.ExecuteAsync(
             GetRouteRanges(routes.Count),
@@ -121,6 +136,22 @@ public sealed class RoutingPipeline<TInput, TOutput> : IDestinationPipeline<TInp
             cancellationToken);
 
         _outputBatch.PermuteInPlace(destination, sourceToDestination);
+    }
+
+    private static void ValidatePermutation(ReadOnlySpan<int> indices, int totalCount)
+    {
+        Span<bool> seen = totalCount <= 256 ? stackalloc bool[totalCount] : new bool[totalCount];
+        for (int i = 0; i < indices.Length; i++)
+        {
+            int index = indices[i];
+            if ((uint)index >= (uint)totalCount || seen[index])
+            {
+                throw new InvalidOperationException(
+                    $"Routing routes must cover every input index from 0 to {totalCount - 1} exactly once. Invalid or duplicate index: {index}.");
+            }
+
+            seen[index] = true;
+        }
     }
 
     private static IEnumerable<Range> GetRouteRanges(int count)

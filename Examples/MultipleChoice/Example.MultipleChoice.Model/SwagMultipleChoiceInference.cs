@@ -20,7 +20,8 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
 
     public async Task<ChoiceResult<TokenizedText>> Predict(SwagInput input)
     {
-        ChoiceResult<TokenizedText>[] output = await BatchPredict(new[] { input });
+        SwagInput[] batch = [input];
+        ChoiceResult<TokenizedText>[] output = await BatchPredict(batch);
         return output[0];
     }
 

@@ -114,8 +114,9 @@ public sealed class PipelinePipelineBuilderTests
         var destinationPipeline = Assert.IsAssignableFrom<IDestinationPipeline<ReadOnlyMemory<int>, Memory<long>>>(pipeline);
 
         Memory<long> output = new long[5];
+        int[] input = [1, 2, 3, 4, 5];
         await destinationPipeline.ExecuteAsync(
-            new[] { 1, 2, 3, 4, 5 },
+            input,
             output,
             TestContext.Current.CancellationToken);
         PartitionedLongPipeline inner = serviceProvider.GetRequiredService<PartitionedLongPipeline>();
@@ -275,6 +276,30 @@ public sealed class PipelinePipelineBuilderTests
         Assert.True(branchPipeline.Output!.IsDisposed);
     }
 
+    [Fact]
+    public async Task Fork_PreservesDisposableInputAsBorrowedAndDisposesBranchOutput()
+    {
+        var services = new ServiceCollection();
+
+        services
+            .AddPipeline<DisposableValue>()
+            .Fork(branch => branch
+                .Then<DisposableValue, DisposableValueIdentityPipeline>())
+            .Then<int, CombineTwoDisposablesPipeline>()
+            .Build();
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        IPipeline<DisposableValue, int> pipeline = serviceProvider.GetRequiredService<IPipeline<DisposableValue, int>>();
+        DisposableValueIdentityPipeline branchPipeline = serviceProvider.GetRequiredService<DisposableValueIdentityPipeline>();
+
+        var input = new DisposableValue(21);
+        int output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, output);
+        Assert.False(input.IsDisposed);
+        Assert.True(branchPipeline.Output!.IsDisposed);
+    }
+
     private sealed class FormatPairPipeline : IPipeline<(int[] Input, long[] Output), string[]>
     {
         public ValueTask<string[]> ExecuteAsync((int[] Input, long[] Output) input, CancellationToken cancellationToken = default)
@@ -293,6 +318,27 @@ public sealed class PipelinePipelineBuilderTests
         {
             Assert.False(input.Output.IsDisposed);
             return ValueTask.FromResult(input.Input + input.Output.Value);
+        }
+    }
+
+    private sealed class CombineTwoDisposablesPipeline : IPipeline<(DisposableValue Input, DisposableValue Output), int>
+    {
+        public ValueTask<int> ExecuteAsync((DisposableValue Input, DisposableValue Output) input, CancellationToken cancellationToken = default)
+        {
+            Assert.False(input.Input.IsDisposed);
+            Assert.False(input.Output.IsDisposed);
+            return ValueTask.FromResult(input.Input.Value + input.Output.Value);
+        }
+    }
+
+    private sealed class DisposableValueIdentityPipeline : IPipeline<DisposableValue, DisposableValue>
+    {
+        public DisposableValue? Output { get; private set; }
+
+        public ValueTask<DisposableValue> ExecuteAsync(DisposableValue input, CancellationToken cancellationToken = default)
+        {
+            Output = new DisposableValue(input.Value);
+            return ValueTask.FromResult(Output);
         }
     }
 

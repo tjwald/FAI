@@ -18,7 +18,7 @@ public class TokenBatchPolicyTests
     public void TokenCountOrdering_CreatesAscendingPermutation()
     {
         var ordering = new TokenCountOrdering<TestTokenizable>(new TokenCountOrderingOptions(Ascending: true));
-        ReadOnlyMemory<TestTokenizable> inputs = new TestTokenizable[] { new(10), new(2), new(5) };
+        TestTokenizable[] inputs = [new(10), new(2), new(5)];
 
         int[] order = ordering.CreateOrder(inputs);
 
@@ -30,7 +30,7 @@ public class TokenBatchPolicyTests
     {
         var tokenizer = DummyTokenizerFactory.Create();
         var pipeline = new TextTokenization(tokenizer);
-        ReadOnlyMemory<string> inputs = new string[] { "hello", "hello world" };
+        string[] inputs = ["hello", "hello world"];
 
         ReadOnlyMemory<TokenizedText> output = await pipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
 

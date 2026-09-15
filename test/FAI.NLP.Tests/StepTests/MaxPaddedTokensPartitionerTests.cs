@@ -17,7 +17,7 @@ public class MaxPaddedTokensPartitionerTests
     {
         var options = new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 0.5, MaxTokenCount: 10);
         var partitioner = new MaxPaddedTokensPartitioner<TestTokenizable>(options);
-        ReadOnlyMemory<TestTokenizable> inputs = new TestTokenizable[] { new(4), new(4), new(4) };
+        TestTokenizable[] inputs = [new(4), new(4), new(4)];
 
         Range[] ranges = partitioner.Partition(inputs).ToArray();
 
@@ -29,7 +29,7 @@ public class MaxPaddedTokensPartitionerTests
     {
         var options = new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 1.0, MaxTokenCount: 10);
         var partitioner = new MaxPaddedTokensPartitioner<TestTokenizable>(options);
-        ReadOnlyMemory<TestTokenizable> inputs = new TestTokenizable[] { new(6), new(2) };
+        TestTokenizable[] inputs = [new(6), new(2)];
 
         Range[] ranges = partitioner.Partition(inputs).ToArray();
 
@@ -45,11 +45,11 @@ public class MaxPaddedTokensPartitionerTests
         var options = new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 1.0, MaxTokenCount: 30);
         var partitioner = new MaxPaddedTokensPartitioner<MultipleChoiceTokenizable>(options);
         // Each item has 4 sentences with max token length 5 (each item = 20 padded tokens)
-        ReadOnlyMemory<MultipleChoiceTokenizable> inputs = new MultipleChoiceTokenizable[]
-        {
+        MultipleChoiceTokenizable[] inputs =
+        [
             new(TokenCount: 20, MaxTokenLength: 5, SentenceCount: 4),
             new(TokenCount: 20, MaxTokenLength: 5, SentenceCount: 4),
-        };
+        ];
 
         Range[] ranges = partitioner.Partition(inputs).ToArray();
 

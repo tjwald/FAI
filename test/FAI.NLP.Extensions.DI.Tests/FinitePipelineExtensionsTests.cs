@@ -16,7 +16,7 @@ public class FinitePipelineExtensionsTests
         ServiceProvider provider = BuildProvider(useOrdering: true, usePartitioning: false);
         var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         var inner = provider.GetRequiredService<RecordingPipeline>();
-        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(10), new(2), new(5) };
+        TestTokenizable[] input = [new(10), new(2), new(5)];
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([2, 5, 10], inner.ObservedTokenCounts);
@@ -29,7 +29,7 @@ public class FinitePipelineExtensionsTests
         ServiceProvider provider = BuildProvider(useOrdering: false, usePartitioning: true);
         var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         var inner = provider.GetRequiredService<RecordingPipeline>();
-        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(4), new(4), new(4) };
+        TestTokenizable[] input = [new(4), new(4), new(4)];
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         Assert.Equal([2, 1], inner.BatchSizes);
@@ -42,7 +42,7 @@ public class FinitePipelineExtensionsTests
         ServiceProvider provider = BuildProvider(useOrdering: true, usePartitioning: true);
         var pipeline = provider.GetRequiredService<IPipeline<ReadOnlyMemory<TestTokenizable>, Memory<int>>>();
         var inner = provider.GetRequiredService<RecordingPipeline>();
-        ReadOnlyMemory<TestTokenizable> input = new TestTokenizable[] { new(9), new(2), new(4), new(3) };
+        TestTokenizable[] input = [new(9), new(2), new(4), new(3)];
 
         Memory<int> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 

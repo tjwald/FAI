@@ -27,10 +27,10 @@ public class MultipleChoiceIntegrationTests
         await using ServiceProvider provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<
             IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>>();
-        ReadOnlyMemory<TextMultipleChoiceInput> input = new TextMultipleChoiceInput[]
-        {
+        TextMultipleChoiceInput[] input =
+        [
             new("Question", [new("choice 1"), new("choice 2")]),
-        };
+        ];
         Memory<ChoiceResult<TokenizedText>> output =
             await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
 
