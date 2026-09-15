@@ -1,8 +1,9 @@
 using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Pipelines;
+using FAI.NLP.Configuration;
 
-namespace Example.TextEmbedding.Model;
+namespace FAI.NLP.InferenceTasks.TextEmbedding;
 
 public sealed class TextEmbeddingInference : IBatchInference<string, Tensor<float>>
 {
@@ -48,5 +49,22 @@ public sealed class TextEmbeddingInference : IBatchInference<string, Tensor<floa
         }
 
         return await _pipeline.ExecuteAsync(input);
+    }
+
+    public async Task BatchPredict(ReadOnlyMemory<string> input, Tensor<float> destination)
+    {
+        if (input.IsEmpty)
+        {
+            throw new ArgumentException("Cannot embed an empty text batch.", nameof(input));
+        }
+
+        if (_pipeline is IDestinationPipeline<ReadOnlyMemory<string>, Tensor<float>> destinationPipeline)
+        {
+            await destinationPipeline.ExecuteAsync(input, destination);
+            return;
+        }
+
+        Tensor<float> result = await _pipeline.ExecuteAsync(input);
+        result.AsReadOnlyTensorSpan().CopyTo(destination.AsTensorSpan());
     }
 }

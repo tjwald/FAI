@@ -4,23 +4,13 @@ using FAI.Onnx.Configuration;
 
 namespace Example.TextEmbedding.Model;
 
-public enum PoolingStrategy
-{
-    Mean,
-    ClsToken
-}
-
-public sealed record TextEmbeddingOptions(
+public sealed record TextEmbeddingModelOptions(
     string ModelDirectory,
     PretrainedTokenizerOptions TokenizerOptions,
     ModelExecutorType ModelExecutorType = ModelExecutorType.Simple,
     bool UseGpu = true)
 {
-    public int? EmbeddingDimensions { get; init; } = 384;
-
-    public PoolingStrategy PoolingStrategy { get; init; } = PoolingStrategy.Mean;
-
-    public bool Normalize { get; init; } = true;
+    public TextEmbeddingOptions DecodingOptions { get; init; } = new(PoolingStrategy.Mean, Normalize: true, EmbeddingDimensions: 384);
 
     public TokenCountOrderingOptions TokenCountOrdering { get; init; } = new(Ascending: true);
 
@@ -30,6 +20,6 @@ public sealed record TextEmbeddingOptions(
 
     public ParallelPartitionSchedulerOptions ParallelScheduler { get; init; } = new(MaxConcurrency: 10);
 
-    public static TextEmbeddingOptions Create(string modelDirectory)
-        => new(modelDirectory, new PretrainedTokenizerOptions(MaxTokenLength: 256));
+    public static TextEmbeddingModelOptions Create(string modelDirectory)
+        => new(modelDirectory, new PretrainedTokenizerOptions(MaxTokenLength: 256, IncludeTokenTypeIds: true));
 }

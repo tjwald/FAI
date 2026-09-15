@@ -1,7 +1,7 @@
 using System.Numerics.Tensors;
-using Example.TextEmbedding.Model;
 using FAI.Core;
 using FAI.Extensions.Evaluation;
+using FAI.NLP.InferenceTasks.TextEmbedding;
 using Microsoft.Extensions.Logging.Abstractions;
 using Parquet;
 using Parquet.Data;

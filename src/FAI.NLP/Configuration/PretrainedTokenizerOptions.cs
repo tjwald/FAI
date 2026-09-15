@@ -28,4 +28,9 @@ public enum TruncationOption
 /// <param name="PaddingToken">The token used for padding sequences.</param>
 /// <param name="MaxTokenLength">The maximum number of tokens allowed in a sequence.</param>
 /// <param name="TruncationOption">The truncation strategy applied when tokenizing text.</param>
-public sealed record PretrainedTokenizerOptions(int PaddingToken = 0, int MaxTokenLength = 512, TruncationOption TruncationOption = TruncationOption.Longest);
+/// <param name="IncludeTokenTypeIds">Whether to include a zero-filled token type IDs tensor in batch tensorization.</param>
+public sealed record PretrainedTokenizerOptions(
+    int PaddingToken = 0,
+    int MaxTokenLength = 512,
+    TruncationOption TruncationOption = TruncationOption.Longest,
+    bool IncludeTokenTypeIds = false);

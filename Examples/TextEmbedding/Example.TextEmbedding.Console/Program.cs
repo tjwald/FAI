@@ -2,12 +2,13 @@ using System.Numerics.Tensors;
 using Example.TextEmbedding.ConsoleApp;
 using Example.TextEmbedding.Model;
 using FAI.Core;
+using FAI.NLP.InferenceTasks.TextEmbedding;
 using Microsoft.Extensions.DependencyInjection;
 
 string modelDirectory = await MiniLmModelDownloader.EnsureDownloadedAsync();
 
 var services = new ServiceCollection();
-var options = TextEmbeddingOptions.Create(modelDirectory) with
+var options = TextEmbeddingModelOptions.Create(modelDirectory) with
 {
     UseGpu = !args.Contains("--cpu", StringComparer.OrdinalIgnoreCase)
 };
