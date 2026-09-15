@@ -112,11 +112,10 @@ public class TextEmbeddingTaskTests
     }
 
     [Fact]
-    public async Task TextEmbeddingInference_PredictAndBatchPredict_ProduceExpectedTensors()
+    public async Task TensorBatchInference_PredictAndBatchPredict_ProduceExpectedTensors()
     {
-        var options = new TextEmbeddingOptions(PoolingStrategy.Mean, Normalize: false, EmbeddingDimensions: 2);
         var stubPipeline = new StubEmbeddingPipeline();
-        var inference = new TextEmbeddingInference(stubPipeline, options);
+        var inference = new TensorBatchInference<string, float>(stubPipeline, secondaryDimension: 2);
 
         Tensor<float> single = await inference.Predict("hello");
         Assert.Equal([1, 2], single.Lengths.ToArray());

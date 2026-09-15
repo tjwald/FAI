@@ -1,7 +1,7 @@
 using System.Numerics.Tensors;
 using FAI.Core;
+using FAI.Core.Abstractions;
 using FAI.Extensions.Evaluation;
-using FAI.NLP.InferenceTasks.TextEmbedding;
 using Microsoft.Extensions.Logging.Abstractions;
 using Parquet;
 using Parquet.Data;
@@ -22,7 +22,7 @@ internal sealed record StsEvaluationSummary(int PairCount, double Pearson, doubl
 
 internal static class StsBenchmark
 {
-    public static async Task RunAsync(TextEmbeddingInference embeddings, string datasetPath, string performanceDatasetPath)
+    public static async Task RunAsync(ITensorInference<string, float> embeddings, string datasetPath, string performanceDatasetPath)
     {
         _ = await embeddings.BatchPredict(new string[]
         {
@@ -56,7 +56,7 @@ internal static class StsBenchmark
     private static EvaluationPipeline<string, TLoadedInput, string, Tensor<float>, TEvaluationResult>
         CreatePipeline<TLoadedInput, TEvaluationResult>(
             IDataLoader<string, TLoadedInput, string> loader,
-            TextEmbeddingInference embeddings,
+            ITensorInference<string, float> embeddings,
             IEvaluator<TLoadedInput, Tensor<float>, TEvaluationResult> evaluator)
         where TLoadedInput : IInferenceInputGetter<string>
     {

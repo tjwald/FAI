@@ -10,7 +10,7 @@ The model pipeline performs:
 4. ONNX inference over token IDs, attention masks, and zero-valued token type IDs.
 5. Attention-mask mean pooling and L2 normalization directly into one preallocated `[batch, 384]` `Tensor<float>`.
 
-`TextEmbeddingInference.Predict` returns a `[1, 384]` tensor, while `BatchPredict` returns `[batch, 384]`. The pooling stage writes directly into that final contiguous tensor and uses vectorized token-row accumulation without intermediate per-embedding arrays.
+`ITensorInference<string, float>.Predict` returns a `[1, 384]` tensor, while `BatchPredict` returns `[batch, 384]`. The pooling stage writes directly into that final contiguous tensor and uses vectorized token-row accumulation without intermediate per-embedding arrays.
 
 The batching defaults match the sentiment example: ascending token-count ordering, a `0.1` maximum padded-token ratio, a `2048` token budget per partition, and up to `10` concurrent partitions. Override these through `TextEmbeddingOptions` for different hardware or workloads.
 

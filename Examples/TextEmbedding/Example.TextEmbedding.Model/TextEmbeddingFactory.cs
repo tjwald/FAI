@@ -1,4 +1,6 @@
 using System.Numerics.Tensors;
+using FAI.Core;
+using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
 using FAI.Core.Extensions.DI;
@@ -59,8 +61,18 @@ public static class TextEmbeddingFactory
                 .Then<Tensor<float>, TextEmbeddingDecoding>()
                 .Build();
 
-            localServices.AddSingleton<TextEmbeddingInference>();
-            localServices.CopyToGlobal<TextEmbeddingInference>();
+            localServices.AddSingleton<ITensorInference<string, float>>(sp =>
+                new TensorBatchInference<string, float>(
+                    sp.GetRequiredService<IPipeline<ReadOnlyMemory<string>, Tensor<float>>>(),
+                    options.DecodingOptions.EmbeddingDimensions));
+            localServices.AddSingleton<IBatchInference<string, Tensor<float>>>(sp =>
+                sp.GetRequiredService<ITensorInference<string, float>>());
+            localServices.AddSingleton(sp =>
+                (TensorBatchInference<string, float>)sp.GetRequiredService<ITensorInference<string, float>>());
+
+            localServices.CopyToGlobal<ITensorInference<string, float>>();
+            localServices.CopyToGlobal<IBatchInference<string, Tensor<float>>>();
+            localServices.CopyToGlobal<TensorBatchInference<string, float>>();
         });
     }
 }

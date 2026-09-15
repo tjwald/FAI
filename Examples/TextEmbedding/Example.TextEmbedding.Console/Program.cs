@@ -2,7 +2,7 @@ using System.Numerics.Tensors;
 using Example.TextEmbedding.ConsoleApp;
 using Example.TextEmbedding.Model;
 using FAI.Core;
-using FAI.NLP.InferenceTasks.TextEmbedding;
+using FAI.Core.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 string modelDirectory = await MiniLmModelDownloader.EnsureDownloadedAsync();
@@ -14,7 +14,7 @@ var options = TextEmbeddingModelOptions.Create(modelDirectory) with
 };
 services.AddTextEmbeddingInference(options);
 await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-var embeddings = serviceProvider.GetRequiredService<TextEmbeddingInference>();
+var embeddings = serviceProvider.GetRequiredService<ITensorInference<string, float>>();
 
 if (args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase))
 {
