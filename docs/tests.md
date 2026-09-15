@@ -44,9 +44,9 @@ The test suite covers the following areas:
 
 ## Integration Testing Strategy
 
-Testing every possible permutation of pipeline components (Schedulers, Slicers, Executors) is neither feasible nor desirable. Instead, we follow a "Representative Combinations" strategy:
+Testing every possible permutation of pipelines and policies is neither feasible nor desirable. Instead, we follow a "Representative Combinations" strategy:
 
-1. **Common Architectural Patterns**: We prioritize testing configurations used in production-like scenarios, such as `Background -> Partition -> Tokenizer -> Model`.
-2. **Component Breadth**: Every major abstraction (e.g., `IPipelineBatchExecutor<TIn, TOut>`, `IBatchSchedular<TIn, TOut>`) must be included in at least one end-to-end integration test.
-3. **Lifecycle & Concurrency**: We focus on cross-component state management, ensuring that data flows correctly through asynchronous boundaries (like `BackgroundPipelineBatchExecutor`) and partitioning logic.
-4. **Logical Mocks**: We use manual implementation of `IModelExecutor` (e.g., `LogicalMockModelExecutor`) to verify the *library's* orchestration logic without the overhead or non-determinism of actual ONNX/PyTorch models.
+1. **Common Architectural Patterns**: Prioritize production-like chains such as tokenization, ordering, partitioning, and model execution.
+2. **Component Breadth**: Every major pipeline contract, indexed-batch trait, and policy should appear in focused or integration coverage.
+3. **Lifecycle & Concurrency**: Verify intermediate leases, caller-owned output, order restoration, cancellation, and bounded scheduling.
+4. **Logical Mocks**: Use small `IPipeline` implementations and disposable `TensorOutputs<T>` values to verify orchestration without runtime-model overhead or nondeterminism.

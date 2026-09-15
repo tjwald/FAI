@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics.Tensors;
-using System.Runtime.InteropServices;
 using FAI.Core;
-using FAI.Core.Abstractions;
+using FAI.Core.Pipelines;
 using FAI.Core.Utilities;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
@@ -14,7 +13,7 @@ namespace FAI.Onnx.ModelExecutors;
 /// Defines a contract for an ONNX model executor.
 /// </summary>
 /// <typeparam name="T">The type of the executor implementing this interface.</typeparam>
-public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T : IOnnxModelExecutor<T>
+public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 {
     /// <summary>
     /// Creates an instance of the ONNX model executor with the specified session, options, and configuration.
@@ -29,7 +28,7 @@ public interface IOnnxModelExecutor<out T> : IModelExecutor<long, float> where T
 /// <summary>
 /// Provides a base implementation for ONNX model executors.
 /// </summary>
-public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
+public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.
@@ -65,55 +64,62 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <param name="ortValues">The prepared ONNX tensor values.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
-    protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(Tensor<long>[] inputs, OrtValue[] ortValues);
+    protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
+        Tensor<long>[] inputs,
+        OrtValue[] ortValues,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Executes the model asynchronously with the provided input tensors.
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous execution, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
-    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(Tensor<long>[] inputs)
+    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
+        Tensor<long>[] inputs,
+        CancellationToken cancellationToken)
     {
-        OrtValue[] ortValues = GetModelInputs(inputs);
-
-        IDisposableReadOnlyCollection<OrtValue> result;
-        using (await _semaphore.EnterScope())
+        cancellationToken.ThrowIfCancellationRequested();
+        using (await _semaphore.EnterScope(cancellationToken))
         {
-            result = await RunSessionInference(inputs, ortValues);
+            cancellationToken.ThrowIfCancellationRequested();
+            OrtValue[] ortValues = GetModelInputs(inputs);
+            try
+            {
+                return await RunSessionInference(inputs, ortValues, cancellationToken);
+            }
+            finally
+            {
+                foreach (OrtValue input in ortValues)
+                {
+                    input.Dispose();
+                }
+            }
         }
-
-        foreach (var input in ortValues)
-        {
-            input.Dispose();
-        }
-
-        return result;
     }
 
-    /// <summary>
-    /// Runs the model asynchronously and returns the output as an array of tensors.
-    /// </summary>
-    /// <param name="inputs">The input tensors for the model.</param>
-    /// <returns>A task containing the output tensors.</returns>
-    public async Task<Tensor<float>[]> RunAsync(Tensor<long>[] inputs)
+    public async ValueTask<TensorOutputs<float>> ExecuteAsync(
+        Tensor<long>[] input,
+        CancellationToken cancellationToken = default)
     {
-        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
-        return ToOutTensors(result);
-    }
-
-    /// <summary>
-    /// Runs the model asynchronously and processes the output using the provided callback.
-    /// </summary>
-    /// <param name="inputs">The input tensors for the model.</param>
-    /// <param name="postProcess">A callback to process each output tensor span.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task RunAsync(Tensor<long>[] inputs, Action<ReadOnlyTensorSpan<float>, int> postProcess)
-    {
-        using IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(inputs);
-        for (int i = 0; i < result.Count; i++)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (input.Length == 0)
         {
-            postProcess(result[i].GetTensorDataAsTensorSpan<float>(), i);
+            throw new ArgumentException("At least one model input tensor is required.", nameof(input));
+        }
+
+        IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new OnnxTensorOutputs(result);
+        }
+        catch
+        {
+            result.Dispose();
+            throw;
         }
     }
 
@@ -133,40 +139,6 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
         _inputMemoryPool.Add(modelInputs);
 
         return ortValues;
-    }
-
-    private static Tensor<float>[] ToOutTensors(IReadOnlyCollection<OrtValue> result)
-    {
-        var outTensors = new Tensor<float>[result.Count];
-        if (result is List<OrtValue> ortValues)
-        {
-            Span<OrtValue> span = CollectionsMarshal.AsSpan(ortValues);
-            for (int i = 0; i < span.Length; i++)
-            {
-                outTensors[i] = ToOutTensor(span[i]);
-            }
-
-            return outTensors;
-        }
-
-        int index = 0;
-        foreach (OrtValue tensor in result)
-        {
-            outTensors[index] = ToOutTensor(tensor);
-            index++;
-        }
-
-        return outTensors;
-    }
-
-    private static Tensor<float> ToOutTensor(OrtValue tensor)
-    {
-        ReadOnlyTensorSpan<float> x = tensor.GetTensorDataAsTensorSpan<float>();
-
-        Tensor<float> outTensor = Tensor.CreateFromShape<float>(x.Lengths, x.Strides);
-        x.CopyTo(outTensor);
-
-        return outTensor;
     }
 
     private Memory<long>[] GetInputsAsMemory(Tensor<long>[] inputs)
@@ -200,4 +172,14 @@ public abstract class OnnxModelExecutorBase : IModelExecutor<long, float>
 
         return dims;
     }
+}
+
+internal sealed class OnnxTensorOutputs(IDisposableReadOnlyCollection<OrtValue> outputs) : TensorOutputs<float>
+{
+    public override int Count => outputs.Count;
+
+    public override ReadOnlyTensorSpan<float> GetOutput(int index)
+        => outputs[index].GetTensorDataAsTensorSpan<float>();
+
+    public override void Dispose() => outputs.Dispose();
 }

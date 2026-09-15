@@ -36,7 +36,7 @@ public ref struct TokensView
             int maxTokens = -1;
             foreach (var t in _textInputs)
             {
-                maxTokens = Math.Max(maxTokens, t.Tokens!.Count);
+                maxTokens = Math.Max(maxTokens, t.Tokens.Length);
             }
 
             _maxTokens = maxTokens;
@@ -50,5 +50,5 @@ public ref struct TokensView
     /// </summary>
     /// <param name="index">The index of the tokenized text input to retrieve.</param>
     /// <returns>The tokenized representation of the text input.</returns>
-    public List<int> this[int index] => _textInputs[index].Tokens!;
+    public ReadOnlySpan<int> this[int index] => _textInputs[index].Tokens.Span;
 }

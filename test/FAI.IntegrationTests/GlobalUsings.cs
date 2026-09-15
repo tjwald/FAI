@@ -1,12 +1,11 @@
 global using System.Numerics.Tensors;
-global using FAI.Core.Abstractions;
-global using FAI.Core.BatchSchedulers;
+global using FAI.Core.Configurations;
 global using FAI.Core.Configurations.InferenceTasks;
-global using FAI.Core.Configurations.PipelineBatchExecutors;
 global using FAI.Core.Extensions.DI;
-global using FAI.Core.PipelineBatchExecutors;
+global using FAI.Core.Pipelines;
 global using FAI.Core.ResultTypes;
 global using FAI.NLP.Configuration;
+global using FAI.NLP.Extensions.DI;
 global using FAI.NLP.InferenceTasks.TextClassification;
 global using FAI.NLP.InferenceTasks.TextMultipleChoice;
 global using FAI.NLP.Tests.Mocks;

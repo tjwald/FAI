@@ -35,23 +35,39 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <param name="ortValues">The prepared ONNX tensor values.</param>
+    /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>
     /// A task representing the asynchronous inference operation, containing the result
     /// as a disposable collection of <see cref="OrtValue"/>.
     /// </returns>
-    protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(Tensor<long>[] inputs, OrtValue[] ortValues)
+    protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
+        Tensor<long>[] inputs,
+        OrtValue[] ortValues,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         long[] outputDimensions = new long[_outputDimensions.Length + 1];
         outputDimensions[0] = inputs[0].Lengths[0];
         _outputDimensions.AsSpan().CopyTo(outputDimensions.AsSpan(1));
 
-        IReadOnlyCollection<OrtValue> outputs =
-            [OrtValue.CreateAllocatedTensorValue(OrtAllocator.DefaultInstance, _elementDataType, outputDimensions)];
+        OrtValue allocatedOutput =
+            OrtValue.CreateAllocatedTensorValue(OrtAllocator.DefaultInstance, _elementDataType, outputDimensions);
 
-        IReadOnlyCollection<OrtValue> result =
-            await Session.RunAsync(RunOptions, Session.InputNames, ortValues, Session.OutputNames, outputs).ConfigureAwait(false);
+        try
+        {
+            IReadOnlyCollection<OrtValue> outputs = [allocatedOutput];
+            IReadOnlyCollection<OrtValue> result =
+                await Session.RunAsync(RunOptions, Session.InputNames, ortValues, Session.OutputNames, outputs)
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
 
-        return new DisposableCollection<OrtValue>(result);
+            return new DisposableCollection<OrtValue>(result);
+        }
+        catch
+        {
+            allocatedOutput.Dispose();
+            throw;
+        }
     }
 
     /// <summary>

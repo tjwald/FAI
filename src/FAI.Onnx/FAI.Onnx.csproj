@@ -16,6 +16,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.1" />
         <ProjectReference Include="..\FAI.Core\FAI.Core.csproj" />
+        <ProjectReference Include="..\FAI.Core.Extensions.DI\FAI.Core.Extensions.DI.csproj" />
         <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.400" />
     </ItemGroup>
 
