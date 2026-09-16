@@ -28,7 +28,9 @@ public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 /// <summary>
 /// Provides a base implementation for ONNX model executors.
 /// </summary>
-public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOutputs<float>>
+public abstract class OnnxModelExecutorBase :
+    IPipeline<Tensor<long>[], TensorOutputs<float>>,
+    IPipeline<BatchEncode, TensorOutputs<float>>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.
@@ -67,7 +69,7 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
-        Tensor<long>[] inputs,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
         CancellationToken cancellationToken = default);
 
@@ -78,17 +80,17 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous execution, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
-        Tensor<long>[] inputs,
+        BatchEncode inputs,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using (await _semaphore.EnterScope(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            OrtValue[] ortValues = GetModelInputs(inputs);
+            (string[] inputNames, OrtValue[] ortValues) = GetModelInputs(inputs);
             try
             {
-                return await RunSessionInference(inputs, ortValues, cancellationToken);
+                return await RunSessionInference(inputNames, ortValues, cancellationToken);
             }
             finally
             {
@@ -101,13 +103,13 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     }
 
     public async ValueTask<TensorOutputs<float>> ExecuteAsync(
-        Tensor<long>[] input,
+        BatchEncode input,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (input.Length == 0)
+        if (input.InputIds is null || input.AttentionMask is null)
         {
-            throw new ArgumentException("At least one model input tensor is required.", nameof(input));
+            throw new ArgumentException("BatchEncode requires input_ids and attention_mask tensors.", nameof(input));
         }
 
         IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
@@ -115,6 +117,18 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new OnnxTensorOutputs(result);
+        }
+
+        public ValueTask<TensorOutputs<float>> ExecuteAsync(
+            Tensor<long>[] input,
+            CancellationToken cancellationToken = default)
+        {
+            if (input.Length == 0)
+            {
+                throw new ArgumentException("At least one model input tensor is required.", nameof(input));
+            }
+
+            return ExecuteAsync(BatchEncode.FromArray(input), cancellationToken);
         }
         catch
         {
@@ -128,17 +142,29 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
-    protected virtual OrtValue[] GetModelInputs(Tensor<long>[] inputs)
+    protected virtual (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(BatchEncode inputs)
     {
-        long[] dims = GetInputDims(inputs);
-        Memory<long>[] modelInputs = GetInputsAsMemory(inputs);
+        Tensor<long>[] tensorInputs = inputs.ToArray();
+        long[] dims = GetInputDims(tensorInputs);
+        Memory<long>[] modelInputs = GetInputsAsMemory(tensorInputs);
         OrtValue[] ortValues = modelInputs.AsSpan().ToOrtValues(dims);
+        string[] inputNames = GetInputNames(inputs);
 
         // Return to pool:
         _dimensionsPool.Add(dims);
         _inputMemoryPool.Add(modelInputs);
 
-        return ortValues;
+        return (inputNames, ortValues);
+    }
+
+    private static string[] GetInputNames(BatchEncode inputs)
+    {
+        if (inputs.TokenTypeIds is null)
+        {
+            return [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName];
+        }
+
+        return [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName, BatchEncode.TokenTypeIdsName];
     }
 
     private Memory<long>[] GetInputsAsMemory(Tensor<long>[] inputs)

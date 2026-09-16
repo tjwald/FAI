@@ -52,15 +52,19 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
-    protected override OrtValue[] GetModelInputs(Tensor<long>[] inputs)
+    protected override (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(BatchEncode inputs)
     {
-        var ortValues = new OrtValue[inputs.Length];
+        Tensor<long>[] tensorInputs = inputs.ToArray();
+        var ortValues = new OrtValue[tensorInputs.Length];
         for (int i = 0; i < ortValues.Length; i++)
         {
-            ortValues[i] = OrtValue.CreateTensorValueFromSystemNumericsTensorObject(inputs[i]);
+            ortValues[i] = OrtValue.CreateTensorValueFromSystemNumericsTensorObject(tensorInputs[i]);
         }
 
-        return ortValues;
+        string[] inputNames = inputs.TokenTypeIds is null
+            ? [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName]
+            : [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName, BatchEncode.TokenTypeIdsName];
+        return (inputNames, ortValues);
     }
 
     /// <summary>
@@ -74,10 +78,10 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// as a disposable collection of <see cref="OrtValue"/>.
     /// </returns>
     protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
-        Tensor<long>[] inputs,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
         CancellationToken cancellationToken = default)
     {
-        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, ortValues, cancellationToken);
+        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, inputNames, ortValues, cancellationToken);
     }
 }

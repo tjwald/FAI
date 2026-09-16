@@ -7,7 +7,7 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextClassification;
 
-public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>, Tensor<long>[]>
+public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>, BatchEncode>
 {
     private readonly PretrainedTokenizer _tokenizer;
 
@@ -16,7 +16,7 @@ public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>,
         _tokenizer = tokenizer;
     }
 
-    public ValueTask<Tensor<long>[]> ExecuteAsync(
+    public ValueTask<BatchEncode> ExecuteAsync(
         ReadOnlyMemory<TokenizedText> input,
         CancellationToken cancellationToken = default)
     {
@@ -29,9 +29,9 @@ public sealed class TextTensorization : IPipeline<ReadOnlyMemory<TokenizedText>,
         return ValueTask.FromResult(Encode(input));
     }
 
-    private Tensor<long>[] Encode(ReadOnlyMemory<TokenizedText> input)
+    private BatchEncode Encode(ReadOnlyMemory<TokenizedText> input)
     {
-        return _tokenizer.BatchTokensToTensors(new TokensView(input.Span)).ToArray();
+        return _tokenizer.BatchTokensToTensors(new TokensView(input.Span));
     }
 }
 

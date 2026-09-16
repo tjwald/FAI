@@ -147,7 +147,7 @@ public class TextEmbeddingTaskTests
 
         Assert.Equal(3, tensorArray.Length);
         Assert.NotNull(result.TokenTypeIds);
-        Assert.Equal(result.Tokens.Lengths, result.TokenTypeIds.Lengths);
+        Assert.Equal(result.InputIds.Lengths, result.TokenTypeIds.Lengths);
         Assert.All(result.TokenTypeIds.AsReadOnlyTensorSpan().AsSpan().ToArray(), val => Assert.Equal(0L, val));
     }
 

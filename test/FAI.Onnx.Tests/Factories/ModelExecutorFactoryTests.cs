@@ -17,7 +17,7 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
     {
         var onnxOptions = CreateOnnxOptions();
         var options = new PooledExecutorOptions<OnnxModelExecutorOptions>(onnxOptions, 2);
-        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline =
+        IPipeline<BatchEncode, TensorOutputs<float>> pipeline =
             ModelExecutorFactory.CreateModelPipeline(ModelExecutorType.Async, options);
 
         await AssertFinitePipelineOutput(pipeline);
@@ -29,7 +29,7 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
         var options = new MultiDeviceExecutorOptions()
             .AddOptions(ConfigureModelPath)
             .AddOptions(ConfigureModelPath);
-        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline =
+        IPipeline<BatchEncode, TensorOutputs<float>> pipeline =
             ModelExecutorFactory.CreateModelPipeline(ModelExecutorType.Simple, options);
 
         await AssertFinitePipelineOutput(pipeline);
@@ -86,7 +86,7 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
         var options = new PooledExecutorOptions<OnnxModelExecutorOptions>(onnxOptions, 2);
 
         // Infers Async from options.ExecutorConfig.ModelExecutorType
-        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline =
+        IPipeline<BatchEncode, TensorOutputs<float>> pipeline =
             ModelExecutorFactory.CreateModelPipeline(options);
 
         await AssertFinitePipelineOutput(pipeline);
@@ -109,9 +109,11 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
     }
 
     private static async Task AssertFinitePipelineOutput(
-        IPipeline<Tensor<long>[], TensorOutputs<float>> pipeline)
+        IPipeline<BatchEncode, TensorOutputs<float>> pipeline)
     {
-        Tensor<long>[] input = [Tensor.Create([11L, 22L, 33L], [1, 3])];
+        BatchEncode input = new(
+            Tensor.Create([11L, 22L, 33L], [1, 3]),
+            Tensor.Create([1L, 1L, 1L], [1, 3]));
         using TensorOutputs<float> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
         Assert.Equal([11.0f, 22.0f, 33.0f], output.GetOutput(0).AsSpan().ToArray());
     }

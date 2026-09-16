@@ -57,7 +57,7 @@ public static class SwagMultipleChoiceInferenceFactory
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
                 .Fork(inner => inner
-                    .Then<Tensor<long>[], TextMultipleChoiceTensorization>()
+                    .Then<BatchEncode, TextMultipleChoiceTensorization>()
                     .ThenOnnxModel())
                 .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
                 .Build();

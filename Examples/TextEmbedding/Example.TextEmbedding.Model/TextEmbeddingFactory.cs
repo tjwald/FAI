@@ -58,7 +58,7 @@ public static class TextEmbeddingFactory
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
                 .Fork(inner => inner
-                    .Then<Tensor<long>[], TextTensorization>()
+                    .Then<BatchEncode, TextTensorization>()
                     .ThenOnnxModel())
                 .Then<Tensor<float>, TextEmbeddingDecoding>()
                 .Build();

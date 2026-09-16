@@ -50,7 +50,7 @@ public class PretrainedTokenizerTests : IClassFixture<PretrainedTokenizerFixture
         // Assert
         Assert.Equal(2, result.BatchSize);
         Assert.True(result.MaxTokenCount >= 2);
-        Assert.Equal(result.Tokens.Lengths, result.Mask.Lengths);
+        Assert.Equal(result.InputIds.Lengths, result.AttentionMask.Lengths);
     }
 
     [Fact]
@@ -67,15 +67,15 @@ public class PretrainedTokenizerTests : IClassFixture<PretrainedTokenizerFixture
         Assert.Equal(2, result.MaxTokenCount);
 
         // Row 0: [hello, PAD] -> [15, 0]
-        Assert.Equal(15, result.Tokens[0, 0]);
-        Assert.Equal(0, result.Tokens[0, 1]);
-        Assert.Equal(1, result.Mask[0, 0]);
-        Assert.Equal(0, result.Mask[0, 1]);
+        Assert.Equal(15, result.InputIds[0, 0]);
+        Assert.Equal(0, result.InputIds[0, 1]);
+        Assert.Equal(1, result.AttentionMask[0, 0]);
+        Assert.Equal(0, result.AttentionMask[0, 1]);
 
         // Row 1: [hello, world] -> [15, 16]
-        Assert.Equal(15, result.Tokens[1, 0]);
-        Assert.Equal(16, result.Tokens[1, 1]);
-        Assert.Equal(1, result.Mask[1, 0]);
-        Assert.Equal(1, result.Mask[1, 1]);
+        Assert.Equal(15, result.InputIds[1, 0]);
+        Assert.Equal(16, result.InputIds[1, 1]);
+        Assert.Equal(1, result.AttentionMask[1, 0]);
+        Assert.Equal(1, result.AttentionMask[1, 1]);
     }
 }

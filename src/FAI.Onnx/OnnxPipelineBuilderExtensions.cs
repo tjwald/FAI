@@ -11,13 +11,17 @@ namespace FAI.Onnx;
 public static class OnnxPipelineBuilderExtensions
 {
     public static PipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
-        this PipelineBuilder<TStart, Tensor<long>[]> builder)
+        this PipelineBuilder<TStart, BatchEncode> builder)
         => builder.Then(ResolveOnnxModelPipeline);
 
-    private static IPipeline<Tensor<long>[], TensorOutputs<float>> ResolveOnnxModelPipeline(IServiceProvider serviceProvider)
+    public static PipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
+        this PipelineBuilder<TStart, Tensor<long>[]> builder)
+        => builder.Then(ResolveLegacyOnnxModelPipeline);
+
+    private static IPipeline<BatchEncode, TensorOutputs<float>> ResolveOnnxModelPipeline(IServiceProvider serviceProvider)
     {
-        IPipeline<Tensor<long>[], TensorOutputs<float>>? existing =
-            serviceProvider.GetService<IPipeline<Tensor<long>[], TensorOutputs<float>>>();
+        IPipeline<BatchEncode, TensorOutputs<float>>? existing =
+            serviceProvider.GetService<IPipeline<BatchEncode, TensorOutputs<float>>>();
         if (existing is not null)
         {
             return existing;
@@ -30,5 +34,28 @@ public static class OnnxPipelineBuilderExtensions
             ?? serviceProvider.GetRequiredService<IModelExecutorOptions>();
 
         return ModelExecutorFactory.CreateModelPipeline(executorOptions);
+    }
+
+    private static IPipeline<Tensor<long>[], TensorOutputs<float>> ResolveLegacyOnnxModelPipeline(IServiceProvider serviceProvider)
+    {
+        IPipeline<Tensor<long>[], TensorOutputs<float>>? existing =
+            serviceProvider.GetService<IPipeline<Tensor<long>[], TensorOutputs<float>>>();
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        return new LegacyTensorArrayOnnxModelPipeline(ResolveOnnxModelPipeline(serviceProvider));
+    }
+
+    private sealed class LegacyTensorArrayOnnxModelPipeline(IPipeline<BatchEncode, TensorOutputs<float>> inner)
+        : IPipeline<Tensor<long>[], TensorOutputs<float>>
+    {
+        public ValueTask<TensorOutputs<float>> ExecuteAsync(
+            Tensor<long>[] input,
+            CancellationToken cancellationToken = default)
+        {
+            return inner.ExecuteAsync(BatchEncode.FromArray(input), cancellationToken);
+        }
     }
 }

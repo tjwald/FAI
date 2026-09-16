@@ -14,7 +14,7 @@ public class PipelineConfigurationIntegrationTests
         services.AddSingleton(new MaxPaddedTokensPartitionerOptions(MaxPaddedTokenRatio: 1, MaxTokenCount: 20));
         services.AddSingleton<IPartitionScheduler>(
             new ParallelPartitionScheduler(new ParallelPartitionSchedulerOptions(MaxConcurrency: 2)));
-        services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
+        services.AddSingleton<IPipeline<BatchEncode, TensorOutputs<float>>>(
             new LogicalMockModelPipeline([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecoding<bool>>();
         services.AddMemoryBatch<ClassificationResult<bool, float>>();
@@ -23,9 +23,9 @@ public class PipelineConfigurationIntegrationTests
             .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
             .UseTokenCountOrdering()
             .UseMaxPaddedTokensPartitioning()
-            .Then<Tensor<long>[], TextTensorization>()
+            .Then<BatchEncode, TextTensorization>()
             .Then(sp =>
-                sp.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>())
+                sp.GetRequiredService<IPipeline<BatchEncode, TensorOutputs<float>>>())
             .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
             .Build();
 
