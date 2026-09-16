@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Numerics.Tensors;
+using FAI.Core.Pipelines;
 
-namespace FAI.Core.Pipelines;
+namespace FAI.NLP.Tokenization;
 
 public readonly record struct BatchEncode : INamedTensorCollection
 {

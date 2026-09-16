@@ -1,7 +1,8 @@
 using System.Numerics.Tensors;
 using FAI.Core.Pipelines;
+using FAI.NLP.Tokenization;
 
-namespace FAI.Core.Tests.PipelineTests;
+namespace FAI.NLP.Tests.Tokenization;
 
 public sealed class BatchEncodeTests
 {
