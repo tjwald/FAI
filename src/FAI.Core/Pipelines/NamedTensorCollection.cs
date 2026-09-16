@@ -3,7 +3,7 @@ using System.Numerics.Tensors;
 
 namespace FAI.Core.Pipelines;
 
-public readonly record struct NamedTensorCollection : IEnumerable<KeyValuePair<string, Tensor<long>>>
+public readonly record struct NamedTensorCollection : INamedTensorCollection
 {
     private readonly KeyValuePair<string, Tensor<long>>[] _inputs;
 
