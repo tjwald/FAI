@@ -1,5 +1,6 @@
 using System.Numerics.Tensors;
 using FAI.Core;
+using FAI.Core.Abstractions;
 using FAI.Core.Pipelines;
 using FAI.NLP.Configuration;
 using FAI.NLP.InferenceTasks.TextEmbedding;
@@ -112,19 +113,25 @@ public class TextEmbeddingTaskTests
     }
 
     [Fact]
-    public async Task TensorBatchInference_PredictAndBatchPredict_ProduceExpectedTensors()
+    public async Task TensorDestinationAllocationPipeline_PreallocatesDestinationAndRuns()
     {
         var stubPipeline = new StubEmbeddingPipeline();
-        var inference = new TensorBatchInference<string, float>(stubPipeline, secondaryDimension: 2);
+        var allocatedPipeline = new TensorDestinationAllocationPipeline<ReadOnlyMemory<string>, float>(
+            stubPipeline,
+            new ReadOnlyMemoryBatchOperations<string>(),
+            new TensorBatchOperations<float>(),
+            2);
+
+        var inference = new PipelineInference<ReadOnlyMemory<string>, Tensor<float>>(allocatedPipeline);
 
         Tensor<float> single = await inference.Predict("hello");
         Assert.Equal([1, 2], single.Lengths.ToArray());
 
-        Tensor<float> batch = await inference.BatchPredict((string[])["first", "second"]);
+        Tensor<float> batch = await inference.Predict((string[])["first", "second"]);
         Assert.Equal([2, 2], batch.Lengths.ToArray());
 
         Tensor<float> dest = Tensor.CreateFromShape<float>([2, 2]);
-        await inference.BatchPredict((string[])["first", "second"], dest);
+        await inference.Predict((string[])["first", "second"], dest);
         Assert.Equal([2, 2], dest.Lengths.ToArray());
     }
 

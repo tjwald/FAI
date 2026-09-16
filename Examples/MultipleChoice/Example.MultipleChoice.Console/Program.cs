@@ -18,7 +18,7 @@ builder.Services.AddDefaultSwagInference(options);
 
 var app = builder.Build();
 
-var model = app.Services.GetRequiredService<IInference<SwagInput, ChoiceResult<TokenizedText>>>();
+var model = app.Services.GetRequiredService<IInference<ReadOnlyMemory<SwagInput>, ChoiceResult<TokenizedText>[]>>();
 
 (SwagInput[] input, int[] expectedOutput) = await LoadTrainingData(fileName);
 
@@ -27,11 +27,11 @@ Console.WriteLine("Finished loading training data");
 await RunBatchPredict(model, input, expectedOutput);
 return;
 
-static async Task RunBatchPredict(IInference<SwagInput, ChoiceResult<TokenizedText>> sentimentInference, SwagInput[] input, int[] expectedOutput)
+static async Task RunBatchPredict(IInference<ReadOnlyMemory<SwagInput>, ChoiceResult<TokenizedText>[]> sentimentInference, SwagInput[] input, int[] expectedOutput)
 {
     long start = Stopwatch.GetTimestamp();
 
-    ChoiceResult<TokenizedText>[] output = await sentimentInference.BatchPredict(input);
+    ChoiceResult<TokenizedText>[] output = await sentimentInference.Predict(input);
     var end = Stopwatch.GetElapsedTime(start);
 
     Console.WriteLine($"elapsed time: {end.TotalSeconds}s");

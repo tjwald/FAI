@@ -28,7 +28,7 @@ public class EvaluationPipelineTests
     {
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
-        var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
+        var inference = Substitute.For<IInference<ReadOnlyMemory<TestInferenceInput>, TestInferenceOutput[]>>();
         var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
         var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions();
@@ -39,7 +39,7 @@ public class EvaluationPipelineTests
         var inputs = Enumerable.Range(0, 5).Select(i => new TestLoadedInput(i)).ToArray();
         dataLoader.LoadData(Arg.Any<TestLoaderInput>()).Returns(ToAsync(inputs));
 
-        inference.BatchPredict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
+        inference.Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
             .Returns(args => Task.FromResult(((ReadOnlyMemory<TestInferenceInput>)args[0]).ToArray().Select(x => new TestInferenceOutput(x.Id, "ok")).ToArray()));
 
         evaluator.Evaluate(Arg.Any<IAsyncEnumerable<(TestLoadedInput[], TestInferenceOutput[])>>())
@@ -57,7 +57,7 @@ public class EvaluationPipelineTests
         Assert.Equal(5, result.SampleSize);
         Assert.Equal(1.0, result.Evaluation.Accuracy);
         dataLoader.Received(1).LoadData(Arg.Is<TestLoaderInput>(x => x.Count == 5));
-        await inference.Received(1).BatchPredict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>());
+        await inference.Received(1).Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>());
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class EvaluationPipelineTests
     {
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
-        var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
+        var inference = Substitute.For<IInference<ReadOnlyMemory<TestInferenceInput>, TestInferenceOutput[]>>();
         var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
         var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions(LoadingChunkSize: 2);
@@ -76,7 +76,7 @@ public class EvaluationPipelineTests
         var inputs = Enumerable.Range(0, 5).Select(i => new TestLoadedInput(i)).ToArray();
         dataLoader.LoadData(Arg.Any<TestLoaderInput>()).Returns(ToAsync(inputs));
 
-        inference.BatchPredict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
+        inference.Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
             .Returns(args => Task.FromResult(((ReadOnlyMemory<TestInferenceInput>)args[0]).ToArray().Select(x => new TestInferenceOutput(x.Id, "ok")).ToArray()));
 
         evaluator.Evaluate(Arg.Any<IAsyncEnumerable<(TestLoadedInput[], TestInferenceOutput[])>>())
@@ -93,7 +93,7 @@ public class EvaluationPipelineTests
         // Assert
         Assert.Equal(5, result.SampleSize);
         // Expect 2 calls of 2 elements and 1 call of 1 element
-        await inference.Received(3).BatchPredict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>());
+        await inference.Received(3).Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>());
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class EvaluationPipelineTests
     {
         // Arrange
         var dataLoader = Substitute.For<IDataLoader<TestLoaderInput, TestLoadedInput, TestInferenceInput>>();
-        var inference = Substitute.For<IInference<TestInferenceInput, TestInferenceOutput>>();
+        var inference = Substitute.For<IInference<ReadOnlyMemory<TestInferenceInput>, TestInferenceOutput[]>>();
         var evaluator = Substitute.For<IEvaluator<TestLoadedInput, TestInferenceOutput[], TestEvaluationResult>>();
         var logger = NullLogger<EvaluationPipeline<TestLoaderInput, TestLoadedInput, TestInferenceInput, TestInferenceOutput[], TestEvaluationResult>>.Instance;
         var options = new EvaluationPipelineOptions(LoadingChunkSize: 2, ParallelLoading: true, ParallelEvaluation: true);
@@ -112,7 +112,7 @@ public class EvaluationPipelineTests
         var inputs = Enumerable.Range(0, 4).Select(i => new TestLoadedInput(i)).ToArray();
         dataLoader.LoadData(Arg.Any<TestLoaderInput>()).Returns(ToAsync(inputs));
 
-        inference.BatchPredict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
+        inference.Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>())
             .Returns(args => Task.FromResult(((ReadOnlyMemory<TestInferenceInput>)args[0]).ToArray().Select(x => new TestInferenceOutput(x.Id, "ok")).ToArray()));
 
         evaluator.Evaluate(Arg.Any<IAsyncEnumerable<(TestLoadedInput[], TestInferenceOutput[])>>())
@@ -128,6 +128,7 @@ public class EvaluationPipelineTests
 
         // Assert
         Assert.Equal(4, result.SampleSize);
+        await inference.Received(2).Predict(Arg.Any<ReadOnlyMemory<TestInferenceInput>>());
         await evaluator.Received(1).Evaluate(Arg.Any<IAsyncEnumerable<(TestLoadedInput[], TestInferenceOutput[])>>());
     }
 }

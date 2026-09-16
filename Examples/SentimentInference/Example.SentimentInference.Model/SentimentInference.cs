@@ -4,7 +4,9 @@ using FAI.Core.ResultTypes;
 
 namespace Example.SentimentInference.Model;
 
-public sealed class SentimentInference : IInference<string, bool>
+public sealed class SentimentInference :
+    IInference<string, bool>,
+    IInference<ReadOnlyMemory<string>, bool[]>
 {
     private readonly IPipeline<ReadOnlyMemory<string>, Memory<ClassificationResult<bool, float>>> _pipeline;
 
@@ -16,30 +18,29 @@ public sealed class SentimentInference : IInference<string, bool>
 
     public async Task<bool> Predict(string input)
     {
-        string[] batch = [input];
-        bool[] output = await BatchPredict(batch);
+        bool[] output = await Predict((string[])[input]);
         return output[0];
     }
 
-    public async Task<bool[]> BatchPredict(ReadOnlyMemory<string> input)
+    public async Task<bool[]> Predict(ReadOnlyMemory<string> input)
     {
         var output = new bool[input.Length];
-        await BatchPredict(input, output);
+        await Predict(input, output);
         return output;
     }
 
-    public async Task BatchPredict(ReadOnlyMemory<string> input, Memory<bool> output)
+    public async Task Predict(ReadOnlyMemory<string> input, bool[] destination)
     {
-        if (input.Length != output.Length)
+        if (input.Length != destination.Length)
         {
-            throw new ArgumentException("Input and output batch sizes must match.", nameof(output));
+            throw new ArgumentException("Input and output batch sizes must match.", nameof(destination));
         }
 
         Memory<ClassificationResult<bool, float>> classificationResults = await _pipeline.ExecuteAsync(input);
 
         for (int index = 0; index < classificationResults.Length; index++)
         {
-            output.Span[index] = classificationResults.Span[index].Choice;
+            destination[index] = classificationResults.Span[index].Choice;
         }
     }
 }

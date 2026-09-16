@@ -8,7 +8,9 @@ namespace Example.MultipleChoice.Model;
 
 public record struct SwagInput(string Context, string Text, string[] Endings);
 
-public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<TokenizedText>>
+public class SwagMultipleChoiceInference :
+    IInference<SwagInput, ChoiceResult<TokenizedText>>,
+    IInference<ReadOnlyMemory<SwagInput>, ChoiceResult<TokenizedText>[]>
 {
     private readonly IPipeline<ReadOnlyMemory<TextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>> _pipeline;
 
@@ -20,19 +22,23 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
 
     public async Task<ChoiceResult<TokenizedText>> Predict(SwagInput input)
     {
-        SwagInput[] batch = [input];
-        ChoiceResult<TokenizedText>[] output = await BatchPredict(batch);
+        ChoiceResult<TokenizedText>[] output = await Predict((SwagInput[])[input]);
         return output[0];
     }
 
-    public async Task<ChoiceResult<TokenizedText>[]> BatchPredict(ReadOnlyMemory<SwagInput> input)
+    public async Task<ChoiceResult<TokenizedText>[]> Predict(ReadOnlyMemory<SwagInput> input)
     {
         var output = new ChoiceResult<TokenizedText>[input.Length];
-        await BatchPredict(input, output);
+        await Predict(input, output.AsMemory());
         return output;
     }
 
-    public async Task BatchPredict(ReadOnlyMemory<SwagInput> input, Memory<ChoiceResult<TokenizedText>> output)
+    public async Task Predict(ReadOnlyMemory<SwagInput> input, ChoiceResult<TokenizedText>[] destination)
+    {
+        await Predict(input, destination.AsMemory());
+    }
+
+    public async Task Predict(ReadOnlyMemory<SwagInput> input, Memory<ChoiceResult<TokenizedText>> destination)
     {
         var pipelineInput = new TextMultipleChoiceInput[input.Length];
         ReadOnlySpan<SwagInput> inputSpan = input.Span;
@@ -42,7 +48,7 @@ public class SwagMultipleChoiceInference : IInference<SwagInput, ChoiceResult<To
         }
 
         Memory<ChoiceResult<TokenizedText>> results = await _pipeline.ExecuteAsync(pipelineInput);
-        results.CopyTo(output);
+        results.CopyTo(destination);
     }
 
     private static TextMultipleChoiceInput MapSwagInputToPipelineInput(SwagInput input)

@@ -22,9 +22,9 @@ internal sealed record StsEvaluationSummary(int PairCount, double Pearson, doubl
 
 internal static class StsBenchmark
 {
-    public static async Task RunAsync(ITensorInference<string, float> embeddings, string datasetPath, string performanceDatasetPath)
+    public static async Task RunAsync(IInference<ReadOnlyMemory<string>, Tensor<float>> embeddings, string datasetPath, string performanceDatasetPath)
     {
-        _ = await embeddings.BatchPredict(new string[]
+        _ = await embeddings.Predict(new string[]
         {
             "Warm-up text excluded from the measured benchmark corpus.",
             "A second warm-up sentence initializes batched model execution."
@@ -56,7 +56,7 @@ internal static class StsBenchmark
     private static EvaluationPipeline<string, TLoadedInput, string, Tensor<float>, TEvaluationResult>
         CreatePipeline<TLoadedInput, TEvaluationResult>(
             IDataLoader<string, TLoadedInput, string> loader,
-            ITensorInference<string, float> embeddings,
+            IInference<ReadOnlyMemory<string>, Tensor<float>> embeddings,
             IEvaluator<TLoadedInput, Tensor<float>, TEvaluationResult> evaluator)
         where TLoadedInput : IInferenceInputGetter<string>
     {

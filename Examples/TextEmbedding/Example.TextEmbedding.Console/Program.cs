@@ -14,7 +14,7 @@ var options = TextEmbeddingModelOptions.Create(modelDirectory) with
 };
 services.AddTextEmbeddingInference(options);
 await using ServiceProvider serviceProvider = services.BuildServiceProvider();
-var embeddings = serviceProvider.GetRequiredService<ITensorInference<string, float>>();
+var embeddings = serviceProvider.GetRequiredService<IInference<ReadOnlyMemory<string>, Tensor<float>>>();
 
 if (args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase))
 {
@@ -34,7 +34,7 @@ string[] documents =
 ];
 
 System.Console.WriteLine("Generating document embeddings with all-MiniLM-L6-v2...");
-Tensor<float> documentEmbeddings = await embeddings.BatchPredict(documents);
+Tensor<float> documentEmbeddings = await embeddings.Predict(documents);
 
 string query = args.Length == 0
     ? "How can I build a mobile app with .NET?"

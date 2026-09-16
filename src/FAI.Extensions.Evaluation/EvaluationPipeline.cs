@@ -10,14 +10,14 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
     where TLoadedInput : IInferenceInputGetter<TInferenceInput>
 {
     private readonly IDataLoader<TLoaderInput, TLoadedInput, TInferenceInput> _dataLoader;
-    private readonly IBatchInference<TInferenceInput, TInferenceOutput> _inference;
+    private readonly IInference<ReadOnlyMemory<TInferenceInput>, TInferenceOutput> _inference;
     private readonly IEvaluator<TLoadedInput, TInferenceOutput, TEvaluationResult> _evaluator;
     private readonly EvaluationPipelineOptions _options;
     private readonly ILogger<EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TInferenceOutput, TEvaluationResult>> _logger;
 
     public EvaluationPipeline(
         IDataLoader<TLoaderInput, TLoadedInput, TInferenceInput> dataLoader,
-        IBatchInference<TInferenceInput, TInferenceOutput> inference,
+        IInference<ReadOnlyMemory<TInferenceInput>, TInferenceOutput> inference,
         IEvaluator<TLoadedInput, TInferenceOutput, TEvaluationResult> evaluator,
         ILogger<EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TInferenceOutput, TEvaluationResult>> logger,
         EvaluationPipelineOptions options)
@@ -107,7 +107,7 @@ public class EvaluationPipeline<TLoaderInput, TLoadedInput, TInferenceInput, TIn
             inferenceActivity?.SetTag("fai.evaluation.inference.run_size", loadedInputs.Length);
             var inferenceInputs = loadedInputs.Select(x => x.InferenceInput).ToArray();
             var start = Stopwatch.GetTimestamp();
-            outputs = await _inference.BatchPredict(inferenceInputs);
+            outputs = await _inference.Predict(inferenceInputs);
             runtime = Stopwatch.GetElapsedTime(start);
         }
 

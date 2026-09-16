@@ -1,5 +1,4 @@
 using System.Numerics.Tensors;
-using FAI.Core;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
@@ -48,10 +47,13 @@ public static class TextEmbeddingFactory
                 new ParallelPartitionScheduler(serviceProvider.GetRequiredService<ParallelPartitionSchedulerOptions>()));
             localServices.AddSingleton<TextTensorization>();
             localServices.AddSingleton<TextEmbeddingDecoding>();
+            localServices.AddReadOnlyMemoryBatch<string>();
             localServices.AddTensorBatch<float>();
 
             localServices
                 .AddPipeline<ReadOnlyMemory<string>>()
+                .UseTensorDestinationAllocation<ReadOnlyMemory<string>, float>(
+                    options.DecodingOptions.EmbeddingDimensions ?? TextEmbeddingDecoding.DefaultEmbeddingDimensions)
                 .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
@@ -61,18 +63,8 @@ public static class TextEmbeddingFactory
                 .Then<Tensor<float>, TextEmbeddingDecoding>()
                 .Build();
 
-            localServices.AddSingleton<ITensorInference<string, float>>(sp =>
-                new TensorBatchInference<string, float>(
-                    sp.GetRequiredService<IPipeline<ReadOnlyMemory<string>, Tensor<float>>>(),
-                    options.DecodingOptions.EmbeddingDimensions));
-            localServices.AddSingleton<IBatchInference<string, Tensor<float>>>(sp =>
-                sp.GetRequiredService<ITensorInference<string, float>>());
-            localServices.AddSingleton(sp =>
-                (TensorBatchInference<string, float>)sp.GetRequiredService<ITensorInference<string, float>>());
-
-            localServices.CopyToGlobal<ITensorInference<string, float>>();
-            localServices.CopyToGlobal<IBatchInference<string, Tensor<float>>>();
-            localServices.CopyToGlobal<TensorBatchInference<string, float>>();
+            localServices.AddPipelineInference<ReadOnlyMemory<string>, Tensor<float>>();
+            localServices.CopyToGlobal<IInference<ReadOnlyMemory<string>, Tensor<float>>>();
         });
     }
 }

@@ -9,6 +9,7 @@ namespace FAI.NLP.InferenceTasks.TextEmbedding;
 public sealed class TextEmbeddingDecoding :
     IDestinationPipeline<(ReadOnlyMemory<TokenizedText> Input, TensorOutputs<float> ModelOutputs), Tensor<float>>
 {
+    public const int DefaultEmbeddingDimensions = 384;
     private readonly TextEmbeddingOptions _options;
 
     public TextEmbeddingDecoding(TextEmbeddingOptions? options = null)
@@ -65,8 +66,8 @@ public sealed class TextEmbeddingDecoding :
             throw new ArgumentException("The output buffer and input tokens must match the model output shape.", nameof(output));
         }
 
-        ReadOnlySpan<float> allTokens = tokenEmbeddings.AsSpan();
-        Span<float> allOutput = output.AsTensorSpan().AsSpan();
+        ReadOnlyTensorDimensionSpan<float> sentenceBatch = tokenEmbeddings.GetDimensionSpan(0);
+        TensorDimensionSpan<float> outputRows = output.GetDimensionSpan(0);
         ReadOnlySpan<TokenizedText> tokensSpan = tokenizedTexts.Span;
 
         PoolingStrategy strategy = _options.PoolingStrategy;
@@ -74,30 +75,28 @@ public sealed class TextEmbeddingDecoding :
 
         if (strategy == PoolingStrategy.ClsToken)
         {
-            PoolClsToken(batchSize, tokenCount, dimensions, allTokens, allOutput, normalize);
+            PoolClsToken(sentenceBatch, outputRows, normalize);
         }
         else
         {
-            PoolMean(batchSize, tokenCount, dimensions, allTokens, allOutput, tokensSpan, normalize);
+            PoolMean(sentenceBatch, outputRows, tokensSpan, normalize);
         }
 
         return ValueTask.CompletedTask;
     }
 
     private static void PoolClsToken(
-        int batchSize,
-        int tokenCount,
-        int dimensions,
-        ReadOnlySpan<float> allTokens,
-        Span<float> allOutput,
+        ReadOnlyTensorDimensionSpan<float> sentenceBatch,
+        TensorDimensionSpan<float> outputRows,
         bool normalize)
     {
-        for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
+        for (int batchIndex = 0; batchIndex < sentenceBatch.Length; batchIndex++)
         {
-            Span<float> embedding = allOutput.Slice(batchIndex * dimensions, dimensions);
-            int batchTokenOffset = batchIndex * tokenCount * dimensions;
-            ReadOnlySpan<float> clsRow = allTokens.Slice(batchTokenOffset, dimensions);
-            clsRow.CopyTo(embedding);
+            ReadOnlyTensorSpan<float> sentence = sentenceBatch[batchIndex];
+            Span<float> embedding = outputRows[batchIndex].AsSpan();
+
+            ReadOnlyTensorSpan<float> clsToken = sentence.GetDimensionSpan(0)[0];
+            clsToken.AsSpan().CopyTo(embedding);
 
             if (normalize)
             {
@@ -111,26 +110,24 @@ public sealed class TextEmbeddingDecoding :
     }
 
     private static void PoolMean(
-        int batchSize,
-        int tokenCount,
-        int dimensions,
-        ReadOnlySpan<float> allTokens,
-        Span<float> allOutput,
+        ReadOnlyTensorDimensionSpan<float> sentenceBatch,
+        TensorDimensionSpan<float> outputRows,
         ReadOnlySpan<TokenizedText> tokensSpan,
         bool normalize)
     {
-        for (int batchIndex = 0; batchIndex < batchSize; batchIndex++)
+        for (int batchIndex = 0; batchIndex < sentenceBatch.Length; batchIndex++)
         {
-            Span<float> embedding = allOutput.Slice(batchIndex * dimensions, dimensions);
-            int batchTokenOffset = batchIndex * tokenCount * dimensions;
-            int realTokenCount = Math.Min(tokenCount, tokensSpan[batchIndex].TokenCount);
+            ReadOnlyTensorSpan<float> sentence = sentenceBatch[batchIndex];
+            Span<float> embedding = outputRows[batchIndex].AsSpan();
+            int realTokenCount = Math.Min((int)sentence.Lengths[0], tokensSpan[batchIndex].TokenCount);
 
             embedding.Clear();
 
+            ReadOnlyTensorDimensionSpan<float> tokenRows = sentence.GetDimensionSpan(0);
             for (int tokenIndex = 0; tokenIndex < realTokenCount; tokenIndex++)
             {
-                ReadOnlySpan<float> tokenRow = allTokens.Slice(batchTokenOffset + tokenIndex * dimensions, dimensions);
-                TensorPrimitives.Add(embedding, tokenRow, embedding);
+                ReadOnlyTensorSpan<float> tokenRow = tokenRows[tokenIndex];
+                TensorPrimitives.Add(embedding, tokenRow.AsSpan(), embedding);
             }
 
             if (!normalize && realTokenCount > 0)
