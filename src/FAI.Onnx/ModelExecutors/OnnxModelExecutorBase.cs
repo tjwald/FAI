@@ -28,7 +28,9 @@ public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 /// <summary>
 /// Provides a base implementation for ONNX model executors.
 /// </summary>
-public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOutputs<float>>
+public abstract class OnnxModelExecutorBase :
+    IPipeline<Tensor<long>[], TensorOutputs<float>>,
+    IPipeline<NamedTensorCollection, TensorOutputs<float>>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.
@@ -67,8 +69,9 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     protected abstract Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
-        Tensor<long>[] inputs,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
+        int batchSize,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -78,17 +81,38 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous execution, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
+        NamedTensorCollection inputs,
+        CancellationToken cancellationToken)
+    {
+        return await ExecuteModelAsyncCore(
+            () => GetModelInputs(inputs),
+            checked((int)inputs[0].Value.Lengths[0]),
+            cancellationToken);
+    }
+
+    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
         Tensor<long>[] inputs,
+        CancellationToken cancellationToken)
+    {
+        return await ExecuteModelAsyncCore(
+            () => (ResolveInputNamesOrThrow(inputs.Length), GetModelInputs(inputs)),
+            checked((int)inputs[0].Lengths[0]),
+            cancellationToken);
+    }
+
+    private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsyncCore(
+        Func<(string[] InputNames, OrtValue[] OrtValues)> prepareInputs,
+        int batchSize,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using (await _semaphore.EnterScope(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            OrtValue[] ortValues = GetModelInputs(inputs);
+            (string[] inputNames, OrtValue[] ortValues) = prepareInputs();
             try
             {
-                return await RunSessionInference(inputs, ortValues, cancellationToken);
+                return await RunSessionInference(inputNames, ortValues, batchSize, cancellationToken);
             }
             finally
             {
@@ -101,6 +125,29 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     }
 
     public async ValueTask<TensorOutputs<float>> ExecuteAsync(
+        NamedTensorCollection input,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (input.Count == 0)
+        {
+            throw new ArgumentException("At least one named tensor input is required.", nameof(input));
+        }
+
+        IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new OnnxTensorOutputs(result);
+        }
+        catch
+        {
+            result.Dispose();
+            throw;
+        }
+    }
+
+    public ValueTask<TensorOutputs<float>> ExecuteAsync(
         Tensor<long>[] input,
         CancellationToken cancellationToken = default)
     {
@@ -110,6 +157,13 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
             throw new ArgumentException("At least one model input tensor is required.", nameof(input));
         }
 
+        return ExecuteAsyncLegacy(input, cancellationToken);
+    }
+
+    private async ValueTask<TensorOutputs<float>> ExecuteAsyncLegacy(
+        Tensor<long>[] input,
+        CancellationToken cancellationToken)
+    {
         IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
         try
         {
@@ -128,28 +182,72 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
+    protected virtual (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(NamedTensorCollection inputs)
+    {
+        (string[] inputNames, Tensor<long>[] tensorInputs) = ResolveModelInputTensors(inputs);
+        OrtValue[] ortValues = GetModelInputs(tensorInputs);
+        return (inputNames, ortValues);
+    }
+
     protected virtual OrtValue[] GetModelInputs(Tensor<long>[] inputs)
     {
         long[] dims = GetInputDims(inputs);
         Memory<long>[] modelInputs = GetInputsAsMemory(inputs);
         OrtValue[] ortValues = modelInputs.AsSpan().ToOrtValues(dims);
 
-        // Return to pool:
         _dimensionsPool.Add(dims);
         _inputMemoryPool.Add(modelInputs);
 
         return ortValues;
     }
 
+    protected string[] ResolveInputNamesForNamedInputs(NamedTensorCollection inputs)
+    {
+        return ResolveModelInputTensors(inputs).InputNames;
+    }
+
+    protected (string[] InputNames, Tensor<long>[] Tensors) ResolveModelInputTensors(NamedTensorCollection inputs)
+    {
+        List<string> inputNames = [];
+        List<Tensor<long>> tensors = [];
+        foreach (string modelInputName in Session.InputNames)
+        {
+            if (!inputs.TryGetValue(modelInputName, out Tensor<long> inputTensor))
+            {
+                if (inputs.Count == 1 && inputNames.Count == 0)
+                {
+                    return (ResolveInputNamesOrThrow(1), [inputs[0].Value]);
+                }
+
+                throw new InvalidOperationException($"Model requires input '{modelInputName}', but it was not supplied.");
+            }
+
+            inputNames.Add(modelInputName);
+            tensors.Add(inputTensor);
+        }
+
+        return ([.. inputNames], [.. tensors]);
+    }
+
+    private string[] ResolveInputNamesOrThrow(int inputCount)
+    {
+        if (Session.InputNames.Count < inputCount)
+        {
+            throw new InvalidOperationException($"Model expects {Session.InputNames.Count} inputs, but {inputCount} were provided.");
+        }
+
+        return Session.InputNames.Take(inputCount).ToArray();
+    }
+
     private Memory<long>[] GetInputsAsMemory(Tensor<long>[] inputs)
     {
         Memory<long>[] modelInputs;
-        if (!_inputMemoryPool.TryTake(out modelInputs!))
+        if (!_inputMemoryPool.TryTake(out modelInputs!) || modelInputs.Length != inputs.Length)
         {
             modelInputs = new Memory<long>[inputs.Length];
         }
 
-        for (int i = 0; i < modelInputs.Length; i++)
+        for (int i = 0; i < inputs.Length; i++)
         {
             modelInputs[i] = inputs[i].AsMemory();
         }
@@ -160,7 +258,7 @@ public abstract class OnnxModelExecutorBase : IPipeline<Tensor<long>[], TensorOu
     private long[] GetInputDims(Tensor<long>[] inputs)
     {
         long[] dims;
-        if (!_dimensionsPool.TryTake(out dims!))
+        if (!_dimensionsPool.TryTake(out dims!) || dims.Length != inputs[0].Rank)
         {
             dims = new long[inputs[0].Rank];
         }

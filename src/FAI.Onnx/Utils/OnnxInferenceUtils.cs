@@ -19,6 +19,7 @@ internal static class OnnxInferenceUtils
     public static Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInferenceAsync(
         InferenceSession session,
         RunOptions options,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
         CancellationToken cancellationToken = default)
     {
@@ -43,7 +44,7 @@ internal static class OnnxInferenceUtils
                     return;
                 }
 
-                IDisposableReadOnlyCollection<OrtValue> x = session.Run(options, session.InputNames, ortValues, session.OutputNames);
+                IDisposableReadOnlyCollection<OrtValue> x = session.Run(options, inputNames, ortValues, session.OutputNames);
                 if (!tcs.TrySetResult(x))
                 {
                     x.Dispose();

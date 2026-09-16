@@ -41,13 +41,14 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
     /// as a disposable collection of <see cref="OrtValue"/>.
     /// </returns>
     protected override async Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
-        Tensor<long>[] inputs,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
+        int batchSize,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         long[] outputDimensions = new long[_outputDimensions.Length + 1];
-        outputDimensions[0] = inputs[0].Lengths[0];
+        outputDimensions[0] = batchSize;
         _outputDimensions.AsSpan().CopyTo(outputDimensions.AsSpan(1));
 
         OrtValue allocatedOutput =
@@ -57,7 +58,7 @@ public sealed class AsyncOnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelEx
         {
             IReadOnlyCollection<OrtValue> outputs = [allocatedOutput];
             IReadOnlyCollection<OrtValue> result =
-                await Session.RunAsync(RunOptions, Session.InputNames, ortValues, Session.OutputNames, outputs)
+                await Session.RunAsync(RunOptions, inputNames, ortValues, Session.OutputNames, outputs)
                     .WaitAsync(cancellationToken)
                     .ConfigureAwait(false);
 

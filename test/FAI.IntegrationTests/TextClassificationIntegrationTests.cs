@@ -10,15 +10,15 @@ public class TextClassificationIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(new ClassificationOptions<bool>([false, true]));
         services.AddSingleton(DummyTokenizerFactory.Create());
-        services.AddSingleton<IPipeline<Tensor<long>[], TensorOutputs<float>>>(
+        services.AddSingleton<IPipeline<NamedTensorCollection, TensorOutputs<float>>>(
             new LogicalMockModelPipeline([[0.1f, 0.9f]]));
         services.AddSingleton<ClassificationDecoding<bool>>();
         services
             .AddPipeline<ReadOnlyMemory<string>>()
             .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
-            .Then<Tensor<long>[], TextTensorization>()
+            .Then<NamedTensorCollection, TextTensorization>()
             .Then(sp =>
-                sp.GetRequiredService<IPipeline<Tensor<long>[], TensorOutputs<float>>>())
+                sp.GetRequiredService<IPipeline<NamedTensorCollection, TensorOutputs<float>>>())
             .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
             .Build();
 

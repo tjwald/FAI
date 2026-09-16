@@ -1,15 +1,15 @@
 namespace FAI.IntegrationTests;
 
 public sealed class LogicalMockModelPipeline(float[][] outputs) :
-    IPipeline<Tensor<long>[], TensorOutputs<float>>
+    IPipeline<NamedTensorCollection, TensorOutputs<float>>
 {
     private int _callCount;
 
     public ValueTask<TensorOutputs<float>> ExecuteAsync(
-        Tensor<long>[] input,
+        NamedTensorCollection input,
         CancellationToken cancellationToken = default)
     {
-        int batchSize = checked((int)input[0].Lengths[0]);
+        int batchSize = input.BatchSize;
         Tensor<float> logits = Tensor.CreateFromShape<float>([batchSize, outputs[0].Length]);
         for (int rowIndex = 0; rowIndex < batchSize; rowIndex++)
         {

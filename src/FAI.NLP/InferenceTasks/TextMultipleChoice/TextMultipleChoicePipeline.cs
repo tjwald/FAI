@@ -7,7 +7,7 @@ using FAI.NLP.Tokenization;
 
 namespace FAI.NLP.InferenceTasks.TextMultipleChoice;
 
-public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Tensor<long>[]>
+public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, NamedTensorCollection>
 {
     private readonly TextMultipleChoiceOptions _options;
 
@@ -16,7 +16,7 @@ public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<T
         _options = options;
     }
 
-    public ValueTask<Tensor<long>[]> ExecuteAsync(
+    public ValueTask<NamedTensorCollection> ExecuteAsync(
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> input,
         CancellationToken cancellationToken = default)
     {
@@ -29,7 +29,7 @@ public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<T
         return ValueTask.FromResult(Encode(input.Span));
     }
 
-    private Tensor<long>[] Encode(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)
+    private NamedTensorCollection Encode(ReadOnlySpan<TokenizedTextMultipleChoiceInput> input)
     {
         int maxChoiceCount = 0;
         int maxTokenCount = 0;
@@ -67,7 +67,9 @@ public sealed class TextMultipleChoiceTensorization : IPipeline<ReadOnlyMemory<T
         }
 
         nint[] shape = [input.Length, maxChoiceCount, maxTokenCount];
-        return new BatchTokenizedResult(tokens.Reshape(shape), mask.Reshape(shape)).ToArray();
+        return new NamedTensorCollection(
+            new KeyValuePair<string, Tensor<long>>(PretrainedTokenizer.InputIdsName, tokens.Reshape(shape)),
+            new KeyValuePair<string, Tensor<long>>(PretrainedTokenizer.AttentionMaskName, mask.Reshape(shape)));
     }
 }
 
@@ -169,11 +171,11 @@ public sealed class TextMultipleChoicePipeline :
     IDestinationPipeline<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, Memory<ChoiceResult<TokenizedText>>>
 {
     private readonly TextMultipleChoiceTensorization _tensorization;
-    private readonly IPipeline<Tensor<long>[], TensorOutputs<float>> _modelPipeline;
+    private readonly IPipeline<NamedTensorCollection, TensorOutputs<float>> _modelPipeline;
     private readonly TextMultipleChoiceDecoding _decoding;
 
     public TextMultipleChoicePipeline(
-        IPipeline<Tensor<long>[], TensorOutputs<float>> modelPipeline,
+        IPipeline<NamedTensorCollection, TensorOutputs<float>> modelPipeline,
         TextMultipleChoiceOptions options)
     {
         _tensorization = new TextMultipleChoiceTensorization(options);
@@ -206,7 +208,7 @@ public sealed class TextMultipleChoicePipeline :
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        Tensor<long>[] modelInput = await _tensorization.ExecuteAsync(input, cancellationToken);
+        NamedTensorCollection modelInput = await _tensorization.ExecuteAsync(input, cancellationToken);
         using TensorOutputs<float> modelOutput = await _modelPipeline.ExecuteAsync(modelInput, cancellationToken);
         await _decoding.ExecuteAsync((input, modelOutput), destination, cancellationToken);
     }

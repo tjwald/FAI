@@ -1,4 +1,3 @@
-using System.Numerics.Tensors;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
 using Microsoft.ML.OnnxRuntime;
@@ -28,11 +27,12 @@ public sealed class OnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecuto
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous inference operation, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
-        Tensor<long>[] inputs,
+        IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
+        int batchSize,
         CancellationToken cancellationToken = default)
     {
-        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, ortValues, cancellationToken);
+        return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, inputNames, ortValues, cancellationToken);
     }
 
     /// <summary>

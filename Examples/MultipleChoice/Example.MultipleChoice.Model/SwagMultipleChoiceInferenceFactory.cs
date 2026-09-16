@@ -1,4 +1,3 @@
-using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;
@@ -57,7 +56,7 @@ public static class SwagMultipleChoiceInferenceFactory
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
                 .Fork(inner => inner
-                    .Then<Tensor<long>[], TextMultipleChoiceTensorization>()
+                    .Then<NamedTensorCollection, TextMultipleChoiceTensorization>()
                     .ThenOnnxModel())
                 .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
                 .Build();

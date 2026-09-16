@@ -53,7 +53,7 @@ public class TextMultipleChoiceTaskTests
         ];
         ReadOnlyMemory<TokenizedTextMultipleChoiceInput> tokenizedInputs =
             await tokenizationPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
-        Tensor<long>[] modelInput = await tensorizationPipeline.ExecuteAsync(tokenizedInputs, TestContext.Current.CancellationToken);
+        NamedTensorCollection modelInput = await tensorizationPipeline.ExecuteAsync(tokenizedInputs, TestContext.Current.CancellationToken);
         using TensorOutputs<float> modelOutput = await modelPipeline.ExecuteAsync(modelInput, TestContext.Current.CancellationToken);
         ChoiceResult<TokenizedText>[] output = new ChoiceResult<TokenizedText>[2];
 
@@ -64,16 +64,17 @@ public class TextMultipleChoiceTaskTests
         Assert.Equal(2, modelPipeline.BatchSize);
     }
 
-    private sealed class StubMultipleChoiceModelPipeline : IPipeline<Tensor<long>[], TensorOutputs<float>>
+    private sealed class StubMultipleChoiceModelPipeline : IPipeline<NamedTensorCollection, TensorOutputs<float>>
     {
         public int BatchSize { get; private set; }
 
         public ValueTask<TensorOutputs<float>> ExecuteAsync(
-            Tensor<long>[] input,
+            NamedTensorCollection input,
             CancellationToken cancellationToken = default)
         {
-            BatchSize = checked((int)input[0].Lengths[0]);
-            int choices = checked((int)input[0].Lengths[1]);
+            input.TryGetValue(PretrainedTokenizer.InputIdsName, out Tensor<long> inputIds);
+            BatchSize = checked((int)inputIds.Lengths[0]);
+            int choices = checked((int)inputIds.Lengths[1]);
             Tensor<float> logits = Tensor.CreateFromShape<float>([BatchSize, choices]);
             logits[0, 0] = -1.0f;
             logits[0, 1] = 2.0f;

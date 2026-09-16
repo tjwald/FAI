@@ -4,7 +4,9 @@ using FAI.Core.Pipelines;
 
 namespace FAI.Onnx.ModelExecutors;
 
-public sealed class PooledOnnxModelPipeline : IPipeline<Tensor<long>[], TensorOutputs<float>>
+public sealed class PooledOnnxModelPipeline :
+    IPipeline<NamedTensorCollection, TensorOutputs<float>>,
+    IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     private readonly IObjectPool<OnnxModelExecutorBase> _pool;
 
@@ -12,6 +14,11 @@ public sealed class PooledOnnxModelPipeline : IPipeline<Tensor<long>[], TensorOu
     {
         _pool = pool;
     }
+
+    public ValueTask<TensorOutputs<float>> ExecuteAsync(
+        NamedTensorCollection input,
+        CancellationToken cancellationToken = default)
+        => _pool.Get().ExecuteAsync(input, cancellationToken);
 
     public ValueTask<TensorOutputs<float>> ExecuteAsync(
         Tensor<long>[] input,

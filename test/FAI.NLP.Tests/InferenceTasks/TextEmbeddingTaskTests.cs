@@ -144,11 +144,12 @@ public class TextEmbeddingTaskTests
 
         var result = tokenizer.BatchTokensToTensors(inputs, 2);
         Tensor<long>[] tensorArray = result.ToArray();
+        result.TryGetValue(PretrainedTokenizer.TokenTypeIdsName, out Tensor<long> tokenTypeIds);
+        result.TryGetValue(PretrainedTokenizer.InputIdsName, out Tensor<long> inputIds);
 
         Assert.Equal(3, tensorArray.Length);
-        Assert.NotNull(result.TokenTypeIds);
-        Assert.Equal(result.Tokens.Lengths, result.TokenTypeIds.Lengths);
-        Assert.All(result.TokenTypeIds.AsReadOnlyTensorSpan().AsSpan().ToArray(), val => Assert.Equal(0L, val));
+        Assert.Equal(inputIds.Lengths, tokenTypeIds.Lengths);
+        Assert.All(tokenTypeIds.AsReadOnlyTensorSpan().AsSpan().ToArray(), val => Assert.Equal(0L, val));
     }
 
     private sealed class StubEmbeddingPipeline : IDestinationPipeline<ReadOnlyMemory<string>, Tensor<float>>

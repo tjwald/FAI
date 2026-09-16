@@ -1,3 +1,4 @@
+using System.Numerics.Tensors;
 using FAI.NLP.Tests.Mocks;
 using FAI.NLP.Tokenization;
 
@@ -50,7 +51,9 @@ public class PretrainedTokenizerTests : IClassFixture<PretrainedTokenizerFixture
         // Assert
         Assert.Equal(2, result.BatchSize);
         Assert.True(result.MaxTokenCount >= 2);
-        Assert.Equal(result.Tokens.Lengths, result.Mask.Lengths);
+        result.TryGetValue(PretrainedTokenizer.InputIdsName, out Tensor<long> inputIds);
+        result.TryGetValue(PretrainedTokenizer.AttentionMaskName, out Tensor<long> attentionMask);
+        Assert.Equal(inputIds.Lengths, attentionMask.Lengths);
     }
 
     [Fact]
@@ -65,17 +68,19 @@ public class PretrainedTokenizerTests : IClassFixture<PretrainedTokenizerFixture
         // Assert
         Assert.Equal(2, result.BatchSize);
         Assert.Equal(2, result.MaxTokenCount);
+        result.TryGetValue(PretrainedTokenizer.InputIdsName, out Tensor<long> inputIds);
+        result.TryGetValue(PretrainedTokenizer.AttentionMaskName, out Tensor<long> attentionMask);
 
         // Row 0: [hello, PAD] -> [15, 0]
-        Assert.Equal(15, result.Tokens[0, 0]);
-        Assert.Equal(0, result.Tokens[0, 1]);
-        Assert.Equal(1, result.Mask[0, 0]);
-        Assert.Equal(0, result.Mask[0, 1]);
+        Assert.Equal(15, inputIds[0, 0]);
+        Assert.Equal(0, inputIds[0, 1]);
+        Assert.Equal(1, attentionMask[0, 0]);
+        Assert.Equal(0, attentionMask[0, 1]);
 
         // Row 1: [hello, world] -> [15, 16]
-        Assert.Equal(15, result.Tokens[1, 0]);
-        Assert.Equal(16, result.Tokens[1, 1]);
-        Assert.Equal(1, result.Mask[1, 0]);
-        Assert.Equal(1, result.Mask[1, 1]);
+        Assert.Equal(15, inputIds[1, 0]);
+        Assert.Equal(16, inputIds[1, 1]);
+        Assert.Equal(1, attentionMask[1, 0]);
+        Assert.Equal(1, attentionMask[1, 1]);
     }
 }

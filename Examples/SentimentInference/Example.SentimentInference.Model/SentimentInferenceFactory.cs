@@ -1,4 +1,3 @@
-using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.InferenceTasks;
@@ -57,7 +56,7 @@ public static class SentimentInferenceFactory
                 .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
-                .Then<Tensor<long>[], TextTensorization>()
+                .Then<NamedTensorCollection, TextTensorization>()
                 .ThenOnnxModel()
                 .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
                 .Build();

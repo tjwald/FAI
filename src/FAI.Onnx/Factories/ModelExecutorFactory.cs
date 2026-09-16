@@ -13,7 +13,7 @@ namespace FAI.Onnx.Factories;
 /// </summary>
 public static class ModelExecutorFactory
 {
-    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
+    public static IPipeline<NamedTensorCollection, TensorOutputs<float>> CreateModelPipeline(
         IModelExecutorOptions modelExecutorOptions)
         => CreateModelPipeline(ResolveModelExecutorType(modelExecutorOptions), modelExecutorOptions);
 
@@ -28,7 +28,30 @@ public static class ModelExecutorFactory
         };
     }
 
-    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateModelPipeline(
+    public static IPipeline<NamedTensorCollection, TensorOutputs<float>> CreateModelPipeline(
+        ModelExecutorType executorType,
+        IModelExecutorOptions modelExecutorOptions)
+    {
+        return modelExecutorOptions switch
+        {
+            MultiDeviceExecutorOptions multiDeviceOptions => new PooledOnnxModelPipeline(
+                new MultiDeviceObjectPool(multiDeviceOptions.ExecutorOptions
+                    .Select(options => CreateOnnxModelExecutor(executorType, options))
+                    .ToList())),
+            PooledExecutorOptions<OnnxModelExecutorOptions> pooledOptions => new PooledOnnxModelPipeline(
+                CreateOnnxModelExecutorPool(executorType, pooledOptions)),
+            OnnxModelExecutorOptions onnxOptions => CreateOnnxModelExecutor(executorType, onnxOptions),
+            _ => throw new NotImplementedException(modelExecutorOptions.GetType().Name),
+        };
+    }
+
+    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateLegacyTensorModelPipeline(
+        IModelExecutorOptions modelExecutorOptions)
+    {
+        return CreateLegacyTensorModelPipeline(ResolveModelExecutorType(modelExecutorOptions), modelExecutorOptions);
+    }
+
+    public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateLegacyTensorModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {

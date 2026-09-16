@@ -22,13 +22,13 @@ public class TextClassificationPipelinesTests
             new("hello", tokenizer.Tokenize("hello").ToArray()),
             new("world", tokenizer.Tokenize("world").ToArray()),
         ];
-        Tensor<long>[] encoded = await encodingPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        NamedTensorCollection encoded = await encodingPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         Tensor<float> logits = Tensor.Create([0.1f, 0.9f, 0.8f, 0.2f], [2, 2]);
         using var outputs = new TestTensorOutputs(logits);
         Memory<ClassificationResult<string, float>> results =
             await decodingPipeline.ExecuteAsync(outputs, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, encoded.Length);
+        Assert.Equal(2, encoded.Count);
         Assert.Equal(["Positive", "Negative"], results.ToArray().Select(result => result.Choice));
         Assert.All(results.ToArray(), result => Assert.True(result.Score > 0.5f));
     }
