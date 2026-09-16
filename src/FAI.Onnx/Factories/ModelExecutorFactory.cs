@@ -13,7 +13,7 @@ namespace FAI.Onnx.Factories;
 /// </summary>
 public static class ModelExecutorFactory
 {
-    public static IPipeline<BatchEncode, TensorOutputs<float>> CreateModelPipeline(
+    public static IPipeline<NamedTensorCollection, TensorOutputs<float>> CreateModelPipeline(
         IModelExecutorOptions modelExecutorOptions)
         => CreateModelPipeline(ResolveModelExecutorType(modelExecutorOptions), modelExecutorOptions);
 
@@ -28,7 +28,7 @@ public static class ModelExecutorFactory
         };
     }
 
-    public static IPipeline<BatchEncode, TensorOutputs<float>> CreateModelPipeline(
+    public static IPipeline<NamedTensorCollection, TensorOutputs<float>> CreateModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {
@@ -45,19 +45,27 @@ public static class ModelExecutorFactory
         };
     }
 
-    [Obsolete("Use CreateModelPipeline(IModelExecutorOptions) returning IPipeline<BatchEncode, TensorOutputs<float>>.")]
     public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateLegacyTensorModelPipeline(
         IModelExecutorOptions modelExecutorOptions)
     {
         return CreateLegacyTensorModelPipeline(ResolveModelExecutorType(modelExecutorOptions), modelExecutorOptions);
     }
 
-    [Obsolete("Use CreateModelPipeline(ModelExecutorType, IModelExecutorOptions) returning IPipeline<BatchEncode, TensorOutputs<float>>.")]
     public static IPipeline<Tensor<long>[], TensorOutputs<float>> CreateLegacyTensorModelPipeline(
         ModelExecutorType executorType,
         IModelExecutorOptions modelExecutorOptions)
     {
-        return new LegacyTensorArrayOnnxModelPipeline(CreateModelPipeline(executorType, modelExecutorOptions));
+        return modelExecutorOptions switch
+        {
+            MultiDeviceExecutorOptions multiDeviceOptions => new PooledOnnxModelPipeline(
+                new MultiDeviceObjectPool(multiDeviceOptions.ExecutorOptions
+                    .Select(options => CreateOnnxModelExecutor(executorType, options))
+                    .ToList())),
+            PooledExecutorOptions<OnnxModelExecutorOptions> pooledOptions => new PooledOnnxModelPipeline(
+                CreateOnnxModelExecutorPool(executorType, pooledOptions)),
+            OnnxModelExecutorOptions onnxOptions => CreateOnnxModelExecutor(executorType, onnxOptions),
+            _ => throw new NotImplementedException(modelExecutorOptions.GetType().Name),
+        };
     }
 
     private static IObjectPool<OnnxModelExecutorBase> CreateOnnxModelExecutorPool(
@@ -85,16 +93,5 @@ public static class ModelExecutorFactory
             ModelExecutorType.Tensor => OnnxModelTensorExecutor.FromPretrained(onnxModelExecutorOptions),
             _ => throw new NotImplementedException(nameof(executorType)),
         };
-    }
-
-    private sealed class LegacyTensorArrayOnnxModelPipeline(IPipeline<BatchEncode, TensorOutputs<float>> inner)
-        : IPipeline<Tensor<long>[], TensorOutputs<float>>
-    {
-        public ValueTask<TensorOutputs<float>> ExecuteAsync(
-            Tensor<long>[] input,
-            CancellationToken cancellationToken = default)
-        {
-            return inner.ExecuteAsync(BatchEncode.FromArray(input), cancellationToken);
-        }
     }
 }

@@ -22,7 +22,7 @@ public class TextClassificationPipelinesTests
             new("hello", tokenizer.Tokenize("hello").ToArray()),
             new("world", tokenizer.Tokenize("world").ToArray()),
         ];
-        BatchEncode encoded = await encodingPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
+        NamedTensorCollection encoded = await encodingPipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         Tensor<float> logits = Tensor.Create([0.1f, 0.9f, 0.8f, 0.2f], [2, 2]);
         using var outputs = new TestTensorOutputs(logits);
         Memory<ClassificationResult<string, float>> results =

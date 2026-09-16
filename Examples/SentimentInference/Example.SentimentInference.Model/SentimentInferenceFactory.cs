@@ -56,7 +56,7 @@ public static class SentimentInferenceFactory
                 .Then<ReadOnlyMemory<TokenizedText>, TextTokenization>()
                 .UseTokenCountOrdering()
                 .UseMaxPaddedTokensPartitioning()
-                .Then<BatchEncode, TextTensorization>()
+                .Then<NamedTensorCollection, TextTensorization>()
                 .ThenOnnxModel()
                 .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
                 .Build();

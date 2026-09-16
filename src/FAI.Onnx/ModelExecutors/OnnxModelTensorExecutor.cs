@@ -53,23 +53,11 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
-    protected override (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(BatchEncode inputs)
+    protected override (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(NamedTensorCollection inputs)
     {
-        string[] inputNames = ResolveInputNamesForBatchEncode(inputs);
-        Tensor<long>[] tensorInputs = new Tensor<long>[inputNames.Length];
-        for (int i = 0; i < inputNames.Length; i++)
-        {
-            tensorInputs[i] = inputNames[i] switch
-            {
-                BatchEncode.InputIdsName => inputs.InputIds,
-                BatchEncode.AttentionMaskName => inputs.AttentionMask!,
-                BatchEncode.TokenTypeIdsName => inputs.TokenTypeIds!,
-                _ => inputs.InputIds,
-            };
-        }
-
+        (string[] inputNames, Tensor<long>[] tensorInputs) = ResolveModelInputTensors(inputs);
         var ortValues = new OrtValue[tensorInputs.Length];
-        for (int i = 0; i < ortValues.Length; i++)
+        for (int i = 0; i < inputNames.Length; i++)
         {
             ortValues[i] = OrtValue.CreateTensorValueFromSystemNumericsTensorObject(tensorInputs[i]);
         }

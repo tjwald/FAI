@@ -1,9 +1,12 @@
+using System.Numerics.Tensors;
 using FAI.Core.ModelExecutors;
 using FAI.Core.Pipelines;
 
 namespace FAI.Onnx.ModelExecutors;
 
-public sealed class PooledOnnxModelPipeline : IPipeline<BatchEncode, TensorOutputs<float>>
+public sealed class PooledOnnxModelPipeline :
+    IPipeline<NamedTensorCollection, TensorOutputs<float>>,
+    IPipeline<Tensor<long>[], TensorOutputs<float>>
 {
     private readonly IObjectPool<OnnxModelExecutorBase> _pool;
 
@@ -13,7 +16,12 @@ public sealed class PooledOnnxModelPipeline : IPipeline<BatchEncode, TensorOutpu
     }
 
     public ValueTask<TensorOutputs<float>> ExecuteAsync(
-        BatchEncode input,
+        NamedTensorCollection input,
+        CancellationToken cancellationToken = default)
+        => _pool.Get().ExecuteAsync(input, cancellationToken);
+
+    public ValueTask<TensorOutputs<float>> ExecuteAsync(
+        Tensor<long>[] input,
         CancellationToken cancellationToken = default)
         => _pool.Get().ExecuteAsync(input, cancellationToken);
 }

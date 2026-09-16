@@ -11,28 +11,23 @@ namespace FAI.Onnx;
 public static class OnnxPipelineBuilderExtensions
 {
     public static PipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
-        this PipelineBuilder<TStart, BatchEncode> builder)
+        this PipelineBuilder<TStart, NamedTensorCollection> builder)
         => builder.Then(ResolveOnnxModelPipeline);
 
     public static PipelineBuilder<TStart, TensorOutputs<float>> ThenOnnxModel<TStart>(
         this PipelineBuilder<TStart, Tensor<long>[]> builder)
         => builder.Then(ResolveLegacyOnnxModelPipeline);
 
-    private static IPipeline<BatchEncode, TensorOutputs<float>> ResolveOnnxModelPipeline(IServiceProvider serviceProvider)
+    private static IPipeline<NamedTensorCollection, TensorOutputs<float>> ResolveOnnxModelPipeline(IServiceProvider serviceProvider)
     {
-        IPipeline<BatchEncode, TensorOutputs<float>>? existing =
-            serviceProvider.GetService<IPipeline<BatchEncode, TensorOutputs<float>>>();
+        IPipeline<NamedTensorCollection, TensorOutputs<float>>? existing =
+            serviceProvider.GetService<IPipeline<NamedTensorCollection, TensorOutputs<float>>>();
         if (existing is not null)
         {
             return existing;
         }
 
-        IModelExecutorOptions executorOptions =
-            serviceProvider.GetService<OnnxModelExecutorOptions>()
-            ?? serviceProvider.GetService<PooledExecutorOptions<OnnxModelExecutorOptions>>()
-            ?? serviceProvider.GetService<MultiDeviceExecutorOptions>()
-            ?? serviceProvider.GetRequiredService<IModelExecutorOptions>();
-
+        IModelExecutorOptions executorOptions = ResolveExecutorOptions(serviceProvider);
         return ModelExecutorFactory.CreateModelPipeline(executorOptions);
     }
 
@@ -45,17 +40,15 @@ public static class OnnxPipelineBuilderExtensions
             return existing;
         }
 
-        return new LegacyTensorArrayOnnxModelPipeline(ResolveOnnxModelPipeline(serviceProvider));
+        IModelExecutorOptions executorOptions = ResolveExecutorOptions(serviceProvider);
+        return ModelExecutorFactory.CreateLegacyTensorModelPipeline(executorOptions);
     }
 
-    private sealed class LegacyTensorArrayOnnxModelPipeline(IPipeline<BatchEncode, TensorOutputs<float>> inner)
-        : IPipeline<Tensor<long>[], TensorOutputs<float>>
+    private static IModelExecutorOptions ResolveExecutorOptions(IServiceProvider serviceProvider)
     {
-        public ValueTask<TensorOutputs<float>> ExecuteAsync(
-            Tensor<long>[] input,
-            CancellationToken cancellationToken = default)
-        {
-            return inner.ExecuteAsync(BatchEncode.FromArray(input), cancellationToken);
-        }
+        return serviceProvider.GetService<OnnxModelExecutorOptions>()
+               ?? serviceProvider.GetService<PooledExecutorOptions<OnnxModelExecutorOptions>>()
+               ?? serviceProvider.GetService<MultiDeviceExecutorOptions>()
+               ?? serviceProvider.GetRequiredService<IModelExecutorOptions>();
     }
 }

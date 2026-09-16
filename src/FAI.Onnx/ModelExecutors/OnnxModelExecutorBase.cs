@@ -30,7 +30,7 @@ public interface IOnnxModelExecutor<out T> where T : IOnnxModelExecutor<T>
 /// </summary>
 public abstract class OnnxModelExecutorBase :
     IPipeline<Tensor<long>[], TensorOutputs<float>>,
-    IPipeline<BatchEncode, TensorOutputs<float>>
+    IPipeline<NamedTensorCollection, TensorOutputs<float>>
 {
     /// <summary>
     /// The ONNX runtime inference session used by this executor.
@@ -81,12 +81,12 @@ public abstract class OnnxModelExecutorBase :
     /// <param name="cancellationToken">The cancellation token to observe.</param>
     /// <returns>A task representing the asynchronous execution, containing the result as a disposable collection of <see cref="OrtValue"/>.</returns>
     private async Task<IDisposableReadOnlyCollection<OrtValue>> ExecuteModelAsync(
-        BatchEncode inputs,
+        NamedTensorCollection inputs,
         CancellationToken cancellationToken)
     {
         return await ExecuteModelAsyncCore(
             () => GetModelInputs(inputs),
-            checked((int)inputs.InputIds.Lengths[0]),
+            checked((int)inputs[0].Value.Lengths[0]),
             cancellationToken);
     }
 
@@ -125,13 +125,13 @@ public abstract class OnnxModelExecutorBase :
     }
 
     public async ValueTask<TensorOutputs<float>> ExecuteAsync(
-        BatchEncode input,
+        NamedTensorCollection input,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (input.InputIds is null)
+        if (input.Count == 0)
         {
-            throw new ArgumentException("BatchEncode requires an input_ids tensor.", nameof(input));
+            throw new ArgumentException("At least one named tensor input is required.", nameof(input));
         }
 
         IDisposableReadOnlyCollection<OrtValue> result = await ExecuteModelAsync(input, cancellationToken);
@@ -182,7 +182,7 @@ public abstract class OnnxModelExecutorBase :
     /// </summary>
     /// <param name="inputs">The input tensors for the model.</param>
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
-    protected virtual (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(BatchEncode inputs)
+    protected virtual (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(NamedTensorCollection inputs)
     {
         (string[] inputNames, Tensor<long>[] tensorInputs) = ResolveModelInputTensors(inputs);
         OrtValue[] ortValues = GetModelInputs(tensorInputs);
@@ -201,50 +201,32 @@ public abstract class OnnxModelExecutorBase :
         return ortValues;
     }
 
-    protected string[] ResolveInputNamesForBatchEncode(BatchEncode inputs)
+    protected string[] ResolveInputNamesForNamedInputs(NamedTensorCollection inputs)
     {
         return ResolveModelInputTensors(inputs).InputNames;
     }
 
-    private (string[] InputNames, Tensor<long>[] Tensors) ResolveModelInputTensors(BatchEncode inputs)
+    protected (string[] InputNames, Tensor<long>[] Tensors) ResolveModelInputTensors(NamedTensorCollection inputs)
     {
         List<string> inputNames = [];
         List<Tensor<long>> tensors = [];
         foreach (string modelInputName in Session.InputNames)
         {
-            switch (modelInputName)
+            if (!inputs.TryGetValue(modelInputName, out Tensor<long> inputTensor))
             {
-                case BatchEncode.InputIdsName:
-                    inputNames.Add(modelInputName);
-                    tensors.Add(inputs.InputIds);
-                    break;
-                case BatchEncode.AttentionMaskName when inputs.AttentionMask is not null:
-                    inputNames.Add(modelInputName);
-                    tensors.Add(inputs.AttentionMask);
-                    break;
-                case BatchEncode.AttentionMaskName:
-                    throw new InvalidOperationException("Model requires attention_mask, but BatchEncode did not include it.");
-                case BatchEncode.TokenTypeIdsName when inputs.TokenTypeIds is not null:
-                    inputNames.Add(modelInputName);
-                    tensors.Add(inputs.TokenTypeIds);
-                    break;
-                case BatchEncode.TokenTypeIdsName:
-                    throw new InvalidOperationException("Model requires token_type_ids, but BatchEncode did not include it.");
+                if (inputs.Count == 1 && inputNames.Count == 0)
+                {
+                    return (ResolveInputNamesOrThrow(1), [inputs[0].Value]);
+                }
+
+                throw new InvalidOperationException($"Model requires input '{modelInputName}', but it was not supplied.");
             }
+
+            inputNames.Add(modelInputName);
+            tensors.Add(inputTensor);
         }
 
-        if (inputNames.Count > 0)
-        {
-            return ([.. inputNames], [.. tensors]);
-        }
-
-        if (inputs.Count == 1)
-        {
-            return (ResolveInputNamesOrThrow(1), [inputs.InputIds]);
-        }
-
-        throw new InvalidOperationException(
-            $"Model does not expose Hugging Face input names ({BatchEncode.InputIdsName}, {BatchEncode.AttentionMaskName}, {BatchEncode.TokenTypeIdsName}) required for multi-tensor BatchEncode.");
+        return ([.. inputNames], [.. tensors]);
     }
 
     private string[] ResolveInputNamesOrThrow(int inputCount)

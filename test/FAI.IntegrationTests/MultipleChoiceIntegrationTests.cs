@@ -11,7 +11,7 @@ public class MultipleChoiceIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton(DummyTokenizerFactory.Create());
         services.AddSingleton(new TextMultipleChoiceOptions(MaxChoices: 2));
-        services.AddSingleton<IPipeline<BatchEncode, TensorOutputs<float>>>(
+        services.AddSingleton<IPipeline<NamedTensorCollection, TensorOutputs<float>>>(
             new LogicalMockModelPipeline([[0.9f, 0.1f]]));
         services.AddSingleton<TextMultipleChoiceTensorization>();
         services.AddSingleton<TextMultipleChoiceDecoding>();
@@ -19,7 +19,7 @@ public class MultipleChoiceIntegrationTests
             .AddPipeline<ReadOnlyMemory<TextMultipleChoiceInput>>()
             .Then<ReadOnlyMemory<TokenizedTextMultipleChoiceInput>, TextMultipleChoiceTokenization>()
             .Fork(inner => inner
-                .Then<BatchEncode, TextMultipleChoiceTensorization>()
+                .Then<NamedTensorCollection, TextMultipleChoiceTensorization>()
                 .ThenOnnxModel())
             .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
             .Build();
