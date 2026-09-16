@@ -1,4 +1,3 @@
-using System.Numerics.Tensors;
 using FAI.Core.Abstractions;
 using FAI.Core.Configurations;
 using FAI.Core.Configurations.ModelExecutors;

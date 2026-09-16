@@ -29,6 +29,7 @@ public sealed class OnnxModelExecutor : OnnxModelExecutorBase, IOnnxModelExecuto
     protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
         IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
+        int batchSize,
         CancellationToken cancellationToken = default)
     {
         return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, inputNames, ortValues, cancellationToken);

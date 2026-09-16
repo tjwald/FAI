@@ -1,4 +1,3 @@
-using System.Numerics.Tensors;
 using FAI.Core.ModelExecutors;
 using FAI.Core.Pipelines;
 

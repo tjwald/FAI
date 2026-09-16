@@ -92,6 +92,24 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
         await AssertFinitePipelineOutput(pipeline);
     }
 
+    [Fact]
+    public async Task CreateModelPipeline_WithMultiTensorBatchEncode_ThrowsWhenModelLacksHfNamedInputs()
+    {
+        var options = new OnnxModelExecutorOptions().ConfigureOnnxOptions(opt =>
+        {
+            opt.ModelDir = Path.GetDirectoryName(_modelPath)!;
+            opt.ModelFileName = Path.GetFileName(_modelPath);
+        });
+
+        IPipeline<BatchEncode, TensorOutputs<float>> pipeline =
+            ModelExecutorFactory.CreateModelPipeline(ModelExecutorType.Simple, options);
+        BatchEncode input = new(
+            Tensor.Create([11L, 22L, 33L], [1, 3]),
+            Tensor.Create([1L, 1L, 1L], [1, 3]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken).AsTask());
+    }
+
     private OnnxModelExecutorOptions CreateOnnxOptions()
     {
         var options = new OnnxModelExecutorOptions();
@@ -111,9 +129,7 @@ public class ModelExecutorFactoryTests(OnnxModelFixture fixture) : IClassFixture
     private static async Task AssertFinitePipelineOutput(
         IPipeline<BatchEncode, TensorOutputs<float>> pipeline)
     {
-        BatchEncode input = new(
-            Tensor.Create([11L, 22L, 33L], [1, 3]),
-            Tensor.Create([1L, 1L, 1L], [1, 3]));
+        BatchEncode input = new(Tensor.Create([11L, 22L, 33L], [1, 3]));
         using TensorOutputs<float> output = await pipeline.ExecuteAsync(input, TestContext.Current.CancellationToken);
         Assert.Equal([11.0f, 22.0f, 33.0f], output.GetOutput(0).AsSpan().ToArray());
     }

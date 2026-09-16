@@ -1,4 +1,5 @@
 using System.Numerics.Tensors;
+using FAI.Core.Pipelines;
 using FAI.Onnx.Configuration;
 using FAI.Onnx.Utils;
 using Microsoft.ML.OnnxRuntime;
@@ -54,16 +55,25 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     /// <returns>An array of prepared <see cref="OrtValue"/> tensors.</returns>
     protected override (string[] InputNames, OrtValue[] OrtValues) GetModelInputs(BatchEncode inputs)
     {
-        Tensor<long>[] tensorInputs = inputs.ToArray();
+        string[] inputNames = ResolveInputNamesForBatchEncode(inputs);
+        Tensor<long>[] tensorInputs = new Tensor<long>[inputNames.Length];
+        for (int i = 0; i < inputNames.Length; i++)
+        {
+            tensorInputs[i] = inputNames[i] switch
+            {
+                BatchEncode.InputIdsName => inputs.InputIds,
+                BatchEncode.AttentionMaskName => inputs.AttentionMask!,
+                BatchEncode.TokenTypeIdsName => inputs.TokenTypeIds!,
+                _ => inputs.InputIds,
+            };
+        }
+
         var ortValues = new OrtValue[tensorInputs.Length];
         for (int i = 0; i < ortValues.Length; i++)
         {
             ortValues[i] = OrtValue.CreateTensorValueFromSystemNumericsTensorObject(tensorInputs[i]);
         }
 
-        string[] inputNames = inputs.TokenTypeIds is null
-            ? [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName]
-            : [BatchEncode.InputIdsName, BatchEncode.AttentionMaskName, BatchEncode.TokenTypeIdsName];
         return (inputNames, ortValues);
     }
 
@@ -80,6 +90,7 @@ public sealed class OnnxModelTensorExecutor : OnnxModelExecutorBase, IOnnxModelE
     protected override Task<IDisposableReadOnlyCollection<OrtValue>> RunSessionInference(
         IReadOnlyList<string> inputNames,
         OrtValue[] ortValues,
+        int batchSize,
         CancellationToken cancellationToken = default)
     {
         return OnnxInferenceUtils.RunSessionInferenceAsync(Session, RunOptions, inputNames, ortValues, cancellationToken);

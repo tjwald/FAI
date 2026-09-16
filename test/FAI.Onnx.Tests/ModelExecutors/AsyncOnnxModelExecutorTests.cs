@@ -32,7 +32,7 @@ public class AsyncOnnxModelExecutorTests(OnnxModelFixture fixture) : IClassFixtu
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithNamedBatchEncodeInput_ReturnsLiveTensorOutputs()
+    public async Task ExecuteAsync_WithBatchEncodeInput_ReturnsLiveTensorOutputs()
     {
         var options = new OnnxModelExecutorOptions().ConfigureOnnxOptions(opt =>
         {
@@ -41,9 +41,7 @@ public class AsyncOnnxModelExecutorTests(OnnxModelFixture fixture) : IClassFixtu
         });
 
         IPipeline<BatchEncode, TensorOutputs<float>> pipeline = AsyncOnnxModelExecutor.FromPretrained(options);
-        BatchEncode inputs = new(
-            Tensor.Create([10L, 20L, 30L], [1, 3]),
-            Tensor.Create([1L, 1L, 1L], [1, 3]));
+        BatchEncode inputs = new(Tensor.Create([10L, 20L, 30L], [1, 3]));
 
         using TensorOutputs<float> output = await pipeline.ExecuteAsync(inputs, TestContext.Current.CancellationToken);
         ReadOnlyTensorSpan<float> tensor = output.GetOutput(0);
