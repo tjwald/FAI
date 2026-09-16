@@ -1,34 +1,42 @@
 // ReSharper disable once CheckNamespace
 namespace FAI.Core.Abstractions
 {
-
     /// <summary>
     /// Defines application-level inference operations.
     /// </summary>
     /// <typeparam name="TInput">The input type.</typeparam>
     /// <typeparam name="TOutput">The output type.</typeparam>
-    public interface IInference<TInput, TOutput>
+    public interface IInference<in TInput, TOutput>
     {
         /// <summary>
-        /// Predicts one output for one input.
+        /// Predicts output for the given input.
         /// </summary>
         Task<TOutput> Predict(TInput input);
 
         /// <summary>
-        /// Predicts outputs for a batch of inputs.
+        /// Predicts output into a caller-provided destination.
         /// </summary>
-        Task<TOutput[]> BatchPredict(ReadOnlyMemory<TInput> input);
+        Task Predict(TInput input, TOutput destination)
+            => throw new NotSupportedException($"{GetType().Name} does not support destination-based prediction.");
+    }
 
+    /// <summary>
+    /// Provides extension methods for inference operations.
+    /// </summary>
+    public static class InferenceExtensions
+    {
         /// <summary>
-        /// Predicts outputs into a caller-provided buffer.
+        /// Predicts output for a single input by wrapping it in a batch.
         /// </summary>
-        Task BatchPredict(ReadOnlyMemory<TInput> input, Memory<TOutput> output);
+        public static Task<TOutput> Predict<TInput, TOutput>(
+            this IInference<ReadOnlyMemory<TInput>, TOutput> inference,
+            TInput single)
+            => inference.Predict((TInput[])[single]);
     }
 }
 
 namespace FAI.Core.Pipelines
 {
-
     public interface IPipeline<in TInput, TOutput>
     {
         ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default);

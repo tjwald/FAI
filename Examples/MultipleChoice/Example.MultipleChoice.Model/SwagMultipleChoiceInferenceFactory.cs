@@ -62,8 +62,11 @@ public static class SwagMultipleChoiceInferenceFactory
                 .Then<Memory<ChoiceResult<TokenizedText>>, TextMultipleChoiceDecoding>()
                 .Build();
 
-            localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>, SwagMultipleChoiceInference>();
+            localServices.AddSingleton<SwagMultipleChoiceInference>();
+            localServices.AddSingleton<IInference<SwagInput, ChoiceResult<TokenizedText>>>(sp => sp.GetRequiredService<SwagMultipleChoiceInference>());
+            localServices.AddSingleton<IInference<ReadOnlyMemory<SwagInput>, ChoiceResult<TokenizedText>[]>>(sp => sp.GetRequiredService<SwagMultipleChoiceInference>());
             localServices.CopyToGlobal<IInference<SwagInput, ChoiceResult<TokenizedText>>>();
+            localServices.CopyToGlobal<IInference<ReadOnlyMemory<SwagInput>, ChoiceResult<TokenizedText>[]>>();
         });
     }
 }

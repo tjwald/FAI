@@ -8,13 +8,14 @@ using Microsoft.ML.Tokenizers;
 namespace FAI.NLP.Tokenization;
 
 /// <summary>
-/// Represents a batch tokenized result containing token and mask tensors.
+/// Represents a batch tokenized result containing token and mask tensors, and optional token type IDs.
 /// </summary>
 /// <param name="Tokens">The tensor representing tokenized input sequences.</param>
 /// <param name="Mask">
 /// The tensor representing the attention mask, indicating which tokens should be processed.
 /// </param>
-public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask) : IEnumerable<Tensor<long>>
+/// <param name="TokenTypeIds">The optional tensor representing token type IDs (segment IDs).</param>
+public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<long> Mask, Tensor<long>? TokenTypeIds = null) : IEnumerable<Tensor<long>>
 {
     /// <summary>
     /// Gets the batch size, determined by the first dimension of the token tensor.
@@ -30,6 +31,10 @@ public readonly record struct BatchTokenizedResult(Tensor<long> Tokens, Tensor<l
     {
         yield return Tokens;
         yield return Mask;
+        if (TokenTypeIds is not null)
+        {
+            yield return TokenTypeIds;
+        }
     }
 
     IEnumerator IEnumerable.GetEnumerator()
@@ -138,7 +143,7 @@ public sealed class PretrainedTokenizer
     private static BatchTokenizedResult BatchTokensToTensors(ReadOnlySpan<List<int>> inputs, PretrainedTokenizerOptions tokenizerOptions, int maxTokenSize)
     {
         int batchSize = inputs.Length;
-        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize);
+        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize, tokenizerOptions.IncludeTokenTypeIds);
 
         TensorDimensionSpan<long> tokenizationSpan = result.Tokens.GetDimensionSpan(0);
         TensorDimensionSpan<long> maskSpan = result.Mask.GetDimensionSpan(0);
@@ -162,7 +167,7 @@ public sealed class PretrainedTokenizer
         int batchSize = inputs.Count;
         int maxTokenSize = inputs.MaxTokenSize;
 
-        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize);
+        var result = CreateTokenAndMaskTensorsFromShape(batchSize, maxTokenSize, tokenizerOptions.IncludeTokenTypeIds);
 
         TensorDimensionSpan<long> tokenizationSpan = result.Tokens.GetDimensionSpan(0);
         TensorDimensionSpan<long> maskSpan = result.Mask.GetDimensionSpan(0);
@@ -174,13 +179,16 @@ public sealed class PretrainedTokenizer
         return result;
     }
 
-    private static BatchTokenizedResult CreateTokenAndMaskTensorsFromShape(int batchSize, int maxTokenSize)
+    private static BatchTokenizedResult CreateTokenAndMaskTensorsFromShape(int batchSize, int maxTokenSize, bool includeTokenTypeIds = false)
     {
         Span<nint> tensorShape = [batchSize, maxTokenSize];
 
         Tensor<long> tokenization = Tensor.CreateFromShape<long>(tensorShape); // would like to pool underlying array and use TensorMemory<T>
         Tensor<long> mask = Tensor.CreateFromShape<long>(tensorShape, tokenization.Strides);
-        return new BatchTokenizedResult(tokenization, mask);
+        Tensor<long>? tokenTypeIds = includeTokenTypeIds
+            ? Tensor.CreateFromShape<long>(tensorShape, tokenization.Strides)
+            : null;
+        return new BatchTokenizedResult(tokenization, mask, tokenTypeIds);
     }
 
     private static void TokenizeRow(PretrainedTokenizerOptions tokenizerOptions, ReadOnlySpan<int> rowTokens, TensorDimensionSpan<long> tokenizationSpan,

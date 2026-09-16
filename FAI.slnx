@@ -11,6 +11,10 @@
     <Project Path="Examples/SentimentInference/Example.SentimentInference.Console/Example.SentimentInference.Console.csproj" />
     <Project Path="Examples/SentimentInference/Example.SentimentInference.Model/Example.SentimentInference.Model.csproj" />
   </Folder>
+  <Folder Name="/Examples/TextEmbedding/">
+    <Project Path="Examples/TextEmbedding/Example.TextEmbedding.Console/Example.TextEmbedding.Console.csproj" />
+    <Project Path="Examples/TextEmbedding/Example.TextEmbedding.Model/Example.TextEmbedding.Model.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/FAI.Core.Extensions.DI/FAI.Core.Extensions.DI.csproj" />
     <Project Path="src/FAI.Core/FAI.Core.csproj" />

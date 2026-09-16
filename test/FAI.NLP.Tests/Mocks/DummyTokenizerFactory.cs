@@ -7,7 +7,24 @@ namespace FAI.NLP.Tests.Mocks;
 
 public static class DummyTokenizerFactory
 {
+    public static PretrainedTokenizer Create(PretrainedTokenizerOptions options)
+    {
+        return Create(options, 128);
+    }
+
     public static PretrainedTokenizer Create(int maxTokenLength = 128)
+    {
+        var options = new PretrainedTokenizerOptions
+        {
+            MaxTokenLength = maxTokenLength,
+            PaddingToken = 0,
+            TruncationOption = TruncationOption.Longest
+        };
+
+        return Create(options, maxTokenLength);
+    }
+
+    private static PretrainedTokenizer Create(PretrainedTokenizerOptions options, int maxTokenLength)
     {
         // Define a minimal vocabulary for BERT tokenizer
         var vocab = new StringBuilder();
@@ -31,13 +48,6 @@ public static class DummyTokenizerFactory
 
         using var ms = new MemoryStream(Encoding.UTF8.GetBytes(vocab.ToString()));
         var bertTokenizer = BertTokenizer.Create(ms);
-
-        var options = new PretrainedTokenizerOptions
-        {
-            MaxTokenLength = maxTokenLength,
-            PaddingToken = 0,
-            TruncationOption = TruncationOption.Longest
-        };
 
         return new PretrainedTokenizer(bertTokenizer, options);
     }

@@ -62,9 +62,12 @@ public static class SentimentInferenceFactory
                 .Then<Memory<ClassificationResult<bool, float>>, ClassificationDecoding<bool>>()
                 .Build();
 
-            localServices.AddSingleton<IInference<string, bool>, SentimentInference>();
+            localServices.AddSingleton<SentimentInference>();
+            localServices.AddSingleton<IInference<string, bool>>(sp => sp.GetRequiredService<SentimentInference>());
+            localServices.AddSingleton<IInference<ReadOnlyMemory<string>, bool[]>>(sp => sp.GetRequiredService<SentimentInference>());
 
             localServices.CopyToGlobal<IInference<string, bool>>();
+            localServices.CopyToGlobal<IInference<ReadOnlyMemory<string>, bool[]>>();
         });
     }
 }
